@@ -1,0 +1,33 @@
+import { useState } from "react";
+import DashboardLayout from "@/components/dashboard/DashboardLayout";
+import UploadSection from "@/components/dashboard/UploadSection";
+import VideosTable from "@/components/dashboard/VideosTable";
+import CodesSection from "@/components/dashboard/CodesSection";
+import CommentsSection from "@/components/dashboard/CommentsSection";
+
+const Dashboard = () => {
+  const [activeSection, setActiveSection] = useState<string>("upload");
+
+  const renderSection = () => {
+    switch (activeSection) {
+      case "upload":
+        return <UploadSection />;
+      case "videos":
+        return <VideosTable />;
+      case "codes":
+        return <CodesSection />;
+      case "comments":
+        return <CommentsSection />;
+      default:
+        return <UploadSection />;
+    }
+  };
+
+  return (
+    <DashboardLayout activeSection={activeSection} onSectionChange={setActiveSection}>
+      {renderSection()}
+    </DashboardLayout>
+  );
+};
+
+export default Dashboard;
