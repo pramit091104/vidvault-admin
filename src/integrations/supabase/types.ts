@@ -14,16 +14,185 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      comments: {
+        Row: {
+          client_name: string
+          created_at: string
+          id: string
+          message: string
+          security_code_id: string | null
+          timestamp_seconds: number
+          video_id: string
+        }
+        Insert: {
+          client_name: string
+          created_at?: string
+          id?: string
+          message: string
+          security_code_id?: string | null
+          timestamp_seconds: number
+          video_id: string
+        }
+        Update: {
+          client_name?: string
+          created_at?: string
+          id?: string
+          message?: string
+          security_code_id?: string | null
+          timestamp_seconds?: number
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comments_security_code_id_fkey"
+            columns: ["security_code_id"]
+            isOneToOne: false
+            referencedRelation: "security_codes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comments_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string
+          full_name: string | null
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          full_name?: string | null
+          id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          full_name?: string | null
+          id?: string
+        }
+        Relationships: []
+      }
+      security_codes: {
+        Row: {
+          client_name: string
+          code: string
+          created_at: string
+          created_by: string | null
+          expire_at: string
+          id: string
+          status: string
+          updated_at: string
+          video_id: string
+        }
+        Insert: {
+          client_name: string
+          code: string
+          created_at?: string
+          created_by?: string | null
+          expire_at: string
+          id?: string
+          status?: string
+          updated_at?: string
+          video_id: string
+        }
+        Update: {
+          client_name?: string
+          code?: string
+          created_at?: string
+          created_by?: string | null
+          expire_at?: string
+          id?: string
+          status?: string
+          updated_at?: string
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "security_codes_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "videos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      videos: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          status: string
+          title: string
+          updated_at: string
+          upload_date: string
+          vimeo_id: string | null
+          vimeo_url: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          title: string
+          updated_at?: string
+          upload_date?: string
+          vimeo_id?: string | null
+          vimeo_url: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          upload_date?: string
+          vimeo_id?: string | null
+          vimeo_url?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "client"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +319,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "client"],
+    },
   },
 } as const
