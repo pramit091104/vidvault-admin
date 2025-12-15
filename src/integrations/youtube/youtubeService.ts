@@ -710,7 +710,6 @@ export class YouTubeService {
       const accessToken = await this.getAccessToken();
       const apiUrl = `https://www.googleapis.com/youtube/v3/commentThreads?part=snippet,replies&videoId=${videoId}&maxResults=${maxResults}&order=relevance&access_token=${accessToken}`;
       
-      console.log('Fetching comments from:', apiUrl);
       const response = await fetch(apiUrl);
 
       if (!response.ok) {
