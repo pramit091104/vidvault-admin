@@ -1,73 +1,179 @@
-# Welcome to your Lovable project
+# VidVault Admin Dashboard
 
-## Project info
+A modern, accessible, and performant admin dashboard for managing video content with YouTube integration. Built with React, TypeScript, and shadcn/ui components.
 
-**URL**: https://lovable.dev/projects/f4122c4c-d19a-405f-814d-9c29f4c03f86
+## ✨ Features
 
-## How can I edit this code?
+- **Video Management**
+  - Upload videos to YouTube
+  - Track video status and analytics
+  - Manage video metadata and settings
 
-There are several ways of editing your application.
+- **User Authentication**
+  - Secure login with Firebase Authentication
+  - Role-based access control
+  - Session management
 
-**Use Lovable**
+- **Responsive Design**
+  - Fully responsive layout
+  - Mobile-friendly interface
+  - Dark/light mode support
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f4122c4c-d19a-405f-814d-9c29f4c03f86) and start prompting.
+- **Accessibility**
+  - WCAG 2.1 AA compliant
+  - Keyboard navigation
+  - Screen reader support
+  - Focus management
 
-Changes made via Lovable will be committed automatically to this repo.
+## 🚀 Tech Stack
 
-**Use your preferred IDE**
+- **Frontend**
+  - React 18 with TypeScript
+  - Vite (Build Tool)
+  - React Router (Routing)
+  - React Hook Form (Form Management)
+  - TanStack Query (Data Fetching)
+  - Sonner (Toasts)
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- **UI Components**
+  - shadcn/ui (Radix UI + Tailwind CSS)
+  - Tailwind CSS (Styling)
+  - Lucide Icons
+  - Recharts (Data Visualization)
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+- **Backend**
+  - Express.js
+  - Firebase Admin SDK
+  - YouTube Data API v3
 
-Follow these steps:
+- **Development**
+  - ESLint + Prettier (Code Quality)
+  - TypeScript (Type Checking)
+  - Vite (Development Server)
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## 📦 Prerequisites
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+- Node.js 18+ and npm 9+
+- Firebase project with Authentication enabled
+- YouTube Data API v3 credentials
+- Google OAuth 2.0 client ID
 
-# Step 3: Install the necessary dependencies.
-npm i
+## 🛠️ Setup & Installation
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/your-username/vidvault-admin.git
+   cd vidvault-admin
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Set up environment variables**
+   Create a `.env` file in the root directory with the following variables:
+   ```env
+   # Firebase
+   VITE_FIREBASE_API_KEY=your-firebase-api-key
+   VITE_FIREBASE_AUTH_DOMAIN=your-project-id.firebaseapp.com
+   VITE_FIREBASE_PROJECT_ID=your-project-id
+   VITE_FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+   VITE_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
+   VITE_FIREBASE_APP_ID=your-app-id
+   
+   # YouTube API
+   VITE_YOUTUBE_API_KEY=your-youtube-api-key
+   
+   # Server
+   VITE_API_URL=http://localhost:3001
+   PORT=3001
+   NODE_ENV=development
+   ```
+
+4. **Start the development server**
+   ```bash
+   # Start frontend and backend in development mode
+   npm run dev:all
+   ```
+
+   This will start:
+   - Frontend at `http://localhost:5173`
+   - Backend at `http://localhost:3001`
+
+## 🏗️ Project Structure
+
+```
+src/
+├── assets/            # Static assets
+├── components/        # Reusable UI components
+│   ├── dashboard/     # Dashboard specific components
+│   ├── ui/            # shadcn/ui components
+│   └── ...
+├── contexts/          # React contexts
+├── hooks/             # Custom React hooks
+├── integrations/      # Third-party integrations
+│   └── youtube/       # YouTube API service
+├── lib/               # Utility functions
+├── pages/             # Page components
+├── styles/            # Global styles
+└── types/             # TypeScript type definitions
 ```
 
-**Edit a file directly in GitHub**
+## 🔧 Available Scripts
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- `npm run dev` - Start the Vite development server
+- `npm run server` - Start the Express backend server
+- `npm run dev:all` - Start both frontend and backend in development mode
+- `npm run build` - Build the application for production
+- `npm run preview` - Preview the production build locally
+- `npm run lint` - Run ESLint
 
-**Use GitHub Codespaces**
+## 🧪 Testing
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+To run tests:
 
-## What technologies are used for this project?
+```bash
+# Run unit tests
+npm test
 
-This project is built with:
+# Run tests in watch mode
+npm test -- --watch
+```
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## 🌍 Production Deployment
 
-## How can I deploy this project?
+### Building for Production
 
-Simply open [Lovable](https://lovable.dev/projects/f4122c4c-d19a-405f-814d-9c29f4c03f86) and click on Share -> Publish.
+```bash
+# Build the frontend
+npm run build
 
-## Can I connect a custom domain to my Lovable project?
+# Start the production server
+npm start
+```
 
-Yes, you can!
+### Environment Variables for Production
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+Make sure to set the following environment variables in your production environment:
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+- `NODE_ENV=production`
+- `PORT=3000` (or your preferred port)
+- Firebase production credentials
+- YouTube API production key
+
+## 📝 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) to get started.
+
+## 📄 Documentation
+
+For detailed documentation, please refer to the [Wiki](https://github.com/your-username/vidvault-admin/wiki).
+
+## 📬 Contact
+
+For any questions or feedback, please open an issue or contact the maintainers.
