@@ -40,9 +40,9 @@ const Index = () => {
 
         <div className="pt-12 grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <div className="p-6 rounded-xl bg-card/50 backdrop-blur-sm border border-border/50 space-y-2">
-            <h3 className="font-semibold text-primary">Vimeo Integration</h3>
+            <h3 className="font-semibold text-primary">Video Management</h3>
             <p className="text-sm text-muted-foreground">
-              Seamlessly upload and manage videos with Vimeo API
+              Seamlessly upload and manage your video drafts
             </p>
           </div>
           <div className="p-6 rounded-xl bg-card/50 backdrop-blur-sm border border-border/50 space-y-2">

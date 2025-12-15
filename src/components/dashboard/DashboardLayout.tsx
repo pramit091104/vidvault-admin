@@ -3,7 +3,7 @@ import { Moon, Upload, Film, Key, MessageSquare, Settings, LogOut } from "lucide
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -13,10 +13,15 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children, activeSection, onSectionChange }: DashboardLayoutProps) => {
   const navigate = useNavigate();
+  const { logout, currentUser } = useAuth();
 
-  const handleLogout = () => {
-    toast.success("Logged out successfully");
-    navigate("/auth");
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate("/auth");
+    } catch (error) {
+      // Error is handled in the context
+    }
   };
 
   const navItems = [
@@ -84,7 +89,7 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
           {/* Header */}
           <header className="space-y-2">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Welcome back 🌙
+              Welcome back{currentUser?.displayName ? `, ${currentUser.displayName}` : ""} 🌙
             </h2>
             <p className="text-muted-foreground">
               Manage your client drafts seamlessly
