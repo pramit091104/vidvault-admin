@@ -138,6 +138,39 @@ export const createAndSaveSecurityCode = async (
 };
 
 /**
+ * Retrieves a security code record by YouTube video ID
+ * @param youtubeVideoId - The YouTube video ID to search for
+ * @returns Promise that resolves to the security code record or null
+ */
+export const getSecurityCodeByYoutubeVideoId = async (youtubeVideoId: string): Promise<VideoSecurityCode | null> => {
+  try {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('youtubeVideoId', '==', youtubeVideoId),
+      where('isActive', '==', true),
+      limit(1)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      const data = doc.data();
+      
+      return {
+        ...data,
+        uploadedAt: data.uploadedAt.toDate(),
+        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+      } as VideoSecurityCode;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error retrieving security code by YouTube video ID:', error);
+    throw new Error('Failed to retrieve security code from Firestore');
+  }
+};
+
+/**
  * Retrieves all security codes for a specific user
  * @param userId - The user ID to search for
  * @param maxResults - Maximum number of results to return (default: 50)

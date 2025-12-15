@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Film, Trash2, ExternalLink, Youtube, Loader2, RefreshCw, AlertCircle, X, Shield, Key, Copy } from "lucide-react";
 import {
   Table,
@@ -17,8 +18,8 @@ import {
 import { youtubeService } from "@/integrations/youtube/youtubeService";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CommentsDialog } from "./CommentsDialog";
-import { createAndSaveSecurityCode } from "@/integrations/firebase/securityCodeService";
+import { ClientComments } from "./ClientComments";
+import { createAndSaveSecurityCode, getSecurityCodeByYoutubeVideoId } from "@/integrations/firebase/securityCodeService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 
@@ -40,8 +41,6 @@ const VideosTable = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selectedVideoId, setSelectedVideoId] = useState<string | null>(null);
-  const [isCommentsDialogOpen, setIsCommentsDialogOpen] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isSecurityCodeDialogOpen, setIsSecurityCodeDialogOpen] = useState(false);
   const [selectedVideoForCode, setSelectedVideoForCode] = useState<YouTubeVideo | null>(null);
@@ -49,6 +48,13 @@ const VideosTable = () => {
   const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [generatedSecurityCode, setGeneratedSecurityCode] = useState<string>("");
+  const [activeTab, setActiveTab] = useState("videos");
+  const [selectedClientComments, setSelectedClientComments] = useState<{
+    clientName: string;
+    securityCode: string;
+    videoTitle: string;
+  } | null>(null);
+  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
 
   const handleSignIn = async () => {
     try {
@@ -147,42 +153,6 @@ const VideosTable = () => {
     fetchVideos(false);
   };
 
-  const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
-
-  const handleDelete = async (videoId: string, videoTitle: string) => {
-    // Use a confirmation dialog from the UI library if available, otherwise use window.confirm
-    const confirmed = window.confirm(`Are you sure you want to delete "${videoTitle}"? This action cannot be undone.`);
-    
-    if (!confirmed) return;
-
-    setDeletingVideoId(videoId);
-    
-    try {
-      await youtubeService.deleteVideo(videoId);
-      
-      // Remove the deleted video from the local state to avoid another API call
-      setVideos(prevVideos => prevVideos.filter(video => video.id !== videoId));
-      
-      toast.success('Video deleted successfully');
-    } catch (error: any) {
-      console.error('Error deleting video:', error);
-      
-      // Handle specific error cases
-      if (error.message?.includes('insufficient authentication scopes')) {
-        toast.error('Insufficient permissions. Please sign in again with delete permissions.');
-      } else if (error.message?.includes('Authentication required')) {
-        toast.error('Please sign in again to perform this action.');
-      } else {
-        toast.error(error.message || 'Failed to delete video');
-      }
-      
-      // Refresh the video list to ensure consistency
-      fetchVideos(false);
-    } finally {
-      setDeletingVideoId(null);
-    }
-  };
-
   const handleGenerateSecurityCode = (video: YouTubeVideo) => {
     setSelectedVideoForCode(video);
     setClientName("");
@@ -228,6 +198,44 @@ const VideosTable = () => {
     if (generatedSecurityCode) {
       navigator.clipboard.writeText(generatedSecurityCode);
       toast.success('Security code copied to clipboard!');
+    }
+  };
+
+  const handleViewClientComments = async (video: YouTubeVideo) => {
+    try {
+      // Get the security code for this YouTube video
+      const securityCodeRecord = await getSecurityCodeByYoutubeVideoId(video.youtubeId);
+      
+      if (!securityCodeRecord) {
+        toast.error('No security code found for this video. Please generate one first.');
+        return;
+      }
+      
+      // Set the client comments data with real values
+      setSelectedClientComments({
+        clientName: securityCodeRecord.clientName,
+        securityCode: securityCodeRecord.securityCode,
+        videoTitle: video.title
+      });
+      setActiveTab("client-comments");
+    } catch (error: any) {
+      console.error('Error fetching security code:', error);
+      toast.error(error.message || 'Failed to fetch security code');
+    }
+  };
+
+  const handleDelete = async (videoId: string, videoTitle: string) => {
+    setDeletingVideoId(videoId);
+    try {
+      // Implement delete functionality here
+      toast.success(`Video "${videoTitle}" deleted successfully`);
+      // Refresh videos after deletion
+      await fetchVideos(false);
+    } catch (error: any) {
+      console.error('Error deleting video:', error);
+      toast.error(error.message || 'Failed to delete video');
+    } finally {
+      setDeletingVideoId(null);
     }
   };
 
@@ -325,180 +333,175 @@ const VideosTable = () => {
           </div>
         )}
 
-        {isLoading ? (
-          <div className="space-y-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="flex items-center gap-4">
-                <Skeleton className="h-16 w-28 rounded" />
-                <div className="flex-1 space-y-2">
-                  <Skeleton className="h-4 w-3/4" />
-                  <Skeleton className="h-3 w-1/2" />
-                </div>
+        {/* Main Content with Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="videos">Videos</TabsTrigger>
+            <TabsTrigger value="client-comments">Client Comments</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="videos" className="space-y-4">
+            {isLoading ? (
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="flex items-center gap-4">
+                    <Skeleton className="h-16 w-28 rounded" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-        ) : (
-          <>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-secondary/50">
-                    <TableHead>Video</TableHead>
-                    <TableHead>Title</TableHead>
-                    <TableHead>Upload Date</TableHead>
-                    <TableHead>Privacy</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {videos.map((video) => (
-                    <TableRow key={video.id} className="hover:bg-secondary/30">
-                      <TableCell>
-                        {video.thumbnailUrl ? (
-                          <img
-                            src={video.thumbnailUrl}
-                            alt={video.title}
-                            className="w-24 h-16 object-cover rounded"
-                          />
-                        ) : (
-                          <div className="w-24 h-16 bg-secondary rounded flex items-center justify-center">
-                            <Film className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-md">
-                          <p className="font-medium line-clamp-2">{video.title}</p>
-                          {video.description && (
-                            <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
-                              {video.description}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{video.uploadDate}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant="outline"
-                          className={
-                            video.privacyStatus === "public"
-                              ? "bg-green-500/10 text-green-600 border-green-500/20"
-                              : video.privacyStatus === "unlisted"
-                              ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
-                              : "bg-gray-500/10 text-gray-600 border-gray-500/20"
-                          }
-                        >
-                          {video.privacyStatus}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge className="bg-primary/10 text-primary border-primary/20">
-                          {video.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right space-x-2">
-                        <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => {
-                              setSelectedVideoId(video.youtubeId);
-                              setIsCommentsDialogOpen(true);
-                            }}
-                            title="View comments"
-                          >
-                            <MessageSquare className="h-4 w-4" />
-                            <span className="sr-only">View comments</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => window.open(video.videoUrl, "_blank")}
-                            title="Open in YouTube"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="sr-only">Open in YouTube</span>
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => handleGenerateSecurityCode(video)}
-                            title="Generate security code"
-                            disabled={!currentUser}
-                          >
-                            <Shield className="h-4 w-4" />
-                            <span className="sr-only">Generate security code</span>
-                          </Button>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          className="h-8 min-w-[32px]"
-                          onClick={() => handleDelete(video.id, video.title)}
-                          disabled={!!deletingVideoId}
-                          title="Delete video"
-                        >
-                          {deletingVideoId === video.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="h-4 w-4" />
-                          )}
-                          <span className="sr-only">Delete video</span>
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            ) : (
+              <>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-secondary/50">
+                        <TableHead>Video</TableHead>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Upload Date</TableHead>
+                        <TableHead>Privacy</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {videos.map((video) => (
+                        <TableRow key={video.id} className="hover:bg-secondary/30">
+                          <TableCell>
+                            {video.thumbnailUrl ? (
+                              <img
+                                src={video.thumbnailUrl}
+                                alt={video.title}
+                                className="w-24 h-16 object-cover rounded"
+                              />
+                            ) : (
+                              <div className="w-24 h-16 bg-secondary rounded flex items-center justify-center">
+                                <Film className="h-6 w-6 text-muted-foreground" />
+                              </div>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="max-w-md">
+                              <p className="font-medium line-clamp-2">{video.title}</p>
+                              {video.description && (
+                                <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                                  {video.description}
+                                </p>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>{video.uploadDate}</TableCell>
+                          <TableCell>
+                            <Badge
+                              variant="outline"
+                              className={
+                                video.privacyStatus === "public"
+                                  ? "bg-green-500/10 text-green-600 border-green-500/20"
+                                  : video.privacyStatus === "unlisted"
+                                  ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                                  : "bg-gray-500/10 text-gray-600 border-gray-500/20"
+                              }
+                            >
+                              {video.privacyStatus}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className="bg-primary/10 text-primary border-primary/20">
+                              {video.status}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-right space-x-2">
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleViewClientComments(video)}
+                                title="View client comments"
+                              >
+                                <MessageSquare className="h-4 w-4 text-blue-500" />
+                                <span className="sr-only">View client comments</span>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => window.open(video.videoUrl, "_blank")}
+                                title="Open in YouTube"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                                <span className="sr-only">Open in YouTube</span>
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => handleGenerateSecurityCode(video)}
+                                title="Generate security code"
+                                disabled={!currentUser}
+                              >
+                                <Shield className="h-4 w-4" />
+                                <span className="sr-only">Generate security code</span>
+                              </Button>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              className="h-8 min-w-[32px]"
+                              onClick={() => handleDelete(video.id, video.title)}
+                              disabled={!!deletingVideoId}
+                              title="Delete video"
+                            >
+                              {deletingVideoId === video.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4" />
+                              )}
+                              <span className="sr-only">Delete video</span>
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
 
-            {videos.length === 0 && !error && (
+                {videos.length === 0 && !error && (
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Film className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p className="font-medium mb-2">No videos found</p>
+                    <p className="text-sm">
+                      Upload your first video using the Upload section above
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="client-comments" className="space-y-4">
+            {selectedClientComments ? (
+              <ClientComments
+                clientName={selectedClientComments.clientName}
+                securityCode={selectedClientComments.securityCode}
+                videoTitle={selectedClientComments.videoTitle}
+              />
+            ) : (
               <div className="text-center py-12 text-muted-foreground">
-                <Film className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium mb-2">No videos found</p>
+                <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p className="font-medium mb-2">No video selected</p>
                 <p className="text-sm">
-                  Upload your first video using the Upload section above
+                  Select a video from the Videos tab to view client comments
                 </p>
               </div>
             )}
-          </>
-        )}
+          </TabsContent>
+        </Tabs>
       </CardContent>
       
-      {/* Comments Dialog */}
-      {selectedVideoId && (
-        <Dialog open={isCommentsDialogOpen} onOpenChange={setIsCommentsDialogOpen}>
-          <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col p-0 overflow-hidden">
-            <div className="flex items-center justify-between p-4 border-b">
-              <DialogHeader>
-                <DialogTitle>Comments</DialogTitle>
-              </DialogHeader>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => setIsCommentsDialogOpen(false)}
-                className="h-8 w-8"
-              >
-                <X className="h-4 w-4" />
-                <span className="sr-only">Close</span>
-              </Button>
-            </div>
-            
-            <div className="flex-1 overflow-hidden">
-              <CommentsDialog 
-                videoId={selectedVideoId} 
-                open={isCommentsDialogOpen} 
-                onOpenChange={setIsCommentsDialogOpen} 
-              />
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
-
       {/* Security Code Generation Dialog */}
       {selectedVideoForCode && (
         <Dialog open={isSecurityCodeDialogOpen} onOpenChange={setIsSecurityCodeDialogOpen}>

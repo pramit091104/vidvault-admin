@@ -42,7 +42,7 @@ const Auth = () => {
           </div>
           <div className="text-center space-y-2">
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Magnova Media
+              Previu
             </CardTitle>
             <CardDescription className="text-muted-foreground">
               Admin Dashboard — Manage Your Client Drafts Seamlessly
