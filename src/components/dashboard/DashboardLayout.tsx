@@ -28,7 +28,6 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
     { id: "upload", label: "Upload Video", icon: Upload },
     { id: "videos", label: "Manage Videos", icon: Film },
     { id: "codes", label: "Security Codes", icon: Key },
-    { id: "comments", label: "Client Comments", icon: MessageSquare },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

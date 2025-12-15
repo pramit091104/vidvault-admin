@@ -3,7 +3,7 @@ import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import UploadSection from "@/components/dashboard/UploadSection";
 import VideosTable from "@/components/dashboard/VideosTable";
 import CodesSection from "@/components/dashboard/CodesSection";
-import CommentsSection from "@/components/dashboard/CommentsSection";
+import SettingsSection from "@/components/dashboard/SettingsSection";
 
 const Dashboard = () => {
   const [activeSection, setActiveSection] = useState<string>("upload");
@@ -16,8 +16,8 @@ const Dashboard = () => {
         return <VideosTable />;
       case "codes":
         return <CodesSection />;
-      case "comments":
-        return <CommentsSection />;
+      case "settings":
+        return <SettingsSection />;
       default:
         return <UploadSection />;
     }

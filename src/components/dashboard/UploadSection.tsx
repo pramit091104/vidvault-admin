@@ -5,22 +5,28 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Loader2, CheckCircle2, Youtube } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Youtube, Shield, Copy } from "lucide-react";
 import { toast } from "sonner";
 import { youtubeService } from "@/integrations/youtube/youtubeService";
 import { Progress } from "@/components/ui/progress";
+import { createAndSaveSecurityCode } from "@/integrations/firebase/securityCodeService";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "@/integrations/firebase/config";
 
 const UploadSection = () => {
   const [fileUrl, setFileUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [clientName, setClientName] = useState("");
   const [privacyStatus, setPrivacyStatus] = useState<"private" | "unlisted" | "public">("private");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [youtubeVideoUrl, setYoutubeVideoUrl] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
+  const [securityCode, setSecurityCode] = useState<string>("");
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
     // Initialize YouTube service on mount
@@ -36,7 +42,14 @@ const UploadSection = () => {
       }
     };
 
+    // Listen for auth state changes
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user);
+    });
+
     initYouTube();
+
+    return () => unsubscribe();
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -80,10 +93,15 @@ const UploadSection = () => {
       toast.error("Please enter a video title.");
       return;
     }
+    if (!clientName.trim()) {
+      toast.error("Please enter a client name.");
+      return;
+    }
     setIsUploading(true);
     setUploadSuccess(false);
     setUploadProgress(0);
     setYoutubeVideoUrl("");
+    setSecurityCode("");
     try {
       // Check authentication
       const isAuthenticated = await youtubeService.isAuthenticated();
@@ -107,20 +125,27 @@ const UploadSection = () => {
           setUploadProgress(progress);
         }
       );
+      // Extract YouTube video ID from the result
+      const youtubeVideoId = result.videoId || result.videoUrl?.split('v=')[1]?.split('&')[0];
+      // Generate and save security code using client name
+      try {
+        const securityCodeRecord = await createAndSaveSecurityCode(
+          title.trim(),
+          clientName.trim(),
+          youtubeVideoId,
+          result.videoUrl,
+          currentUser?.uid
+        );
+        setSecurityCode(securityCodeRecord.securityCode);
+        toast.success('Security code generated successfully!');
+      } catch (securityError: any) {
+        console.error('Security code generation error:', securityError);
+        toast.error('Video uploaded but security code generation failed');
+      }
       setYoutubeVideoUrl(result.videoUrl);
       setUploadSuccess(true);
       toast.success('Video uploaded successfully to YouTube!');
       window.dispatchEvent(new CustomEvent("youtube-video-uploaded"));
-      // Reset form after 3 seconds
-      setTimeout(() => {
-        setFile(null);
-        setTitle("");
-        setDescription("");
-        setPrivacyStatus("private");
-        setUploadSuccess(false);
-        setUploadProgress(0);
-        setYoutubeVideoUrl("");
-      }, 5000);
     } catch (error: any) {
       console.error("Upload error:", error);
       if (error.isYouTubeSignupRequired || error.message?.includes("YouTube channel")) {
@@ -143,6 +168,13 @@ const UploadSection = () => {
     }
   };
 
+  const copySecurityCode = () => {
+    if (securityCode) {
+      navigator.clipboard.writeText(securityCode);
+      toast.success('Security code copied to clipboard!');
+    }
+  };
+
   return (
     <Card className="border-border/50 bg-card/95 backdrop-blur-sm">
       <CardHeader>
@@ -162,6 +194,17 @@ const UploadSection = () => {
             placeholder="Enter video title"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
+            className="bg-background/50"
+            required />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="clientName">Client Name *</Label>
+          <Input
+            id="clientName"
+            placeholder="Enter client name"
+            value={clientName}
+            onChange={(e) => setClientName(e.target.value)}
             className="bg-background/50"
             required />
         </div>
@@ -224,21 +267,50 @@ const UploadSection = () => {
           </div>
         )}
 
-                {uploadSuccess && (
-          <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 space-y-2">
-            <p className="text-sm text-muted-foreground">
-              Selected: {file.name}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Size: {(file.size / 1024 / 1024).toFixed(2)} MB
-            </p>
+        {uploadSuccess && (
+          <div className="space-y-4">
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 space-y-2">
+              <p className="text-sm text-muted-foreground">
+                Selected: {file.name}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Size: {(file.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+            
+            {securityCode && (
+              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
+                  <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
+                    Security Code Generated
+                  </h4>
+                </div>
+                <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-green-300 dark:border-green-700 rounded-md px-3 py-2">
+                  <code className="text-lg font-mono text-green-700 dark:text-green-300">
+                    {securityCode}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copySecurityCode}
+                    className="ml-2 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-green-600 dark:text-green-400">
+                  Share this code with users who need access to this video. Each code can be used to track video access.
+                </p>
+              </div>
+            )}
           </div>
         )}
 
         <Button
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
           onClick={handleUpload}
-          disabled={!file || !title || isUploading || isInitializing}
+          disabled={!file || !title || !clientName || isUploading || isInitializing}
         >
           {isInitializing ? (
             <>
