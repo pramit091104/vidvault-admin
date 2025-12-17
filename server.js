@@ -34,12 +34,28 @@ const bucketName = process.env.GCS_BUCKET_NAME;
 
 if (bucketName && process.env.GCS_PROJECT_ID) {
   try {
+    // Parse private key - handle both escaped and unescaped newlines
+    let privateKey = process.env.GCS_PRIVATE_KEY || '';
+    
+    // If the key is wrapped in quotes, remove them
+    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+      privateKey = privateKey.slice(1, -1);
+    }
+    
+    // Replace escaped newlines with actual newlines
+    privateKey = privateKey.replace(/\\n/g, '\n');
+    
+    // Ensure the key starts with -----BEGIN and ends with END-----
+    if (!privateKey.includes('BEGIN')) {
+      throw new Error('Invalid private key format');
+    }
+    
     storage = new Storage({
       projectId: process.env.GCS_PROJECT_ID,
       credentials: {
         type: 'service_account',
         project_id: process.env.GCS_PROJECT_ID,
-        private_key: process.env.GCS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        private_key: privateKey,
         client_email: process.env.GCS_CLIENT_EMAIL,
         client_id: process.env.GCS_CLIENT_ID || '',
         auth_uri: 'https://accounts.google.com/o/oauth2/auth',
