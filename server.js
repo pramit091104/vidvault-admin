@@ -62,8 +62,8 @@ app.use(helmet());
 app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
 app.use(express.json());
 
-// Ensure upload directory exists
-if (!fs.existsSync(UPLOAD_DIR)) {
+// Ensure upload directory exists (only on local environments, not on Vercel)
+if (!process.env.VERCEL && !fs.existsSync(UPLOAD_DIR)) {
   fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
