@@ -34,33 +34,24 @@ const bucketName = process.env.GCS_BUCKET_NAME;
 
 if (bucketName && process.env.GCS_PROJECT_ID) {
   try {
-    // Parse private key - handle both escaped and unescaped newlines
-    let privateKey = process.env.GCS_PRIVATE_KEY || '';
+    let credentials;
     
-    // If the key is wrapped in quotes, remove them
-    if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-      privateKey = privateKey.slice(1, -1);
-    }
-    
-    // Replace escaped newlines with actual newlines
-    privateKey = privateKey.replace(/\\n/g, '\n');
-    
-    // Ensure the key starts with -----BEGIN and ends with END-----
-    if (!privateKey.includes('BEGIN')) {
-      throw new Error('Invalid private key format');
+    // Try to use base64-encoded credentials first (more reliable on Vercel)
+    if (process.env.GCS_CREDENTIALS_BASE64) {
+      const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      credentials = JSON.parse(decoded);
+    } else if (process.env.GCS_KEY_FILE) {
+      // Fallback to file-based credentials (local development)
+      const keyPath = process.env.GCS_KEY_FILE;
+      const keyFileContent = fs.readFileSync(keyPath, 'utf8');
+      credentials = JSON.parse(keyFileContent);
+    } else {
+      throw new Error('No GCS credentials provided. Set GCS_CREDENTIALS_BASE64 or GCS_KEY_FILE.');
     }
     
     storage = new Storage({
       projectId: process.env.GCS_PROJECT_ID,
-      credentials: {
-        type: 'service_account',
-        project_id: process.env.GCS_PROJECT_ID,
-        private_key: privateKey,
-        client_email: process.env.GCS_CLIENT_EMAIL,
-        client_id: process.env.GCS_CLIENT_ID || '',
-        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      },
+      credentials,
     });
     bucket = storage.bucket(bucketName);
     console.log('Google Cloud Storage initialized successfully');
