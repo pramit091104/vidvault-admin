@@ -36,15 +36,21 @@ if (bucketName && process.env.GCS_PROJECT_ID) {
   try {
     storage = new Storage({
       projectId: process.env.GCS_PROJECT_ID,
-      keyFilename: process.env.GCS_KEY_FILE || undefined,
+      credentials: {
+        type: 'service_account',
+        project_id: process.env.GCS_PROJECT_ID,
+        private_key: process.env.GCS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+        client_email: process.env.GCS_CLIENT_EMAIL,
+        client_id: process.env.GCS_CLIENT_ID || '',
+        auth_uri: 'https://accounts.google.com/o/oauth2/auth',
+        token_uri: 'https://oauth2.googleapis.com/token',
+      },
     });
     bucket = storage.bucket(bucketName);
     console.log('Google Cloud Storage initialized successfully');
   } catch (error) {
     console.warn('Failed to initialize Google Cloud Storage:', error.message);
   }
-} else {
-  console.log('Google Cloud Storage not configured - GCS endpoints will be disabled');
 }
 
 // Initialize Express app
