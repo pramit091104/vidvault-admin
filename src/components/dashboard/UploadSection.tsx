@@ -5,38 +5,51 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Loader2, CheckCircle2, Youtube, Shield, Copy } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Youtube, Shield, Copy, Cloud } from "lucide-react";
 import { toast } from "sonner";
 import { youtubeService } from "@/integrations/youtube/youtubeService";
+import { gcsService } from "@/integrations/gcs/gcsService";
 import { Progress } from "@/components/ui/progress";
 import { createAndSaveSecurityCode } from "@/integrations/firebase/securityCodeService";
+import { saveYouTubeVideo, saveGCSVideo } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
+import { v4 as uuidv4 } from 'uuid';
 
 const UploadSection = () => {
-  const [fileUrl, setFileUrl] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
   const [privacyStatus, setPrivacyStatus] = useState<"private" | "unlisted" | "public">("private");
+  const [uploadService, setUploadService] = useState<"youtube" | "gcs">("youtube");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [youtubeVideoUrl, setYoutubeVideoUrl] = useState("");
+  const [gcsVideoUrl, setGcsVideoUrl] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
   const [securityCode, setSecurityCode] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    // Initialize YouTube service on mount
-    const initYouTube = async () => {
+    // Initialize services based on selected upload service
+    const initializeServices = async () => {
       try {
         setIsInitializing(true);
+        
+        // Always initialize YouTube service in case user switches to it
         await youtubeService.initialize();
+        
+        // Initialize GCS service
+        await gcsService.initialize();
       } catch (error: any) {
-        console.error("Failed to initialize YouTube service:", error);
-        toast.error("Failed to initialize YouTube service. Please check your configuration.");
+        console.error("Failed to initialize services:", error);
+        if (uploadService === 'youtube') {
+          toast.error("Failed to initialize YouTube service. Please check your configuration.");
+        } else {
+          toast.error("Failed to initialize Google Cloud Storage service. Please check your configuration.");
+        }
       } finally {
         setIsInitializing(false);
       }
@@ -47,10 +60,10 @@ const UploadSection = () => {
       setCurrentUser(user);
     });
 
-    initYouTube();
+    initializeServices();
 
     return () => unsubscribe();
-  }, []);
+  }, [uploadService]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -97,71 +110,168 @@ const UploadSection = () => {
       toast.error("Please enter a client name.");
       return;
     }
+    
     setIsUploading(true);
     setUploadSuccess(false);
     setUploadProgress(0);
     setYoutubeVideoUrl("");
+    setGcsVideoUrl("");
     setSecurityCode("");
+    
     try {
-      // Check authentication
-      const isAuthenticated = await youtubeService.isAuthenticated();
-      if (!isAuthenticated) {
-        toast.info("Please sign in to YouTube to continue");
-        const authenticated = await youtubeService.authenticate();
-        if (!authenticated) {
-          setIsUploading(false);
-          return;
+      if (uploadService === 'youtube') {
+        // YouTube Upload Logic
+        const isAuthenticated = await youtubeService.isAuthenticated();
+        if (!isAuthenticated) {
+          toast.info("Please sign in to YouTube to continue");
+          const authenticated = await youtubeService.authenticate();
+          if (!authenticated) {
+            setIsUploading(false);
+            return;
+          }
         }
-      }
-      // Upload video to YouTube
-      const result = await youtubeService.uploadVideo(
-        file,
-        {
-          title: title.trim(),
-          description: description?.trim() || undefined,
-          privacyStatus,
-        },
-        (progress) => {
-          setUploadProgress(progress);
-        }
-      );
-      // Extract YouTube video ID from the result
-      const youtubeVideoId = result.videoId || result.videoUrl?.split('v=')[1]?.split('&')[0];
-      // Generate and save security code using client name
-      try {
-        const securityCodeRecord = await createAndSaveSecurityCode(
-          title.trim(),
-          clientName.trim(),
-          youtubeVideoId,
-          result.videoUrl,
-          currentUser?.uid
-        );
-        setSecurityCode(securityCodeRecord.securityCode);
-        toast.success('Security code generated successfully!');
-      } catch (securityError: any) {
-        console.error('Security code generation error:', securityError);
-        toast.error('Video uploaded but security code generation failed');
-      }
-      setYoutubeVideoUrl(result.videoUrl);
-      setUploadSuccess(true);
-      toast.success('Video uploaded successfully to YouTube!');
-      window.dispatchEvent(new CustomEvent("youtube-video-uploaded"));
-    } catch (error: any) {
-      console.error("Upload error:", error);
-      if (error.isYouTubeSignupRequired || error.message?.includes("YouTube channel")) {
-        toast.error(
-          error.message || "Your Google account needs a YouTube channel to upload videos. Please create one at youtube.com first.",
+        
+        const result = await youtubeService.uploadVideo(
+          file,
           {
-            duration: 8000,
-            action: {
-              label: "Open YouTube",
-              onClick: () => window.open("https://www.youtube.com", "_blank"),
-            },
+            title: title.trim(),
+            description: description?.trim() || undefined,
+            privacyStatus,
+          },
+          (progress) => {
+            setUploadProgress(progress);
           }
         );
+        
+        const youtubeVideoId = result.videoId || result.videoUrl?.split('v=')[1]?.split('&')[0];
+        
+        // Save to Firebase YouTube collection
+        const videoId = uuidv4();
+        try {
+          await saveYouTubeVideo({
+            id: videoId,
+            title: title.trim(),
+            description: description?.trim() || '',
+            clientName: clientName.trim(),
+            userId: currentUser?.uid,
+            youtubeVideoId,
+            youtubeVideoUrl: result.videoUrl,
+            privacyStatus,
+            securityCode: '', // Will be set below
+            isActive: true,
+            accessCount: 0,
+            uploadStatus: 'completed',
+            uploadedAt: new Date(),
+          });
+        } catch (firebaseError: any) {
+          console.error('Firebase save error:', firebaseError);
+          toast.error('Video uploaded but failed to save to database');
+        }
+        
+        // Generate and save security code
+        try {
+          const securityCodeRecord = await createAndSaveSecurityCode(
+            title.trim(),
+            clientName.trim(),
+            youtubeVideoId,
+            result.videoUrl,
+            currentUser?.uid
+          );
+          setSecurityCode(securityCodeRecord.securityCode);
+          toast.success('Security code generated successfully!');
+        } catch (securityError: any) {
+          console.error('Security code generation error:', securityError);
+          toast.error('Video uploaded but security code generation failed');
+        }
+        
+        setYoutubeVideoUrl(result.videoUrl);
+        setUploadSuccess(true);
+        toast.success('Video uploaded successfully to YouTube!');
+        window.dispatchEvent(new CustomEvent("youtube-video-uploaded"));
+        
       } else {
-        toast.error(error.message || "Failed to upload video to YouTube");
+        // Google Cloud Storage Upload Logic
+        const result = await gcsService.uploadVideo(
+          file,
+          {
+            title: title.trim(),
+            description: description?.trim() || '',
+            clientName: clientName.trim(),
+            privacyStatus,
+          },
+          (progress) => {
+            setUploadProgress(progress);
+          }
+        );
+        
+        // Save to Firebase GCS collection
+        const videoId = uuidv4();
+        try {
+          await saveGCSVideo({
+            id: videoId,
+            title: title.trim(),
+            description: description?.trim() || '',
+            clientName: clientName.trim(),
+            userId: currentUser?.uid,
+            fileName: result.fileName,
+            publicUrl: result.publicUrl,
+            size: result.size,
+            contentType: result.contentType,
+            privacyStatus,
+            securityCode: '', // Will be set below
+            isActive: true,
+            accessCount: 0,
+            isPubliclyAccessible: privacyStatus === 'public',
+            uploadedAt: new Date(),
+          });
+        } catch (firebaseError: any) {
+          console.error('Firebase save error:', firebaseError);
+          toast.error('Video uploaded but failed to save to database');
+        }
+        
+        // Generate and save security code
+        try {
+          const securityCodeRecord = await createAndSaveSecurityCode(
+            title.trim(),
+            clientName.trim(),
+            undefined, // No YouTube video ID for GCS
+            result.publicUrl,
+            currentUser?.uid
+          );
+          setSecurityCode(securityCodeRecord.securityCode);
+          toast.success('Security code generated successfully!');
+        } catch (securityError: any) {
+          console.error('Security code generation error:', securityError);
+          toast.error('Video uploaded but security code generation failed');
+        }
+        
+        setGcsVideoUrl(result.publicUrl);
+        setUploadSuccess(true);
+        toast.success('Video uploaded successfully to Google Cloud Storage!');
+        window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
       }
+    } catch (error: any) {
+      console.error("Upload error:", error);
+      
+      if (uploadService === 'youtube') {
+        if (error.isYouTubeSignupRequired || error.message?.includes("YouTube channel")) {
+          toast.error(
+            error.message || "Your Google account needs a YouTube channel to upload videos. Please create one at youtube.com first.",
+            {
+              duration: 8000,
+              action: {
+                label: "Open YouTube",
+                onClick: () => window.open("https://www.youtube.com", "_blank"),
+              },
+            }
+          );
+        } else {
+          toast.error(error.message || "Failed to upload video to YouTube");
+        }
+      } else {
+        toast.error(error.message || "Failed to upload video to Google Cloud Storage");
+      }
+      
       setUploadProgress(0);
     } finally {
       setIsUploading(false);
@@ -183,10 +293,33 @@ const UploadSection = () => {
           Upload Video
         </CardTitle>
         <CardDescription>
-          Upload your video to YouTube
+          Upload your video to YouTube or Google Cloud Storage
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        <div className="space-y-2">
+          <Label htmlFor="uploadService">Upload Service *</Label>
+          <Select value={uploadService} onValueChange={(value: "youtube" | "gcs") => setUploadService(value)}>
+            <SelectTrigger className="bg-background/50">
+              <SelectValue placeholder="Select upload service" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="youtube">
+                <div className="flex items-center gap-2">
+                  <Youtube className="h-4 w-4" />
+                  YouTube
+                </div>
+              </SelectItem>
+              <SelectItem value="gcs">
+                <div className="flex items-center gap-2">
+                  <Cloud className="h-4 w-4" />
+                  Google Cloud Storage
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         <div className="space-y-2">
           <Label htmlFor="title">Video Title *</Label>
           <Input
@@ -320,7 +453,7 @@ const UploadSection = () => {
           ) : isUploading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Uploading to YouTube...
+              Uploading to {uploadService === 'youtube' ? 'YouTube...' : 'Google Cloud Storage...'}
             </>
           ) : uploadSuccess ? (
             <>
@@ -329,37 +462,79 @@ const UploadSection = () => {
             </>
           ) : (
             <>
-              <Youtube className="mr-2 h-4 w-4" />
-              Upload to YouTube
+              {uploadService === 'youtube' ? (
+                <>
+                  <Youtube className="mr-2 h-4 w-4" />
+                  Upload to YouTube
+                </>
+              ) : (
+                <>
+                  <Cloud className="mr-2 h-4 w-4" />
+                  Upload to Google Cloud Storage
+                </>
+              )}
             </>
           )}
         </Button>
 
         <div className="bg-secondary/50 border border-border rounded-lg p-4 space-y-2">
-          <h4 className="text-sm font-medium text-foreground">YouTube Integration</h4>
-          <p className="text-xs text-muted-foreground">
-            Videos will be uploaded to your YouTube channel. Make sure you have:
-          </p>
-          <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-            <li>Configured YouTube API credentials</li>
-            <li>Authorized the application to upload videos</li>
-            <li>
-              <strong>Created a YouTube channel</strong> (visit{" "}
-              <a
-                href="https://www.youtube.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:underline"
-              >
-                youtube.com
-              </a>{" "}
-              to create one if needed)
-            </li>
-          </ul>
+          {uploadService === 'youtube' ? (
+            <>
+              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Youtube className="h-4 w-4" />
+                YouTube Integration
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Videos will be uploaded to your YouTube channel. Make sure you have:
+              </p>
+              <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Configured YouTube API credentials</li>
+                <li>Authorized the application to upload videos</li>
+                <li>
+                  <strong>Created a YouTube channel</strong> (visit{" "}
+                  <a
+                    href="https://www.youtube.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    youtube.com
+                  </a>{" "}
+                  to create one if needed)
+                </li>
+              </ul>
+            </>
+          ) : (
+            <>
+              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+                <Cloud className="h-4 w-4" />
+                Google Cloud Storage Integration
+              </h4>
+              <p className="text-xs text-muted-foreground">
+                Videos will be uploaded to Google Cloud Storage. Make sure you have:
+              </p>
+              <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
+                <li>Configured Google Cloud Storage credentials</li>
+                <li>Set up a GCS bucket with appropriate permissions</li>
+                <li>
+                  <strong>Enabled the Cloud Storage API</strong> (visit{" "}
+                  <a
+                    href="https://console.cloud.google.com"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Google Cloud Console
+                  </a>{" "}
+                  to configure)
+                </li>
+              </ul>
+            </>
+          )}
         </div>
       </CardContent>
     </Card>
   );
-}
+};
 
 export default UploadSection;

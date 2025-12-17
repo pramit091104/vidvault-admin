@@ -28,11 +28,32 @@ export const saveSecurityCode = async (
   try {
     // Use client name as document ID
     const docRef = doc(db, COLLECTION_NAME, securityCodeData.clientName);
-    const firestoreData = {
-      ...securityCodeData,
+    
+    // Build the data object, excluding undefined values
+    const firestoreData: any = {
+      videoId: securityCodeData.videoId,
+      securityCode: securityCodeData.securityCode,
+      title: securityCodeData.title,
+      clientName: securityCodeData.clientName,
       uploadedAt: Timestamp.fromDate(securityCodeData.uploadedAt),
-      lastAccessed: securityCodeData.lastAccessed ? Timestamp.fromDate(securityCodeData.lastAccessed) : null,
+      isActive: securityCodeData.isActive,
+      accessCount: securityCodeData.accessCount,
     };
+    
+    // Only include optional fields if they have values
+    if (securityCodeData.youtubeVideoId !== undefined) {
+      firestoreData.youtubeVideoId = securityCodeData.youtubeVideoId;
+    }
+    if (securityCodeData.youtubeVideoUrl !== undefined) {
+      firestoreData.youtubeVideoUrl = securityCodeData.youtubeVideoUrl;
+    }
+    if (securityCodeData.userId !== undefined) {
+      firestoreData.userId = securityCodeData.userId;
+    }
+    if (securityCodeData.lastAccessed !== undefined) {
+      firestoreData.lastAccessed = Timestamp.fromDate(securityCodeData.lastAccessed);
+    }
+    
     await setDoc(docRef, firestoreData);
   } catch (error) {
     console.error('Error saving security code:', error);
