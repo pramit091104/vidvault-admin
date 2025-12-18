@@ -110,6 +110,10 @@ const UploadSection = () => {
       toast.error("Please enter a client name.");
       return;
     }
+    if (!currentUser) {
+      toast.error("Please sign in to upload videos.");
+      return;
+    }
     
     setIsUploading(true);
     setUploadSuccess(false);
@@ -145,7 +149,29 @@ const UploadSection = () => {
         
         const youtubeVideoId = result.videoId || result.videoUrl?.split('v=')[1]?.split('&')[0];
         
-        // Save to Firebase YouTube collection
+        // Generate security code first
+        let generatedSecurityCode = '';
+        try {
+          const securityCodeRecord = await createAndSaveSecurityCode(
+            'youtube',
+            title.trim(),
+            clientName.trim(),
+            youtubeVideoId,
+            result.videoUrl,
+            currentUser?.uid
+          );
+          generatedSecurityCode = securityCodeRecord.securityCode;
+          setSecurityCode(generatedSecurityCode);
+          toast.success('Security code generated successfully!');
+        } catch (securityError: any) {
+          console.error('Security code generation error:', securityError);
+          toast.error('Video uploaded but security code generation failed');
+          setYoutubeVideoUrl(result.videoUrl);
+          setUploadSuccess(true);
+          return;
+        }
+        
+        // Save to Firebase YouTube collection using security code as document ID
         const videoId = uuidv4();
         try {
           await saveYouTubeVideo({
@@ -157,31 +183,15 @@ const UploadSection = () => {
             youtubeVideoId,
             youtubeVideoUrl: result.videoUrl,
             privacyStatus,
-            securityCode: '', // Will be set below
+            securityCode: generatedSecurityCode,
             isActive: true,
             accessCount: 0,
             uploadStatus: 'completed',
             uploadedAt: new Date(),
-          });
+          }, generatedSecurityCode);
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
           toast.error('Video uploaded but failed to save to database');
-        }
-        
-        // Generate and save security code
-        try {
-          const securityCodeRecord = await createAndSaveSecurityCode(
-            title.trim(),
-            clientName.trim(),
-            youtubeVideoId,
-            result.videoUrl,
-            currentUser?.uid
-          );
-          setSecurityCode(securityCodeRecord.securityCode);
-          toast.success('Security code generated successfully!');
-        } catch (securityError: any) {
-          console.error('Security code generation error:', securityError);
-          toast.error('Video uploaded but security code generation failed');
         }
         
         setYoutubeVideoUrl(result.videoUrl);
@@ -204,7 +214,29 @@ const UploadSection = () => {
           }
         );
         
-        // Save to Firebase GCS collection
+        // Generate security code first
+        let generatedSecurityCode = '';
+        try {
+          const securityCodeRecord = await createAndSaveSecurityCode(
+            'gcs',
+            title.trim(),
+            clientName.trim(),
+            undefined, // No YouTube video ID for GCS
+            result.publicUrl,
+            currentUser?.uid
+          );
+          generatedSecurityCode = securityCodeRecord.securityCode;
+          setSecurityCode(generatedSecurityCode);
+          toast.success('Security code generated successfully!');
+        } catch (securityError: any) {
+          console.error('Security code generation error:', securityError);
+          toast.error('Video uploaded but security code generation failed');
+          setGcsVideoUrl(result.publicUrl);
+          setUploadSuccess(true);
+          return;
+        }
+        
+        // Save to Firebase GCS collection using security code as document ID
         const videoId = uuidv4();
         try {
           await saveGCSVideo({
@@ -218,31 +250,15 @@ const UploadSection = () => {
             size: result.size,
             contentType: result.contentType,
             privacyStatus,
-            securityCode: '', // Will be set below
+            securityCode: generatedSecurityCode,
             isActive: true,
             accessCount: 0,
             isPubliclyAccessible: privacyStatus === 'public',
             uploadedAt: new Date(),
-          });
+          }, generatedSecurityCode);
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
           toast.error('Video uploaded but failed to save to database');
-        }
-        
-        // Generate and save security code
-        try {
-          const securityCodeRecord = await createAndSaveSecurityCode(
-            title.trim(),
-            clientName.trim(),
-            undefined, // No YouTube video ID for GCS
-            result.publicUrl,
-            currentUser?.uid
-          );
-          setSecurityCode(securityCodeRecord.securityCode);
-          toast.success('Security code generated successfully!');
-        } catch (securityError: any) {
-          console.error('Security code generation error:', securityError);
-          toast.error('Video uploaded but security code generation failed');
         }
         
         setGcsVideoUrl(result.publicUrl);

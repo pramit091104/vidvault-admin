@@ -79,14 +79,14 @@ const CodesSection = () => {
     setExpiryDate("");
   };
 
-  const handleDelete = async (clientName: string) => {
-    if (!clientName || clientName.trim() === '') {
-      toast.error('Invalid client name for deletion');
+  const handleDelete = async (securityCode: string) => {
+    if (!securityCode || securityCode.trim() === '') {
+      toast.error('Invalid security code for deletion');
       return;
     }
 
     try {
-      await deleteSecurityCode(clientName);
+      await deleteSecurityCode(securityCode);
       // Refresh the list
       if (currentUser) {
         const codes = await getSecurityCodesByUser(currentUser.uid);
@@ -194,7 +194,7 @@ const CodesSection = () => {
                           size="sm"
                           variant="destructive"
                           className="h-8"
-                          onClick={() => handleDelete(code.clientName)}
+                          onClick={() => handleDelete(code.securityCode)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>

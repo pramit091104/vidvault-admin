@@ -18,7 +18,7 @@ import { VideoSecurityCode, createSecurityCodeRecord } from '@/lib/securityCode'
 const COLLECTION_NAME = 'videoSecurityCodes';
 
 /**
- * Saves a security code record to Firestore using client name as document ID
+ * Saves a security code record to Firestore using the security code as document ID
  * @param securityCodeData - Security code data to save
  * @returns Promise that resolves when the record is saved
  */
@@ -26,9 +26,10 @@ export const saveSecurityCode = async (
   securityCodeData: Omit<VideoSecurityCode, 'uploadedAt'> & { uploadedAt: Date }
 ): Promise<void> => {
   try {
-    // Use client name as document ID
-    const docRef = doc(db, COLLECTION_NAME, securityCodeData.clientName);
-    
+    // Use securityCode as document ID
+    const docId = securityCodeData.securityCode;
+    const docRef = doc(db, COLLECTION_NAME, docId);
+
     // Build the data object, excluding undefined values
     const firestoreData: any = {
       videoId: securityCodeData.videoId,
@@ -39,7 +40,7 @@ export const saveSecurityCode = async (
       isActive: securityCodeData.isActive,
       accessCount: securityCodeData.accessCount,
     };
-    
+
     // Only include optional fields if they have values
     if (securityCodeData.youtubeVideoId !== undefined) {
       firestoreData.youtubeVideoId = securityCodeData.youtubeVideoId;
@@ -53,7 +54,7 @@ export const saveSecurityCode = async (
     if (securityCodeData.lastAccessed !== undefined) {
       firestoreData.lastAccessed = Timestamp.fromDate(securityCodeData.lastAccessed);
     }
-    
+
     await setDoc(docRef, firestoreData);
   } catch (error) {
     console.error('Error saving security code:', error);
@@ -68,10 +69,15 @@ export const saveSecurityCode = async (
  */
 export const getSecurityCodeByClientName = async (clientName: string): Promise<VideoSecurityCode | null> => {
   try {
-    const docRef = doc(db, COLLECTION_NAME, clientName);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
+    const q = query(
+      collection(db, COLLECTION_NAME),
+      where('clientName', '==', clientName),
+      limit(1)
+    );
+
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const docSnap = querySnapshot.docs[0];
       const data = docSnap.data();
       return {
         ...data,
@@ -81,7 +87,7 @@ export const getSecurityCodeByClientName = async (clientName: string): Promise<V
     }
     return null;
   } catch (error) {
-    console.error('Error retrieving security code:', error);
+    console.error('Error retrieving security code by client name:', error);
     throw new Error('Failed to retrieve security code from Firestore');
   }
 };
@@ -93,25 +99,18 @@ export const getSecurityCodeByClientName = async (clientName: string): Promise<V
  */
 export const getSecurityCodeByCode = async (securityCode: string): Promise<VideoSecurityCode | null> => {
   try {
-    const q = query(
-      collection(db, COLLECTION_NAME),
-      where('securityCode', '==', securityCode),
-      where('isActive', '==', true),
-      limit(1)
-    );
-    
-    const querySnapshot = await getDocs(q);
-    
-    if (!querySnapshot.empty) {
-      const doc = querySnapshot.docs[0];
-      const data = doc.data();
-      
+    const docRef = doc(db, COLLECTION_NAME, securityCode);
+    const docSnap = await getDoc(docRef);
+
+    if (docSnap.exists()) {
+      const data = docSnap.data();
+
       // Update access count and last accessed timestamp
-      await updateDoc(doc.ref, {
-        accessCount: data.accessCount + 1,
+      await updateDoc(docRef, {
+        accessCount: (data.accessCount || 0) + 1,
         lastAccessed: Timestamp.now(),
       });
-      
+
       return {
         ...data,
         uploadedAt: data.uploadedAt.toDate(),
@@ -126,15 +125,17 @@ export const getSecurityCodeByCode = async (securityCode: string): Promise<Video
 };
 
 /**
- * Creates and saves a new security code for a video using client name as document ID
+ * Creates and saves a new security code for a video
+ * @param service - 'youtube' or 'gcs'
  * @param title - Video title
- * @param clientName - Client name (used as document ID)
+ * @param clientName - Client name
  * @param youtubeVideoId - YouTube video ID (optional)
  * @param youtubeVideoUrl - YouTube video URL (optional)
  * @param userId - User ID who uploaded the video (optional)
  * @returns Promise that resolves to the created security code record
  */
 export const createAndSaveSecurityCode = async (
+  service: 'youtube' | 'gcs',
   title: string,
   clientName: string,
   youtubeVideoId?: string,
@@ -143,6 +144,7 @@ export const createAndSaveSecurityCode = async (
 ): Promise<VideoSecurityCode> => {
   try {
     const securityCodeRecord = createSecurityCodeRecord(
+      service,
       title,
       clientName,
       youtubeVideoId,
@@ -235,15 +237,17 @@ export const getSecurityCodesByUser = async (
  * @returns Promise that resolves when the record is updated
  */
 export const updateSecurityCode = async (
-  clientName: string,
+  securityCode: string,
   updates: Partial<Omit<VideoSecurityCode, 'uploadedAt' | 'clientName'>>
 ): Promise<void> => {
   try {
-    const docRef = doc(db, COLLECTION_NAME, clientName);
-    const firestoreUpdates = {
+    const docRef = doc(db, COLLECTION_NAME, securityCode);
+    const firestoreUpdates: any = {
       ...updates,
-      lastAccessed: updates.lastAccessed ? Timestamp.fromDate(updates.lastAccessed) : null,
     };
+    if (updates.lastAccessed) {
+      firestoreUpdates.lastAccessed = Timestamp.fromDate(updates.lastAccessed as Date);
+    }
     await updateDoc(docRef, firestoreUpdates);
   } catch (error) {
     console.error('Error updating security code:', error);
@@ -256,9 +260,9 @@ export const updateSecurityCode = async (
  * @param clientName - The client name of the record to deactivate
  * @returns Promise that resolves when the record is deactivated
  */
-export const deactivateSecurityCode = async (clientName: string): Promise<void> => {
+export const deactivateSecurityCode = async (securityCode: string): Promise<void> => {
   try {
-    await updateSecurityCode(clientName, { isActive: false });
+    await updateSecurityCode(securityCode, { isActive: false });
   } catch (error) {
     console.error('Error deactivating security code:', error);
     throw new Error('Failed to deactivate security code');
@@ -270,22 +274,22 @@ export const deactivateSecurityCode = async (clientName: string): Promise<void> 
  * @param clientName - The client name of the record to delete
  * @returns Promise that resolves when the record is deleted
  */
-export const deleteSecurityCode = async (clientName: string): Promise<void> => {
+export const deleteSecurityCode = async (securityCode: string): Promise<void> => {
   try {
-    // Validate clientName parameter
-    if (!clientName || typeof clientName !== 'string' || clientName.trim() === '') {
-      throw new Error('Invalid client name provided for deletion');
+    // Validate securityCode parameter
+    if (!securityCode || typeof securityCode !== 'string' || securityCode.trim() === '') {
+      throw new Error('Invalid security code provided for deletion');
     }
 
-    // Sanitize clientName for Firestore document ID
-    const sanitizedClientName = clientName.trim();
-    
+    // Sanitize securityCode for Firestore document ID
+    const sanitizedCode = securityCode.trim();
+
     // Additional validation for Firestore document ID constraints
-    if (sanitizedClientName.includes('/') || sanitizedClientName.includes('\\') || sanitizedClientName.includes('.')) {
-      throw new Error('Client name contains invalid characters for document ID');
+    if (sanitizedCode.includes('/') || sanitizedCode.includes('\\') || sanitizedCode.includes('.')) {
+      throw new Error('Security code contains invalid characters for document ID');
     }
 
-    const docRef = doc(db, COLLECTION_NAME, sanitizedClientName);
+    const docRef = doc(db, COLLECTION_NAME, sanitizedCode);
     await deleteDoc(docRef);
   } catch (error) {
     console.error('Error deleting security code:', error);

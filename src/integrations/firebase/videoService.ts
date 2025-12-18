@@ -15,8 +15,8 @@ import {
 import { db } from './config';
 
 // Collections for different upload services
-export const YOUTUBE_VIDEOS_COLLECTION = 'youtubeVideos';
-export const GCS_VIDEOS_COLLECTION = 'gcsVideos';
+export const YOUTUBE_VIDEOS_COLLECTION = 'youtubeClientCodes';
+export const GCS_VIDEOS_COLLECTION = 'gcsClientCodes';
 
 export interface BaseVideoRecord {
   id: string;
@@ -53,13 +53,16 @@ export interface GCSVideoRecord extends BaseVideoRecord {
 export type VideoRecord = YouTubeVideoRecord | GCSVideoRecord;
 
 /**
- * Save YouTube video record to Firestore
+ * Save YouTube video record to Firestore using security code as document ID
  */
 export const saveYouTubeVideo = async (
-  videoData: Omit<YouTubeVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date }
+  videoData: Omit<YouTubeVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date },
+  securityCode?: string
 ): Promise<void> => {
   try {
-    const docRef = doc(db, YOUTUBE_VIDEOS_COLLECTION, videoData.id);
+    // Use security code as document ID if provided, otherwise use videoData.id
+    const docId = securityCode || videoData.id;
+    const docRef = doc(db, YOUTUBE_VIDEOS_COLLECTION, docId);
     const firestoreData = {
       ...videoData,
       service: 'youtube',
@@ -74,13 +77,16 @@ export const saveYouTubeVideo = async (
 };
 
 /**
- * Save GCS video record to Firestore
+ * Save GCS video record to Firestore using security code as document ID
  */
 export const saveGCSVideo = async (
-  videoData: Omit<GCSVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date }
+  videoData: Omit<GCSVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date },
+  securityCode?: string
 ): Promise<void> => {
   try {
-    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoData.id);
+    // Use security code as document ID if provided, otherwise use videoData.id
+    const docId = securityCode || videoData.id;
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, docId);
     const firestoreData = {
       ...videoData,
       service: 'gcs',
@@ -148,6 +154,8 @@ export const getAllVideosForUser = async (
   maxResults: number = 50
 ): Promise<VideoRecord[]> => {
   try {
+    console.log('getAllVideosForUser called with userId:', userId);
+    
     // Get YouTube videos
     const youtubeQuery = query(
       collection(db, YOUTUBE_VIDEOS_COLLECTION),
@@ -157,11 +165,14 @@ export const getAllVideosForUser = async (
       limit(maxResults)
     );
     
+    console.log('Executing YouTube query...');
     const youtubeSnapshot = await getDocs(youtubeQuery);
+    console.log('YouTube videos found:', youtubeSnapshot.size);
     const youtubeVideos: YouTubeVideoRecord[] = [];
     
     youtubeSnapshot.forEach((doc) => {
       const data = doc.data();
+      console.log('YouTube video doc:', doc.id, data);
       youtubeVideos.push({
         ...data,
         uploadedAt: data.uploadedAt.toDate(),
@@ -169,30 +180,65 @@ export const getAllVideosForUser = async (
       } as YouTubeVideoRecord);
     });
 
-    // Get GCS videos
-    const gcsQuery = query(
-      collection(db, GCS_VIDEOS_COLLECTION),
-      where('userId', '==', userId),
-      where('isActive', '==', true),
-      orderBy('uploadedAt', 'desc'),
-      limit(maxResults)
-    );
-    
-    const gcsSnapshot = await getDocs(gcsQuery);
-    const gcsVideos: GCSVideoRecord[] = [];
-    
-    gcsSnapshot.forEach((doc) => {
-      const data = doc.data();
-      gcsVideos.push({
-        ...data,
-        uploadedAt: data.uploadedAt.toDate(),
-        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
-      } as GCSVideoRecord);
-    });
+    // Get GCS videos - also try query with just userId if first query returns nothing
+    let gcsVideos: GCSVideoRecord[] = [];
+    try {
+      const gcsQuery = query(
+        collection(db, GCS_VIDEOS_COLLECTION),
+        where('userId', '==', userId),
+        where('isActive', '==', true),
+        orderBy('uploadedAt', 'desc'),
+        limit(maxResults)
+      );
+      
+      console.log('Executing GCS query (with isActive)...');
+      const gcsSnapshot = await getDocs(gcsQuery);
+      console.log('GCS videos found (with isActive):', gcsSnapshot.size);
+      
+      gcsSnapshot.forEach((doc) => {
+        const data = doc.data();
+        console.log('GCS video doc:', doc.id, data);
+        gcsVideos.push({
+          ...data,
+          uploadedAt: data.uploadedAt.toDate(),
+          lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+        } as GCSVideoRecord);
+      });
+    } catch (gcsError: any) {
+      console.log('GCS query with isActive failed:', gcsError.message);
+      // Fallback: query without isActive condition
+      try {
+        console.log('Trying fallback GCS query (userId only)...');
+        const fallbackGcsQuery = query(
+          collection(db, GCS_VIDEOS_COLLECTION),
+          where('userId', '==', userId),
+          orderBy('uploadedAt', 'desc'),
+          limit(maxResults)
+        );
+        const fallbackSnapshot = await getDocs(fallbackGcsQuery);
+        console.log('GCS videos found (fallback):', fallbackSnapshot.size);
+        
+        fallbackSnapshot.forEach((doc) => {
+          const data = doc.data();
+          if (data.isActive !== false) { // Include active and missing isActive field
+            console.log('GCS video doc (fallback):', doc.id, data);
+            gcsVideos.push({
+              ...data,
+              uploadedAt: data.uploadedAt.toDate(),
+              lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+            } as GCSVideoRecord);
+          }
+        });
+      } catch (fallbackError) {
+        console.error('Fallback GCS query also failed:', fallbackError);
+      }
+    }
 
     // Combine and sort by upload date
     const allVideos = [...youtubeVideos, ...gcsVideos];
-    return allVideos.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()).slice(0, maxResults);
+    const sorted = allVideos.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()).slice(0, maxResults);
+    console.log('Total videos returned:', sorted.length);
+    return sorted;
   } catch (error) {
     console.error('Error retrieving all videos for user:', error);
     throw new Error('Failed to retrieve videos from Firestore');

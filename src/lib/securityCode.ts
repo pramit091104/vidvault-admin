@@ -1,23 +1,36 @@
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Generates a secure random code for video access
- * @param length - Length of the security code (default: 8)
- * @returns A secure random alphanumeric code
+ * Generates a secure random 4-digit code for security code
+ * @returns A 4-digit random number as string
  */
-export const generateSecurityCode = (length: number = 8): string => {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
+export const generateRandomDigits = (): string => {
+  return Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+};
+
+/**
+ * Generates a security code based on service type and client name
+ * Format: [SERVICE_PREFIX][CLIENT_INITIALS][RANDOM_4_DIGITS]
+ * Examples: YTPR8262 (YouTube), GSPR6281 (Google Cloud Storage)
+ * @param service - 'youtube' or 'gcs'
+ * @param clientName - Client name (uses first 2 letters)
+ * @returns Formatted security code
+ */
+export const generateSecurityCode = (service: 'youtube' | 'gcs', clientName: string): string => {
+  // Service prefix
+  const servicePrefix = service === 'youtube' ? 'YT' : 'GS';
   
-  // Use crypto.getRandomValues for better randomness
-  const randomValues = new Uint32Array(length);
-  crypto.getRandomValues(randomValues);
+  // Get first 2 letters of client name (uppercase)
+  const clientInitials = clientName
+    .trim()
+    .substring(0, 2)
+    .toUpperCase()
+    .padEnd(2, 'X'); // Pad with 'X' if name is too short
   
-  for (let i = 0; i < length; i++) {
-    result += chars[randomValues[i] % chars.length];
-  }
+  // Generate random 4-digit code
+  const randomDigits = generateRandomDigits();
   
-  return result;
+  return `${servicePrefix}${clientInitials}${randomDigits}`;
 };
 
 /**
@@ -49,14 +62,16 @@ export interface VideoSecurityCode {
 
 /**
  * Creates a security code record for a new video
+ * @param service - 'youtube' or 'gcs'
  * @param title - Video title
- * @param clientName - Client name (used as document ID)
+ * @param clientName - Client name
  * @param youtubeVideoId - YouTube video ID (optional)
  * @param youtubeVideoUrl - YouTube video URL (optional)
  * @param userId - User ID who uploaded the video (optional)
  * @returns Security code record
  */
 export const createSecurityCodeRecord = (
+  service: 'youtube' | 'gcs',
   title: string,
   clientName: string,
   youtubeVideoId?: string,
@@ -65,7 +80,7 @@ export const createSecurityCodeRecord = (
 ): VideoSecurityCode => {
   return {
     videoId: generateVideoId(),
-    securityCode: generateSecurityCode(),
+    securityCode: generateSecurityCode(service, clientName),
     title: title.trim(),
     clientName: clientName.trim(),
     youtubeVideoId,

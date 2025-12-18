@@ -16,10 +16,13 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { youtubeService } from "@/integrations/youtube/youtubeService";
+import { gcsService } from "@/integrations/gcs/gcsService";
+import { getAllVideosForUser } from "@/integrations/firebase/videoService";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientComments } from "./ClientComments";
-import { createAndSaveSecurityCode, getSecurityCodeByYoutubeVideoId } from "@/integrations/firebase/securityCodeService";
+import { createAndSaveSecurityCode, getSecurityCodeByYoutubeVideoId, getSecurityCodeByCode, deleteSecurityCode } from "@/integrations/firebase/securityCodeService";
+import { deleteVideo } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 
@@ -55,6 +58,9 @@ const VideosTable = () => {
     videoTitle: string;
   } | null>(null);
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
+  const [serviceView, setServiceView] = useState<'youtube' | 'gcs'>('youtube');
+  const [gcsVideos, setGcsVideos] = useState<any[]>([]);
+  const [isLoadingGcs, setIsLoadingGcs] = useState(false);
 
   const handleSignIn = async () => {
     try {
@@ -132,11 +138,14 @@ const VideosTable = () => {
 
   useEffect(() => {
     fetchVideos();
+
     // Listen for video upload events to refresh the list
     const handleVideoUploaded = () => {
       fetchVideos(false);
+      fetchGcsVideos();
     };
     window.addEventListener("youtube-video-uploaded", handleVideoUploaded);
+    window.addEventListener("gcs-video-uploaded", handleVideoUploaded);
     
     // Listen for auth state changes
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -145,12 +154,20 @@ const VideosTable = () => {
     
     return () => {
       window.removeEventListener("youtube-video-uploaded", handleVideoUploaded);
+      window.removeEventListener("gcs-video-uploaded", handleVideoUploaded);
       unsubscribe();
     };
   }, []);
 
+  useEffect(() => {
+    if (currentUser) {
+      fetchGcsVideos();
+    }
+  }, [currentUser]);
+
   const handleRefresh = () => {
     fetchVideos(false);
+    fetchGcsVideos();
   };
 
   const handleGenerateSecurityCode = (video: YouTubeVideo) => {
@@ -158,6 +175,46 @@ const VideosTable = () => {
     setClientName("");
     setGeneratedSecurityCode("");
     setIsSecurityCodeDialogOpen(true);
+  };
+
+  const fetchGcsVideos = async () => {
+    if (!currentUser) {
+      console.log('No current user, skipping GCS videos fetch');
+      setGcsVideos([]);
+      return;
+    }
+    try {
+      setIsLoadingGcs(true);
+      console.log('Fetching GCS videos for user:', currentUser.uid);
+      const all = await getAllVideosForUser(currentUser.uid, 100);
+      console.log('All videos retrieved:', all);
+      console.log('Total videos:', all.length);
+      
+      // Log each video's service type
+      all.forEach((v, idx) => {
+        console.log(`Video ${idx}:`, { 
+          title: v.title, 
+          service: (v as any).service, 
+          hasService: 'service' in v,
+          publicUrl: (v as any).publicUrl 
+        });
+      });
+      
+      const gcs = all.filter((v: any) => {
+        console.log('Checking video:', v.title, 'service:', v.service, 'equals gcs:', v.service === 'gcs');
+        return v.service === 'gcs';
+      });
+      console.log('GCS videos filtered:', gcs.length, 'videos');
+      gcs.forEach((v, idx) => {
+        console.log(`GCS Video ${idx}:`, { title: v.title, publicUrl: (v as any).publicUrl });
+      });
+      setGcsVideos(gcs);
+    } catch (err: any) {
+      console.error('Error fetching GCS videos:', err);
+      console.error('Error details:', err.message, err.code);
+    } finally {
+      setIsLoadingGcs(false);
+    }
   };
 
   const handleCreateSecurityCode = async () => {
@@ -169,6 +226,7 @@ const VideosTable = () => {
     setIsGeneratingCode(true);
     try {
       const securityCodeRecord = await createAndSaveSecurityCode(
+        'youtube',
         selectedVideoForCode.title,
         clientName.trim(),
         selectedVideoForCode.youtubeId,
@@ -224,13 +282,44 @@ const VideosTable = () => {
     }
   };
 
+  const handleViewClientCommentsGcs = async (securityCode: string, videoTitle: string) => {
+    try {
+      const securityCodeRecord = await getSecurityCodeByCode(securityCode);
+      if (!securityCodeRecord) {
+        toast.error('No security code found for this video.');
+        return;
+      }
+      setSelectedClientComments({
+        clientName: securityCodeRecord.clientName,
+        securityCode: securityCodeRecord.securityCode,
+        videoTitle
+      });
+      setActiveTab('client-comments');
+    } catch (error: any) {
+      console.error('Error fetching security code:', error);
+      toast.error(error.message || 'Failed to fetch security code');
+    }
+  };
+
   const handleDelete = async (videoId: string, videoTitle: string) => {
     setDeletingVideoId(videoId);
     try {
-      // Implement delete functionality here
+      // Delete from YouTube first
+      await youtubeService.deleteVideo(videoId);
+
+      // Try to find associated security code (if any)
+      const scRecord = await getSecurityCodeByYoutubeVideoId(videoId);
+      if (scRecord && scRecord.securityCode) {
+        // Delete security code document (videoSecurityCodes)
+        await deleteSecurityCode(scRecord.securityCode);
+        // Delete the video record stored under the security code in Firestore
+        await deleteVideo(scRecord.securityCode, 'youtube');
+      }
+
       toast.success(`Video "${videoTitle}" deleted successfully`);
       // Refresh videos after deletion
       await fetchVideos(false);
+      await fetchGcsVideos();
     } catch (error: any) {
       console.error('Error deleting video:', error);
       toast.error(error.message || 'Failed to delete video');
@@ -239,6 +328,33 @@ const VideosTable = () => {
     }
   };
 
+  const handleDeleteGcs = async (record: any) => {
+    const securityCode = record.securityCode;
+    setDeletingVideoId(securityCode || record.fileName || null);
+    try {
+      // Delete file from GCS
+      if (record.fileName) {
+        await gcsService.deleteFile(record.fileName);
+      }
+
+      // Delete security code doc and video record in Firestore
+      if (securityCode) {
+        await deleteSecurityCode(securityCode);
+        await deleteVideo(securityCode, 'gcs');
+      }
+
+      toast.success(`Video "${record.title || record.fileName}" deleted successfully`);
+      await fetchGcsVideos();
+      await fetchVideos(false);
+    } catch (error: any) {
+      console.error('Error deleting GCS video:', error);
+      toast.error(error.message || 'Failed to delete GCS video');
+    } finally {
+      setDeletingVideoId(null);
+    }
+  };
+
+
   return (
     <Card className="border-border/50 bg-card/95 backdrop-blur-sm">
       <CardHeader>
@@ -246,10 +362,10 @@ const VideosTable = () => {
         <div>
           <CardTitle className="flex items-center gap-2">
             <Film className="h-5 w-5 text-primary" />
-            Manage YouTube Videos
+            Manage Videos
           </CardTitle>
           <CardDescription>
-            View and manage all videos from your YouTube account
+            View and manage uploaded videos (YouTube and Google Cloud Storage)
           </CardDescription>
         </div>
         <div className="flex gap-2 items-center">
@@ -341,133 +457,151 @@ const VideosTable = () => {
           </TabsList>
           
           <TabsContent value="videos" className="space-y-4">
-            {isLoading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="flex items-center gap-4">
-                    <Skeleton className="h-16 w-28 rounded" />
-                    <div className="flex-1 space-y-2">
-                      <Skeleton className="h-4 w-3/4" />
-                      <Skeleton className="h-3 w-1/2" />
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                variant={serviceView === 'youtube' ? 'default' : 'ghost'}
+                onClick={() => setServiceView('youtube')}
+              >
+                YouTube
+              </Button>
+              <Button
+                size="sm"
+                variant={serviceView === 'gcs' ? 'default' : 'ghost'}
+                onClick={() => setServiceView('gcs')}
+              >
+                Google Cloud Storage
+              </Button>
+            </div>
+
+            {serviceView === 'youtube' ? (
+              isLoading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <Skeleton className="h-16 w-28 rounded" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <>
-                <div className="rounded-lg border border-border overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-secondary/50">
-                        <TableHead>Video</TableHead>
-                        <TableHead>Title</TableHead>
-                        <TableHead>Upload Date</TableHead>
-                        <TableHead>Privacy</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {videos.map((video) => (
-                        <TableRow key={video.id} className="hover:bg-secondary/30">
-                          <TableCell>
-                            {video.thumbnailUrl ? (
-                              <img
-                                src={video.thumbnailUrl}
-                                alt={video.title}
-                                className="w-24 h-16 object-cover rounded"
-                              />
-                            ) : (
-                              <div className="w-24 h-16 bg-secondary rounded flex items-center justify-center">
-                                <Film className="h-6 w-6 text-muted-foreground" />
-                              </div>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="max-w-md">
-                              <p className="font-medium line-clamp-2">{video.title}</p>
-                              {video.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
-                                  {video.description}
-                                </p>
-                              )}
-                            </div>
-                          </TableCell>
-                          <TableCell>{video.uploadDate}</TableCell>
-                          <TableCell>
-                            <Badge
-                              variant="outline"
-                              className={
-                                video.privacyStatus === "public"
-                                  ? "bg-green-500/10 text-green-600 border-green-500/20"
-                                  : video.privacyStatus === "unlisted"
-                                  ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
-                                  : "bg-gray-500/10 text-gray-600 border-gray-500/20"
-                              }
-                            >
-                              {video.privacyStatus}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge className="bg-primary/10 text-primary border-primary/20">
-                              {video.status}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-right space-x-2">
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleViewClientComments(video)}
-                                title="View client comments"
-                              >
-                                <MessageSquare className="h-4 w-4 text-blue-500" />
-                                <span className="sr-only">View client comments</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => window.open(video.videoUrl, "_blank")}
-                                title="Open in YouTube"
-                              >
-                                <ExternalLink className="h-4 w-4" />
-                                <span className="sr-only">Open in YouTube</span>
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8"
-                                onClick={() => handleGenerateSecurityCode(video)}
-                                title="Generate security code"
-                                disabled={!currentUser}
-                              >
-                                <Shield className="h-4 w-4" />
-                                <span className="sr-only">Generate security code</span>
-                              </Button>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              className="h-8 min-w-[32px]"
-                              onClick={() => handleDelete(video.id, video.title)}
-                              disabled={!!deletingVideoId}
-                              title="Delete video"
-                            >
-                              {deletingVideoId === video.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <Trash2 className="h-4 w-4" />
-                              )}
-                              <span className="sr-only">Delete video</span>
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                  ))}
                 </div>
+              ) : (
+                <>
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-secondary/50">
+                          <TableHead>Video</TableHead>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Upload Date</TableHead>
+                          <TableHead>Privacy</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {videos.map((video) => (
+                          <TableRow key={video.id} className="hover:bg-secondary/30">
+                            <TableCell>
+                              {video.thumbnailUrl ? (
+                                <img
+                                  src={video.thumbnailUrl}
+                                  alt={video.title}
+                                  className="w-24 h-16 object-cover rounded"
+                                />
+                              ) : (
+                                <div className="w-24 h-16 bg-secondary rounded flex items-center justify-center">
+                                  <Film className="h-6 w-6 text-muted-foreground" />
+                                </div>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <div className="max-w-md">
+                                <p className="font-medium line-clamp-2">{video.title}</p>
+                                {video.description && (
+                                  <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                                    {video.description}
+                                  </p>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>{video.uploadDate}</TableCell>
+                            <TableCell>
+                              <Badge
+                                variant="outline"
+                                className={
+                                  video.privacyStatus === "public"
+                                    ? "bg-green-500/10 text-green-600 border-green-500/20"
+                                    : video.privacyStatus === "unlisted"
+                                    ? "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                                    : "bg-gray-500/10 text-gray-600 border-gray-500/20"
+                                }
+                              >
+                                {video.privacyStatus}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className="bg-primary/10 text-primary border-primary/20">
+                                {video.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right space-x-2">
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleViewClientComments(video)}
+                                  title="View client comments"
+                                >
+                                  <MessageSquare className="h-4 w-4 text-blue-500" />
+                                  <span className="sr-only">View client comments</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => window.open(video.videoUrl, "_blank")}
+                                  title="Open in YouTube"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  <span className="sr-only">Open in YouTube</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleGenerateSecurityCode(video)}
+                                  title="Generate security code"
+                                  disabled={!currentUser}
+                                >
+                                  <Shield className="h-4 w-4" />
+                                  <span className="sr-only">Generate security code</span>
+                                </Button>
+                              </div>
+                              <Button
+                                size="sm"
+                                variant="destructive"
+                                className="h-8 min-w-[32px]"
+                                onClick={() => handleDelete(video.id, video.title)}
+                                disabled={!!deletingVideoId}
+                                title="Delete video"
+                              >
+                                {deletingVideoId === video.id ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                                <span className="sr-only">Delete video</span>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
 
                 {videos.length === 0 && !error && (
                   <div className="text-center py-12 text-muted-foreground">
@@ -479,6 +613,158 @@ const VideosTable = () => {
                   </div>
                 )}
               </>
+            )
+            ) : (
+              isLoadingGcs ? (
+                <div className="space-y-4">
+                  {[1, 2, 3].map((i) => (
+                    <div key={i} className="flex items-center gap-4">
+                      <Skeleton className="h-16 w-28 rounded" />
+                      <div className="flex-1 space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-3 w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="rounded-lg border border-border overflow-hidden">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-secondary/50">
+                          <TableHead>File Name</TableHead>
+                          <TableHead>Title</TableHead>
+                          <TableHead>Upload Date</TableHead>
+                          <TableHead>Security Code</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {gcsVideos.map((video) => (
+                          <TableRow key={video.securityCode} className="hover:bg-secondary/30">
+                            <TableCell>
+                              <p className="font-mono text-sm max-w-[100px] truncate" title={video.fileName}>
+                                {video.fileName?.length > 15 ? video.fileName.substring(0, 15) + '...' : video.fileName}
+                              </p>
+                            </TableCell>
+                            <TableCell>
+                              <p className="font-medium line-clamp-1">{video.title || 'Untitled'}</p>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-muted-foreground">
+                                {video.uploadedAt ? new Date(video.uploadedAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="font-mono text-xs">
+                                  {video.securityCode}
+                                </Badge>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(video.securityCode);
+                                    toast.success('Security code copied!');
+                                  }}
+                                  title="Copy security code"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                  <span className="sr-only">Copy security code</span>
+                                </Button>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex items-center justify-end gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    if (!video.publicUrl) {
+                                      toast.error('Video URL not available');
+                                      console.error('Video publicUrl is missing:', video);
+                                      return;
+                                    }
+                                    console.log('Opening video:', video.publicUrl);
+                                    const opened = window.open(video.publicUrl, '_blank');
+                                    if (!opened) {
+                                      toast.error('Could not open video. Please check popup blocker settings.');
+                                    }
+                                  }}
+                                  disabled={!video.publicUrl}
+                                  title="View video"
+                                >
+                                  <ExternalLink className="h-4 w-4" />
+                                  <span className="sr-only">View video</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setSelectedVideoForCode(video as any);
+                                    setClientName(video.clientName || '');
+                                    setIsSecurityCodeDialogOpen(true);
+                                  }}
+                                  title="Generate new security code"
+                                >
+                                  <Shield className="h-4 w-4" />
+                                  <span className="sr-only">Generate security code</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => {
+                                    setSelectedClientComments({
+                                      clientName: video.clientName || 'Unknown',
+                                      securityCode: video.securityCode,
+                                      videoTitle: video.title || 'Untitled',
+                                    });
+                                    setActiveTab('client-comments');
+                                  }}
+                                  title="View comments"
+                                >
+                                  <MessageSquare className="h-4 w-4" />
+                                  <span className="sr-only">View comments</span>
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive"
+                                  disabled={deletingVideoId === (video.securityCode || video.fileName)}
+                                  onClick={() => handleDeleteGcs(video)}
+                                  title="Delete video"
+                                >
+                                  {deletingVideoId === (video.securityCode || video.fileName) ? (
+                                    <Loader2 className="h-4 w-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4" />
+                                  )}
+                                  <span className="sr-only">Delete video</span>
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+
+                  {gcsVideos.length === 0 && !error && (
+                    <div className="text-center py-12 text-muted-foreground">
+                      <Film className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p className="font-medium mb-2">No videos found</p>
+                      <p className="text-sm">
+                        Upload your first video using the Upload section above
+                      </p>
+                    </div>
+                  )}
+                </>
+              )
             )}
           </TabsContent>
           

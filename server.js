@@ -183,16 +183,44 @@ app.post('/api/gcs/upload', gcsUpload, async (req, res) => {
 
     blobStream.on('finish', async () => {
       try {
+        let publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
+        
         // Make the file public (optional, based on privacy settings)
         if (metadata) {
           const parsedMetadata = JSON.parse(metadata);
           if (parsedMetadata.privacyStatus === 'public') {
-            await blob.makePublic();
+            try {
+              await blob.makePublic();
+              console.log('File made public:', fileName);
+            } catch (makePublicError) {
+              console.warn('Failed to make file public:', makePublicError.message);
+              // Generate a signed URL as fallback for access
+              try {
+                // Use a reasonable signed URL expiry (7 days)
+                const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
+                const [signedUrl] = await blob.getSignedUrl({
+                  version: 'v4',
+                  action: 'read',
+                  expires: expiresAt,
+                });
+                publicUrl = signedUrl;
+                console.log('Using signed URL as fallback:', fileName, 'expiresAt:', new Date(expiresAt).toISOString());
+              } catch (signedUrlError) {
+                console.warn('Failed to generate signed URL:', signedUrlError.message);
+              }
+            }
           }
         }
 
         // Get file metadata
         const [metadataResult] = await blob.getMetadata();
+        
+        console.log('GCS upload successful:', {
+          fileName,
+          publicUrl,
+          size: metadataResult.size,
+          contentType: metadataResult.contentType
+        });
         
         res.json({
           success: true,
@@ -200,7 +228,7 @@ app.post('/api/gcs/upload', gcsUpload, async (req, res) => {
           size: metadataResult.size,
           contentType: metadataResult.contentType,
           uploadedAt: new Date().toISOString(),
-          publicUrl: `https://storage.googleapis.com/${bucketName}/${fileName}`,
+          publicUrl,
         });
       } catch (error) {
         console.error('Error getting file metadata:', error);
