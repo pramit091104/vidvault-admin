@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Share2, Eye, Calendar} from "lucide-react";
 import { toast } from "sonner";
+import 'plyr/dist/plyr.css';
 import { requestSignedUrl } from '@/integrations/api/signedUrlService';
 import { getPublicVideoBySlug, updateVideoViewCount, YouTubeVideoRecord, GCSVideoRecord } from "@/integrations/firebase/videoService";
 import { format } from "date-fns";
@@ -37,6 +38,56 @@ const Watch = () => {
   const [videoError, setVideoError] = useState<string | null>(null);
   
   const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<Plyr | null>(null);
+
+  // Initialize Plyr player when video element and signed URL are ready
+  useEffect(() => {
+    let cancelled = false;
+    const init = async () => {
+      if (!videoRef.current || !signedVideoUrl || playerRef.current) return;
+      try {
+        const PlyrModule = await import('plyr');
+        const PlyrClass = (PlyrModule as any).default || PlyrModule;
+        playerRef.current = new PlyrClass(videoRef.current, {
+          controls: [
+            'play-large',
+            'play',
+            'progress',
+            'current-time',
+            'duration',
+            'mute',
+            'volume',
+            'settings',
+            'pip',
+            'airplay',
+            'fullscreen'
+          ],
+          settings: ['captions', 'quality', 'speed', 'loop'],
+          quality: { default: 720, options: [360, 720] },
+          tooltips: { controls: true, seek: true },
+          keyboard: { focused: true, global: true },
+          clickToPlay: true,
+          autoplay: false,
+        });
+      } catch (err) {
+        if (!cancelled) console.error('Plyr initialization error:', err);
+      }
+    };
+
+    init();
+
+    return () => {
+      cancelled = true;
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+        } catch (err) {
+          console.error('Error destroying player:', err);
+        }
+        playerRef.current = null;
+      }
+    };
+  }, [signedVideoUrl]);
 
   useEffect(() => {
     const fetchVideo = async () => {
@@ -85,7 +136,6 @@ const Watch = () => {
 
         // --- SECURE URL LOGIC ---
         if (mappedVideo.service === 'gcs') {
-            console.log("Attempting to sign GCS URL for ID:", mappedVideo.id);
             try {
               // Use the stored fileName for signing; fall back to the document id
               const targetId = (videoData as any).fileName || mappedVideo.id;
@@ -93,7 +143,6 @@ const Watch = () => {
                 targetId,
                 'gcs'
               );
-              console.log("Signed URL received successfully");
               setSignedVideoUrl(url);
             } catch (err: any) {
               console.error("Signing failed details:", err.message);
@@ -160,9 +209,9 @@ const Watch = () => {
 
       <main className="max-w-6xl mx-auto px-4 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-6">
-          <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-lg flex items-center justify-center">
+        <div className="relative aspect-video bg-black rounded-lg overflow-hidden shadow-lg flex items-center justify-center group">
             {videoError && (
-              <div className="absolute inset-0 bg-black/80 z-10 flex flex-col items-center justify-center text-white">
+              <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center text-white">
                  <p className="text-red-400 font-semibold mb-2">Playback Error</p>
                  <p className="text-sm text-gray-300">{videoError}</p>
               </div>
@@ -174,8 +223,7 @@ const Watch = () => {
                   <video
                     key={signedVideoUrl}
                     ref={videoRef}
-                    controls
-                    className="w-full h-full"
+                    className="w-full h-full bg-black"
                     poster={video.thumbnailUrl}
                     playsInline
                     preload="metadata"
