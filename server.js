@@ -53,8 +53,8 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 app.post('/api/signed-url', async (req, res) => {
   try {
     if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
-
     const { videoId, securityCode, service } = req.body;
+    console.log('[/api/signed-url] request body:', { videoId, securityCode, service });
     
     // Clean up the input ID (remove doubles extensions if present)
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
@@ -88,12 +88,13 @@ app.post('/api/signed-url', async (req, res) => {
 
     // 2. IF NOT FOUND: Debugging Help
     if (!foundFile) {
+      console.error('⚠️ File not found. Searched paths:', potentialPaths);
       console.error('⚠️ File not found. Listing files in bucket to help debug...');
       
-      // List first 10 files in bucket to see where they actually are
+      // List first 25 files in bucket to see where they actually are
       try {
-        const [files] = await bucket.getFiles({ maxResults: 10 });
-        console.log('--- ACTUAL BUCKET CONTENT (First 10) ---');
+        const [files] = await bucket.getFiles({ maxResults: 25 });
+        console.log('--- ACTUAL BUCKET CONTENT (First 25) ---');
         files.forEach(f => console.log(`- ${f.name}`));
         console.log('----------------------------------------');
       } catch (e) {

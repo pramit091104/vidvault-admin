@@ -71,9 +71,13 @@ export class GCSService {
       // Upload using resumable upload via our backend
       const result = await this.performResumableUpload(formData, onProgress);
 
+      // Prefer signedUrl returned by backend (when bucket is private).
+      const returnedFileName = result?.fileName || fileName;
+      const returnedSignedUrl = result?.signedUrl || null;
+
       return {
-        fileName,
-        publicUrl: getPublicUrl(fileName),
+        fileName: returnedFileName,
+        publicUrl: returnedSignedUrl || getPublicUrl(returnedFileName),
         size: file.size,
         contentType: file.type,
         uploadedAt: new Date(),
