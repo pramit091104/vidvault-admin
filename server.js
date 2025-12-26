@@ -42,6 +42,28 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
       const storage = new Storage({ projectId: process.env.GCS_PROJECT_ID, credentials });
       bucket = storage.bucket(BUCKET_NAME);
       console.log('✅ Google Cloud Storage initialized');
+      // Optionally auto-configure CORS on startup to allow browser video playback
+      if (process.env.AUTO_CONFIGURE_GCS_CORS === 'true') {
+        (async () => {
+          try {
+            const origins = (process.env.GCS_CORS_ORIGINS || 'https://www.previu.online,http://localhost:5173,http://localhost:8080')
+              .split(',')
+              .map(s => s.trim());
+            const corsConfig = [
+              {
+                origin: origins,
+                method: ['GET', 'HEAD', 'OPTIONS'],
+                responseHeader: ['Content-Type', 'Content-Length', 'Accept-Ranges', 'Range'],
+                maxAgeSeconds: 3600,
+              },
+            ];
+            await bucket.setMetadata({ cors: corsConfig });
+            console.log('✅ GCS CORS configured for origins:', origins);
+          } catch (e) {
+            console.warn('⚠️ Failed to auto-configure GCS CORS:', e.message);
+          }
+        })();
+      }
     }
   } catch (error) {
     console.warn('❌ Failed to initialize GCS:', error.message);
@@ -191,6 +213,31 @@ app.get('/api/gcs/metadata', async (req, res) => {
     res.json(meta);
   } catch (error) {
     console.error('GCS metadata error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin endpoint to set bucket CORS policy (POST)
+app.post('/api/gcs/set-cors', express.json(), async (req, res) => {
+  try {
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
+
+    const { origins } = req.body;
+    if (!origins || !Array.isArray(origins)) return res.status(400).json({ error: 'origins array required' });
+
+    const corsConfig = [
+      {
+        origin: origins,
+        method: ['GET', 'HEAD', 'OPTIONS'],
+        responseHeader: ['Content-Type', 'Content-Length', 'Accept-Ranges', 'Range'],
+        maxAgeSeconds: 3600,
+      },
+    ];
+
+    await bucket.setMetadata({ cors: corsConfig });
+    res.json({ success: true, origins });
+  } catch (error) {
+    console.error('GCS set-cors error:', error);
     res.status(500).json({ error: error.message });
   }
 });
