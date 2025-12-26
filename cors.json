@@ -1,8 +1,21 @@
 [
   {
-    "origin": ["http://localhost:3001", "http://localhost:8080"],
-    "method": ["GET", "HEAD", "OPTIONS"],
-    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin", "Range"],
+    "origin": [
+      "http://localhost:3001",
+      "http://localhost:8080",
+      "https://www.previu.online"
+    ],
+    "method": [
+      "GET",
+      "HEAD",
+      "OPTIONS"
+    ],
+    "responseHeader": [
+      "Content-Type",
+      "Content-Length",
+      "Accept-Ranges",
+      "Range"
+    ],
     "maxAgeSeconds": 3600
   }
 ]
