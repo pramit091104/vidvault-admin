@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Film, Trash2, ExternalLink, Youtube, Loader2, RefreshCw, AlertCircle, X, Shield, Key, Copy } from "lucide-react";
+import { MessageSquare, Film, Trash2, ExternalLink, Youtube, Loader2, RefreshCw, AlertCircle, X, Shield, Key, Copy, Globe, Link2, Eye } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -22,7 +22,7 @@ import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientComments } from "./ClientComments";
 import { createAndSaveSecurityCode, getSecurityCodeByYoutubeVideoId, getSecurityCodeByCode, deleteSecurityCode } from "@/integrations/firebase/securityCodeService";
-import { deleteVideo } from "@/integrations/firebase/videoService";
+import { deleteVideo, toggleVideoPublicAccess } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 
@@ -61,7 +61,87 @@ const VideosTable = () => {
   const [serviceView, setServiceView] = useState<'youtube' | 'gcs'>('youtube');
   const [gcsVideos, setGcsVideos] = useState<any[]>([]);
   const [isLoadingGcs, setIsLoadingGcs] = useState(false);
+  const [allVideos, setAllVideos] = useState<any[]>([]);
 
+  const fetchAllVideos = async () => {
+    if (!currentUser) return;
+    
+    try {
+      setIsLoading(true);
+      const videos = await getAllVideosForUser(currentUser.uid);
+      setAllVideos(videos);
+    } catch (error: any) {
+      console.error('Error fetching all videos:', error);
+      toast.error('Failed to fetch videos');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTogglePublicAccess = async (video: any) => {
+    try {
+      let newPublicStatus = !video.isPublic;
+      let slugToUse = video.publicSlug;
+      
+      // If making public and no slug exists, generate one
+      if (newPublicStatus && !slugToUse) {
+        const { generateVideoSlug } = await import('@/lib/slugGenerator');
+        slugToUse = generateVideoSlug(video.clientName, video.title);
+        
+        // Update the video record with the new slug
+        await toggleVideoPublicAccess(
+          video.securityCode,
+          video.service,
+          newPublicStatus,
+          slugToUse
+        );
+        
+        // Update local state with both public status and slug
+        setAllVideos(prev => prev.map(v => 
+          v.securityCode === video.securityCode 
+            ? { ...v, isPublic: newPublicStatus, publicSlug: slugToUse }
+            : v
+        ));
+        
+        // Copy public URL to clipboard
+        const publicUrl = `${window.location.origin}/watch/${slugToUse}`;
+        navigator.clipboard.writeText(publicUrl);
+        
+        toast.success('Video is now public! Public URL copied to clipboard.');
+        return;
+      }
+      
+      // Normal toggle for existing slugs
+      await toggleVideoPublicAccess(
+        video.securityCode,
+        video.service,
+        newPublicStatus,
+        slugToUse
+      );
+      
+      setAllVideos(prev => prev.map(v => 
+        v.securityCode === video.securityCode 
+          ? { ...v, isPublic: newPublicStatus }
+          : v
+      ));
+      
+      toast.success(`Video is now ${newPublicStatus ? 'public' : 'private'}`);
+    } catch (error: any) {
+      console.error('Error toggling public access:', error);
+      toast.error('Failed to update public access');
+    }
+  };
+
+  const copyPublicUrl = (video: any) => {
+    if (!video.publicSlug) {
+      toast.error('Public URL not available');
+      return;
+    }
+    
+    const publicUrl = `${window.location.origin}/watch/${video.publicSlug}`;
+    navigator.clipboard.writeText(publicUrl);
+    toast.success('Public URL copied to clipboard!');
+  };
   const handleSignIn = async () => {
     try {
       setIsLoading(true);
@@ -138,11 +218,13 @@ const VideosTable = () => {
 
   useEffect(() => {
     fetchVideos();
+    fetchAllVideos();
 
     // Listen for video upload events to refresh the list
     const handleVideoUploaded = () => {
       fetchVideos(false);
       fetchGcsVideos();
+      fetchAllVideos();
     };
     window.addEventListener("youtube-video-uploaded", handleVideoUploaded);
     window.addEventListener("gcs-video-uploaded", handleVideoUploaded);
@@ -162,6 +244,7 @@ const VideosTable = () => {
   useEffect(() => {
     if (currentUser) {
       fetchGcsVideos();
+      fetchAllVideos();
     }
   }, [currentUser]);
 
@@ -678,6 +761,28 @@ const VideosTable = () => {
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
+                                {video.isPublic && (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => copyPublicUrl(video)}
+                                    title="Copy public URL"
+                                  >
+                                    <Link2 className="h-4 w-4" />
+                                    <span className="sr-only">Copy public URL</span>
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => handleTogglePublicAccess(video)}
+                                  title={video.isPublic ? 'Make private' : 'Make public'}
+                                >
+                                  <Globe className={`h-4 w-4 ${video.isPublic ? 'text-blue-600' : 'text-muted-foreground'}`} />
+                                  <span className="sr-only">Toggle public access</span>
+                                </Button>
                                 <Button
                                   variant="ghost"
                                   size="icon"

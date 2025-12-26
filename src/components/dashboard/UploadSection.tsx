@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Loader2, CheckCircle2, Youtube, Shield, Copy, Cloud } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Youtube, Shield, Copy, Cloud, Globe, Link2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { youtubeService } from "@/integrations/youtube/youtubeService";
 import { gcsService } from "@/integrations/gcs/gcsService";
@@ -15,6 +15,7 @@ import { saveYouTubeVideo, saveGCSVideo } from "@/integrations/firebase/videoSer
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 import { v4 as uuidv4 } from 'uuid';
+import { generateVideoSlug, createPublicUrl } from '@/lib/slugGenerator';
 
 const UploadSection = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -31,6 +32,9 @@ const UploadSection = () => {
   const [isInitializing, setIsInitializing] = useState(false);
   const [securityCode, setSecurityCode] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [isPublicWebsite, setIsPublicWebsite] = useState<boolean>(false);
+  const [publicSlug, setPublicSlug] = useState<string>("");
+  const [publicUrl, setPublicUrl] = useState<string>("");
 
   useEffect(() => {
     // Initialize services based on selected upload service
@@ -121,6 +125,8 @@ const UploadSection = () => {
     setYoutubeVideoUrl("");
     setGcsVideoUrl("");
     setSecurityCode("");
+    setPublicSlug("");
+    setPublicUrl("");
     
     try {
       if (uploadService === 'youtube') {
@@ -171,6 +177,21 @@ const UploadSection = () => {
           return;
         }
         
+        // Generate public slug if enabled
+        let generatedSlug = '';
+        if (isPublicWebsite) {
+          try {
+            generatedSlug = generateVideoSlug(clientName.trim(), title.trim());
+            setPublicSlug(generatedSlug);
+            const url = createPublicUrl(generatedSlug);
+            setPublicUrl(url);
+            toast.success('Public website created successfully!');
+          } catch (slugError: any) {
+            console.error('Slug generation error:', slugError);
+            toast.error('Video uploaded but failed to create public website');
+          }
+        }
+        
         // Save to Firebase YouTube collection using security code as document ID
         const videoId = uuidv4();
         try {
@@ -188,6 +209,10 @@ const UploadSection = () => {
             accessCount: 0,
             uploadStatus: 'completed',
             uploadedAt: new Date(),
+            isPublic: isPublicWebsite,
+            publicSlug: generatedSlug,
+            publicUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
+            viewCount: 0,
           }, generatedSecurityCode);
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
@@ -236,6 +261,21 @@ const UploadSection = () => {
           return;
         }
         
+        // Generate public slug if enabled
+        let generatedSlug = '';
+        if (isPublicWebsite) {
+          try {
+            generatedSlug = generateVideoSlug(clientName.trim(), title.trim());
+            setPublicSlug(generatedSlug);
+            const url = createPublicUrl(generatedSlug);
+            setPublicUrl(url);
+            toast.success('Public website created successfully!');
+          } catch (slugError: any) {
+            console.error('Slug generation error:', slugError);
+            toast.error('Video uploaded but failed to create public website');
+          }
+        }
+        
         // Save to Firebase GCS collection using security code as document ID
         const videoId = uuidv4();
         try {
@@ -255,6 +295,10 @@ const UploadSection = () => {
             accessCount: 0,
             isPubliclyAccessible: privacyStatus === 'public',
             uploadedAt: new Date(),
+            isPublic: isPublicWebsite,
+            publicSlug: generatedSlug,
+            publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
+            viewCount: 0,
           }, generatedSecurityCode);
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
@@ -298,6 +342,13 @@ const UploadSection = () => {
     if (securityCode) {
       navigator.clipboard.writeText(securityCode);
       toast.success('Security code copied to clipboard!');
+    }
+  };
+
+  const copyPublicUrl = () => {
+    if (publicUrl) {
+      navigator.clipboard.writeText(publicUrl);
+      toast.success('Public URL copied to clipboard!');
     }
   };
 
@@ -384,6 +435,28 @@ const UploadSection = () => {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="publicWebsite">Public Access</Label>
+          <div className="flex items-center space-x-3 p-4 border border-border/50 rounded-lg bg-background/50">
+            <input
+              type="checkbox"
+              id="publicWebsite"
+              checked={isPublicWebsite}
+              onChange={(e) => setIsPublicWebsite(e.target.checked)}
+              className="h-4 w-4 text-primary rounded border-border"
+            />
+            <div className="flex-1">
+              <Label htmlFor="publicWebsite" className="text-sm font-medium text-foreground cursor-pointer">
+                Create public website
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Generate a shareable single-page website for this video. Anyone with the link can view without a security code.
+              </p>
+            </div>
+            <Globe className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="video">Video File *</Label>
           <div className="relative">
             <Input
@@ -450,6 +523,33 @@ const UploadSection = () => {
                 </div>
                 <p className="text-xs text-green-600 dark:text-green-400">
                   Share this code with users who need access to this video. Each code can be used to track video access.
+                </p>
+              </div>
+            )}
+            
+            {publicUrl && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
+                <div className="flex items-center gap-2">
+                  <Globe className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                  <h4 className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                    Public Website Created
+                  </h4>
+                </div>
+                <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-blue-300 dark:border-blue-700 rounded-md px-3 py-2">
+                  <code className="text-sm font-mono text-blue-700 dark:text-blue-300 truncate">
+                    {publicUrl}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={copyPublicUrl}
+                    className="ml-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="text-xs text-blue-600 dark:text-blue-400">
+                  Share this link for direct public access. No security code required.
                 </p>
               </div>
             )}

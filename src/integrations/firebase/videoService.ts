@@ -13,6 +13,7 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from './config';
+import { increment } from 'firebase/firestore';
 
 // Collections for different upload services
 export const YOUTUBE_VIDEOS_COLLECTION = 'youtubeClientCodes';
@@ -29,6 +30,9 @@ export interface BaseVideoRecord {
   isActive: boolean;
   accessCount: number;
   lastAccessed?: Date;
+  isPublic?: boolean;
+  publicSlug?: string;
+  viewCount?: number;
 }
 
 export interface YouTubeVideoRecord extends BaseVideoRecord {
@@ -38,6 +42,7 @@ export interface YouTubeVideoRecord extends BaseVideoRecord {
   privacyStatus: 'private' | 'unlisted' | 'public';
   thumbnailUrl?: string;
   uploadStatus: 'processing' | 'completed' | 'failed';
+  publicUrl?: string;
 }
 
 export interface GCSVideoRecord extends BaseVideoRecord {
@@ -48,6 +53,7 @@ export interface GCSVideoRecord extends BaseVideoRecord {
   contentType: string;
   privacyStatus: 'private' | 'unlisted' | 'public';
   isPubliclyAccessible: boolean;
+  publicWebsiteUrl?: string;
 }
 
 export type VideoRecord = YouTubeVideoRecord | GCSVideoRecord;
@@ -302,8 +308,108 @@ export const deleteVideo = async (
   }
 };
 
-// Helper function for incrementing access count
-const increment = (n: number) => ({
-  value: n,
-  type: 'increment'
-});
+/**
+ * Get public video by slug
+ */
+export const getPublicVideoBySlug = async (slug: string): Promise<VideoRecord | null> => {
+  try {
+    // Search in YouTube videos first
+    const youtubeQuery = query(
+      collection(db, YOUTUBE_VIDEOS_COLLECTION),
+      where('publicSlug', '==', slug),
+      where('isPublic', '==', true),
+      where('isActive', '==', true),
+      limit(1)
+    );
+    
+    const youtubeSnapshot = await getDocs(youtubeQuery);
+    if (!youtubeSnapshot.empty) {
+      const doc = youtubeSnapshot.docs[0];
+      const data = doc.data();
+      return {
+        ...data,
+        uploadedAt: data.uploadedAt.toDate(),
+        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+      } as YouTubeVideoRecord;
+    }
+    
+    // Search in GCS videos
+    const gcsQuery = query(
+      collection(db, GCS_VIDEOS_COLLECTION),
+      where('publicSlug', '==', slug),
+      where('isPublic', '==', true),
+      where('isActive', '==', true),
+      limit(1)
+    );
+    
+    const gcsSnapshot = await getDocs(gcsQuery);
+    if (!gcsSnapshot.empty) {
+      const doc = gcsSnapshot.docs[0];
+      const data = doc.data();
+      return {
+        ...data,
+        uploadedAt: data.uploadedAt.toDate(),
+        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+      } as GCSVideoRecord;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error retrieving public video by slug:', error);
+    throw new Error('Failed to retrieve public video from Firestore');
+  }
+};
+
+/**
+ * Update public video view count
+ */
+export const updateVideoViewCount = async (
+  slug: string, 
+  service: 'youtube' | 'gcs'
+): Promise<void> => {
+  try {
+    const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
+    const docsQuery = query(
+      collection(db, collectionName),
+      where('publicSlug', '==', slug),
+      limit(1)
+    );
+    
+    const snapshot = await getDocs(docsQuery);
+    if (!snapshot.empty) {
+      const docRef = doc(db, collectionName, snapshot.docs[0].id);
+      await updateDoc(docRef, {
+        viewCount: increment(1),
+        lastAccessed: Timestamp.now(),
+      });
+    }
+  } catch (error) {
+    console.error('Error updating video view count:', error);
+    // Don't throw error for view count updates to avoid breaking user experience
+  }
+};
+
+/**
+ * Toggle public access for a video
+ */
+export const toggleVideoPublicAccess = async (
+  videoId: string, 
+  service: 'youtube' | 'gcs',
+  isPublic: boolean,
+  publicSlug?: string
+): Promise<void> => {
+  try {
+    const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
+    const docRef = doc(db, collectionName, videoId);
+    
+    const updateData: any = { isPublic };
+    if (isPublic && publicSlug) {
+      updateData.publicSlug = publicSlug;
+    }
+    
+    await updateDoc(docRef, updateData);
+  } catch (error) {
+    console.error('Error toggling video public access:', error);
+    throw new Error('Failed to update video public access in Firestore');
+  }
+};

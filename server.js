@@ -1,375 +1,187 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
-import multer from 'multer';
-import path from 'path';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-import fs from 'fs';
 import { Storage } from '@google-cloud/storage';
+import multer from 'multer';
 import dotenv from 'dotenv';
+import fs from 'fs';
 
 // Load environment variables
 dotenv.config();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+const app = express();
+const PORT = process.env.PORT || 3001;
+const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 
-const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
-const ALLOWED_MIME_TYPES = [
-  'video/mp4',
-  'video/mpeg',
-  'video/quicktime',
-  'video/x-msvideo',
-  'video/webm',
-  'video/ogg',
-  'video/x-matroska'
-];
-const MAX_FILE_SIZE = 100 * 1024 * 1024; // 100MB
+// Multer for multipart/form-data (file uploads)
+const upload = multer({ storage: multer.memoryStorage() });
 
-// Initialize Google Cloud Storage (only if configured)
-let storage = null;
+// --- Middleware ---
+app.use(helmet());
+app.use(cors({ 
+  origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000'],
+  credentials: true 
+}));
+app.use(express.json());
+
+// --- Initialize Google Cloud Storage ---
 let bucket = null;
-const bucketName = process.env.GCS_BUCKET_NAME;
 
-if (bucketName && process.env.GCS_PROJECT_ID) {
+if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   try {
     let credentials;
-    
-    // Try to use base64-encoded credentials first (more reliable on Vercel)
     if (process.env.GCS_CREDENTIALS_BASE64) {
       const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
       credentials = JSON.parse(decoded);
-    } else if (process.env.GCS_KEY_FILE) {
-      // Fallback to file-based credentials (local development)
-      const keyPath = process.env.GCS_KEY_FILE;
-      const keyFileContent = fs.readFileSync(keyPath, 'utf8');
+    } else if (process.env.GCS_KEY_FILE && fs.existsSync(process.env.GCS_KEY_FILE)) {
+      const keyFileContent = fs.readFileSync(process.env.GCS_KEY_FILE, 'utf8');
       credentials = JSON.parse(keyFileContent);
-    } else {
-      throw new Error('No GCS credentials provided. Set GCS_CREDENTIALS_BASE64 or GCS_KEY_FILE.');
     }
-    
-    storage = new Storage({
-      projectId: process.env.GCS_PROJECT_ID,
-      credentials,
-    });
-    bucket = storage.bucket(bucketName);
-    console.log('Google Cloud Storage initialized successfully');
+
+    if (credentials) {
+      const storage = new Storage({ projectId: process.env.GCS_PROJECT_ID, credentials });
+      bucket = storage.bucket(BUCKET_NAME);
+      console.log('✅ Google Cloud Storage initialized');
+    }
   } catch (error) {
-    console.warn('Failed to initialize Google Cloud Storage:', error.message);
+    console.warn('❌ Failed to initialize GCS:', error.message);
   }
 }
 
-// Initialize Express app
-const app = express();
-const PORT = process.env.PORT || 3001;
+// --- Endpoints ---
 
-// Security middlewares
-app.use(helmet());
-app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
-app.use(express.json());
-
-// Ensure upload directory exists (only on local environments, not on Vercel)
-if (!process.env.VERCEL && !fs.existsSync(UPLOAD_DIR)) {
-  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
-}
-
-// Configure multer for file uploads
-const multerStorage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, UPLOAD_DIR);
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
-  storage: multerStorage,
-  limits: { fileSize: MAX_FILE_SIZE },
-  fileFilter: (req, file, cb) => {
-    if (!ALLOWED_MIME_TYPES.includes(file.mimetype)) {
-      return cb(new Error('Only video files are allowed'));
-    }
-    cb(null, true);
-  }
-});
-
-// Serve static files with caching
-app.use('/uploads', express.static('uploads', {
-  maxAge: '1y',
-  setHeaders: (res, path) => {
-    res.set('Cache-Control', 'public, max-age=31536000');
-  }
-}));
-
-// Test endpoint
-app.get('/', (req, res) => {
-  res.send('File Upload Server is running!');
-});
-
-// File upload endpoint
-app.post('/api/upload', upload.single('file'), (req, res) => {
+app.post('/api/signed-url', async (req, res) => {
   try {
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
 
-    const fileUrl = `http://localhost:${PORT}/uploads/${req.file.filename}`;
+    const { videoId, securityCode, service } = req.body;
     
-    res.json({
-      success: true,
-      fileUrl,
-      fileName: req.file.filename,
-      filePath: `/uploads/${req.file.filename}`
-    });
-  } catch (error) {
-    console.error('Upload error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'File upload failed',
-      details: error.message 
-    });
-  }
-});
-
-// Configure multer for GCS uploads (memory storage)
-const gcsUpload = multer({ storage: multer.memoryStorage() }).single('file');
-
-// Google Cloud Storage upload endpoint
-app.post('/api/gcs/upload', gcsUpload, async (req, res) => {
-  try {
-    // Check if GCS is configured
-    if (!bucket) {
-      return res.status(503).json({ 
-        success: false,
-        error: 'Google Cloud Storage is not configured or available',
-        details: 'Please configure GCS credentials and bucket name'
-      });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded' });
-    }
-
-    if (!bucketName) {
-      return res.status(500).json({ error: 'Google Cloud Storage bucket not configured' });
-    }
-
-    const { fileName, contentType, metadata } = req.body;
+    // Clean up the input ID (remove doubles extensions if present)
+    const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
     
-    if (!fileName) {
-      return res.status(400).json({ error: 'File name is required' });
-    }
+    console.log(`\n🔍 Searching for: "${cleanId}"`);
 
-    // Create a blob in the bucket
-    const blob = bucket.file(fileName);
-    const blobStream = blob.createWriteStream({
-      metadata: {
-        contentType: contentType || req.file.mimetype,
-        metadata: metadata ? JSON.parse(metadata) : {},
-      },
-    });
+    // EXPANDED SEARCH PATHS
+    // We added 'uploads/' and root checks with/without extension
+    const potentialPaths = [
+      `videos/${securityCode}/${cleanId}`,
+      `videos/${cleanId}`,
+      `uploads/${cleanId}`,           // <--- Added 'uploads' folder check
+      cleanId,                        // <--- Check Root (Exact match)
+      `${cleanId}.mp4`,               // <--- Check Root + .mp4
+      `uploads/${cleanId}.mp4`,       // <--- Check Uploads + .mp4
+      `videos/${cleanId}.mp4`
+    ];
 
-    blobStream.on('error', (err) => {
-      console.error('GCS upload error:', err);
-      res.status(500).json({ 
-        success: false,
-        error: 'Failed to upload to Google Cloud Storage',
-        details: err.message 
-      });
-    });
+    let foundFile = null;
 
-    blobStream.on('finish', async () => {
-      try {
-        let publicUrl = `https://storage.googleapis.com/${bucketName}/${fileName}`;
-        
-        // Make the file public (optional, based on privacy settings)
-        if (metadata) {
-          const parsedMetadata = JSON.parse(metadata);
-          if (parsedMetadata.privacyStatus === 'public') {
-            try {
-              await blob.makePublic();
-              console.log('File made public:', fileName);
-            } catch (makePublicError) {
-              console.warn('Failed to make file public:', makePublicError.message);
-              // Generate a signed URL as fallback for access
-              try {
-                // Use a reasonable signed URL expiry (7 days)
-                const expiresAt = Date.now() + 1000 * 60 * 60 * 24 * 7; // 7 days
-                const [signedUrl] = await blob.getSignedUrl({
-                  version: 'v4',
-                  action: 'read',
-                  expires: expiresAt,
-                });
-                publicUrl = signedUrl;
-                console.log('Using signed URL as fallback:', fileName, 'expiresAt:', new Date(expiresAt).toISOString());
-              } catch (signedUrlError) {
-                console.warn('Failed to generate signed URL:', signedUrlError.message);
-              }
-            }
-          }
-        }
-
-        // Get file metadata
-        const [metadataResult] = await blob.getMetadata();
-        
-        console.log('GCS upload successful:', {
-          fileName,
-          publicUrl,
-          size: metadataResult.size,
-          contentType: metadataResult.contentType
-        });
-        
-        res.json({
-          success: true,
-          fileName,
-          size: metadataResult.size,
-          contentType: metadataResult.contentType,
-          uploadedAt: new Date().toISOString(),
-          publicUrl,
-        });
-      } catch (error) {
-        console.error('Error getting file metadata:', error);
-        res.status(500).json({ 
-          success: false,
-          error: 'File uploaded but failed to get metadata',
-          details: error.message 
-        });
+    // 1. Try to find the file
+    for (const path of potentialPaths) {
+      const file = bucket.file(path);
+      const [exists] = await file.exists();
+      if (exists) {
+        foundFile = file;
+        console.log(`✅ FOUND at: ${path}`);
+        break;
       }
+    }
+
+    // 2. IF NOT FOUND: Debugging Help
+    if (!foundFile) {
+      console.error('⚠️ File not found. Listing files in bucket to help debug...');
+      
+      // List first 10 files in bucket to see where they actually are
+      try {
+        const [files] = await bucket.getFiles({ maxResults: 10 });
+        console.log('--- ACTUAL BUCKET CONTENT (First 10) ---');
+        files.forEach(f => console.log(`- ${f.name}`));
+        console.log('----------------------------------------');
+      } catch (e) {
+        console.error('Could not list files:', e.message);
+      }
+
+      return res.status(404).json({ error: 'Video not found in storage' });
+    }
+
+    // 3. Generate URL
+    const expiresAt = Date.now() + 60 * 60 * 1000;
+    const [signedUrl] = await foundFile.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: expiresAt,
     });
 
-    // Pipe the file buffer to GCS
-    blobStream.end(req.file.buffer);
+    res.json({ signedUrl, expiresAt: new Date(expiresAt).toISOString() });
+
+  } catch (error) {
+    console.error('Error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`\n🚀 Debug Server running on http://localhost:${PORT}`);
+});
+
+// --- GCS Upload / Delete / Metadata Endpoints ---
+
+app.post('/api/gcs/upload', upload.single('file'), async (req, res) => {
+  try {
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
+
+    const fileBuffer = req.file?.buffer;
+    const originalName = req.file?.originalname;
+    const fileName = req.body.fileName || originalName;
+    const contentType = req.body.contentType || req.file?.mimetype || 'application/octet-stream';
+    const metadata = req.body.metadata ? JSON.parse(req.body.metadata) : {};
+
+    if (!fileBuffer || !fileName) return res.status(400).json({ error: 'No file provided' });
+
+    const gcsFile = bucket.file(fileName);
+
+    await gcsFile.save(fileBuffer, {
+      metadata: { contentType, metadata },
+      resumable: false,
+    });
+
+    // Try to make public (optional). If it fails, we still return success.
+    try {
+      await gcsFile.makePublic();
+    } catch (e) {
+      console.warn('Could not make uploaded file public:', e.message);
+    }
+
+    res.status(201).json({ success: true, fileName });
   } catch (error) {
     console.error('GCS upload error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Google Cloud Storage upload failed',
-      details: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// GCS file deletion endpoint
-app.delete('/api/gcs/delete', async (req, res) => {
+app.delete('/api/gcs/delete', express.json(), async (req, res) => {
   try {
-    // Check if GCS is configured
-    if (!bucket) {
-      return res.status(503).json({ 
-        success: false,
-        error: 'Google Cloud Storage is not configured or available',
-        details: 'Please configure GCS credentials and bucket name'
-      });
-    }
-
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
     const { fileName } = req.body;
-    
-    if (!fileName) {
-      return res.status(400).json({ error: 'File name is required' });
-    }
+    if (!fileName) return res.status(400).json({ error: 'fileName required' });
 
-    if (!bucketName) {
-      return res.status(500).json({ error: 'Google Cloud Storage bucket not configured' });
-    }
-
-    const blob = bucket.file(fileName);
-    await blob.delete();
-    
-    res.json({
-      success: true,
-      message: 'File deleted successfully'
-    });
+    await bucket.file(fileName).delete();
+    res.json({ success: true });
   } catch (error) {
     console.error('GCS delete error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to delete file from Google Cloud Storage',
-      details: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
 });
 
-// GCS file metadata endpoint
 app.get('/api/gcs/metadata', async (req, res) => {
   try {
-    // Check if GCS is configured
-    if (!bucket) {
-      return res.status(503).json({ 
-        success: false,
-        error: 'Google Cloud Storage is not configured or available',
-        details: 'Please configure GCS credentials and bucket name'
-      });
-    }
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
+    const fileName = String(req.query.fileName || '');
+    if (!fileName) return res.status(400).json({ error: 'fileName query required' });
 
-    const { fileName } = req.query;
-    
-    if (!fileName) {
-      return res.status(400).json({ error: 'File name is required' });
-    }
-
-    if (!bucketName) {
-      return res.status(500).json({ error: 'Google Cloud Storage bucket not configured' });
-    }
-
-    const blob = bucket.file(fileName);
-    const [metadata] = await blob.getMetadata();
-    
-    res.json({
-      success: true,
-      metadata: {
-        name: metadata.name,
-        size: metadata.size,
-        contentType: metadata.contentType,
-        timeCreated: metadata.timeCreated,
-        updated: metadata.updated,
-        generation: metadata.generation,
-        md5Hash: metadata.md5Hash,
-        crc32c: metadata.crc32c,
-      }
-    });
+    const [meta] = await bucket.file(fileName).getMetadata();
+    res.json(meta);
   } catch (error) {
     console.error('GCS metadata error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: 'Failed to get file metadata from Google Cloud Storage',
-      details: error.message 
-    });
+    res.status(500).json({ error: error.message });
   }
-});
-
-// Enhanced logging for server errors
-app.use((err, req, res, next) => {
-  console.error('Server error:', err);
-  console.error('Request details:', {
-    method: req.method,
-    url: req.url,
-    headers: req.headers,
-    body: req.body,
-  });
-  res.status(500).json({
-    success: false,
-    error: 'Internal Server Error',
-    message: err.message
-  });
-});
-
-// Start server
-const server = app.listen(PORT, '0.0.0.0', () => {
-  console.log(`\n🚀 Server running on http://localhost:${PORT}`);
-  console.log('📂 Ready to handle file uploads at POST /api/upload');
-  console.log('📂 Serving static files from /uploads\n');
-});
-
-// Handle unhandled promise rejections
-process.on('unhandledRejection', (err) => {
-  console.error('Unhandled Rejection:', err);
-  server.close(() => process.exit(1));
-});
-
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('Uncaught Exception:', err);
-  server.close(() => process.exit(1));
 });
