@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Share2, Eye, Calendar, Moon } from "lucide-react";
+import { Loader2, Share2, Eye, Calendar} from "lucide-react";
 import { toast } from "sonner";
 import { requestSignedUrl } from '@/integrations/api/signedUrlService';
 import { getPublicVideoBySlug, updateVideoViewCount, YouTubeVideoRecord, GCSVideoRecord } from "@/integrations/firebase/videoService";
@@ -151,7 +151,7 @@ const Watch = () => {
       <header className="border-b bg-card/95 backdrop-blur px-4 py-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="p-2 rounded-lg bg-primary/10"><Moon className="h-6 w-6 text-primary" /></div>
+            <div className="p-2 rounded-lg bg-primary/10"></div>
             <h2 className="text-xl font-bold">Previu</h2>
           </div>
           <Button variant="outline" size="sm" onClick={handleShare}><Share2 className="h-4 w-4 mr-2" /> Share</Button>

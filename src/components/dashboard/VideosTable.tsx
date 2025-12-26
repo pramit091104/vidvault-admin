@@ -640,7 +640,6 @@ const VideosTable = () => {
                           <TableHead>File Name</TableHead>
                           <TableHead>Title</TableHead>
                           <TableHead>Upload Date</TableHead>
-                          <TableHead>Security Code</TableHead>
                           <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -659,26 +658,6 @@ const VideosTable = () => {
                               <span className="text-sm text-muted-foreground">
                                 {video.uploadedAt ? new Date(video.uploadedAt.seconds * 1000).toLocaleDateString() : 'N/A'}
                               </span>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="outline" className="font-mono text-xs">
-                                  {video.securityCode}
-                                </Badge>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => {
-                                    navigator.clipboard.writeText(video.securityCode);
-                                    toast.success('Security code copied!');
-                                  }}
-                                  title="Copy security code"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                  <span className="sr-only">Copy security code</span>
-                                </Button>
-                              </div>
                             </TableCell>
                             <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">

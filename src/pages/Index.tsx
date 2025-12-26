@@ -1,6 +1,6 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Moon, ArrowRight } from "lucide-react";
+import {ArrowRight } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -17,7 +17,6 @@ const Index = () => {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 rounded-lg bg-primary/10">
-              <Moon className="h-6 w-6 text-primary" />
             </div>
             <h2 className="text-xl font-bold text-foreground">Previu</h2>
           </div>
@@ -64,7 +63,6 @@ const Index = () => {
         <div className="relative z-10 text-center space-y-8 px-4 animate-fade-in-up max-w-4xl">
           <div className="flex items-center justify-center gap-4 mb-8">
             <div className="p-4 rounded-2xl bg-primary/10 animate-glow-pulse">
-              <Moon className="h-16 w-16 text-primary" />
             </div>
           </div>
           

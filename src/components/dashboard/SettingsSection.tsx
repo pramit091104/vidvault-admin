@@ -232,18 +232,6 @@ const SettingsSection = () => {
               </p>
             </div>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="photoURL">Profile Photo URL</Label>
-            <Input
-              id="photoURL"
-              placeholder="Enter profile photo URL (optional)"
-              value={photoURL}
-              onChange={(e) => setPhotoURL(e.target.value)}
-              disabled={isUpdating}
-            />
-          </div>
-
           <div className="flex justify-end">
             <Button
               onClick={handleUpdateProfile}
@@ -329,36 +317,6 @@ const SettingsSection = () => {
                 )}
               </Button>
             </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Security Info */}
-      <Card className="border-border/50 bg-card/95 backdrop-blur-sm">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="h-5 w-5 text-primary" />
-            Security Information
-          </CardTitle>
-          <CardDescription>
-            Your account security and authentication details
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Authentication Provider</Label>
-              <Badge variant="secondary">Google</Badge>
-            </div>
-            <div className="space-y-2">
-              <Label>Account Status</Label>
-              <Badge className="bg-green-100 text-green-800 border-green-200">
-                Active
-              </Badge>
-            </div>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            <p>Your account is secured through Google OAuth. All data is encrypted and stored securely in Firebase.</p>
           </div>
         </CardContent>
       </Card>

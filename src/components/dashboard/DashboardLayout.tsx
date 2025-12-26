@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Moon, Upload, Film, MessageSquare, Settings, LogOut } from "lucide-react";
+import {  Upload, Film, MessageSquare, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -36,11 +36,8 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
       <aside className="fixed left-0 top-0 h-full w-64 border-r border-border bg-card/50 backdrop-blur-sm p-6 space-y-8 animate-fade-in">
         {/* Logo */}
         <div className="flex items-center gap-3">
-          <div className="p-2 rounded-lg bg-primary/10 animate-glow-pulse">
-            <Moon className="h-6 w-6 text-primary" />
-          </div>
           <div>
-            <h1 className="text-xl font-bold text-foreground">Magnova Media</h1>
+            <h1 className="text-xl font-bold text-foreground">Previu</h1>
             <p className="text-xs text-muted-foreground">Admin Dashboard</p>
           </div>
         </div>
@@ -87,7 +84,7 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
           {/* Header */}
           <header className="space-y-2">
             <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Welcome back{currentUser?.displayName ? `, ${currentUser.displayName}` : ""} 🌙
+              Welcome back{currentUser?.displayName ? `, ${currentUser.displayName}` : ""}
             </h2>
             <p className="text-muted-foreground">
               Manage your client drafts seamlessly

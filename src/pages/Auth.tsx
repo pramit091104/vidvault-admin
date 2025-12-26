@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Moon, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -36,9 +35,6 @@ const Auth = () => {
       <Card className="w-full max-w-md relative animate-fade-in-up border-border/50 backdrop-blur-sm bg-card/95">
         <CardHeader className="space-y-4">
           <div className="flex items-center justify-center gap-3">
-            <div className="p-3 rounded-xl bg-primary/10 animate-glow-pulse">
-              <Moon className="h-8 w-8 text-primary" />
-            </div>
           </div>
           <div className="text-center space-y-2">
             <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
@@ -58,7 +54,6 @@ const Auth = () => {
           >
             {isLoading ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Signing in...
               </>
             ) : (
