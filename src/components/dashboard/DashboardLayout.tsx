@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Moon, Upload, Film, Key, MessageSquare, Settings, LogOut } from "lucide-react";
+import { Moon, Upload, Film, MessageSquare, Settings, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -27,7 +27,6 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
   const navItems = [
     { id: "upload", label: "Upload Video", icon: Upload },
     { id: "videos", label: "Manage Videos", icon: Film },
-    { id: "codes", label: "Security Codes", icon: Key },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

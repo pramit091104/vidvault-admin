@@ -2,7 +2,6 @@ import { useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import UploadSection from "@/components/dashboard/UploadSection";
 import VideosTable from "@/components/dashboard/VideosTable";
-import CodesSection from "@/components/dashboard/CodesSection";
 import SettingsSection from "@/components/dashboard/SettingsSection";
 
 const Dashboard = () => {
@@ -14,8 +13,6 @@ const Dashboard = () => {
         return <UploadSection />;
       case "videos":
         return <VideosTable />;
-      case "codes":
-        return <CodesSection />;
       case "settings":
         return <SettingsSection />;
       default:

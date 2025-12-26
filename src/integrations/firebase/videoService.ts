@@ -59,15 +59,13 @@ export interface GCSVideoRecord extends BaseVideoRecord {
 export type VideoRecord = YouTubeVideoRecord | GCSVideoRecord;
 
 /**
- * Save YouTube video record to Firestore using security code as document ID
+ * Save YouTube video record to Firestore
  */
 export const saveYouTubeVideo = async (
-  videoData: Omit<YouTubeVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date },
-  securityCode?: string
+  videoData: Omit<YouTubeVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date }
 ): Promise<void> => {
   try {
-    // Use security code as document ID if provided, otherwise use videoData.id
-    const docId = securityCode || videoData.id;
+    const docId = videoData.id;
     const docRef = doc(db, YOUTUBE_VIDEOS_COLLECTION, docId);
     const firestoreData = {
       ...videoData,
@@ -83,15 +81,13 @@ export const saveYouTubeVideo = async (
 };
 
 /**
- * Save GCS video record to Firestore using security code as document ID
+ * Save GCS video record to Firestore
  */
 export const saveGCSVideo = async (
-  videoData: Omit<GCSVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date },
-  securityCode?: string
+  videoData: Omit<GCSVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date }
 ): Promise<void> => {
   try {
-    // Use security code as document ID if provided, otherwise use videoData.id
-    const docId = securityCode || videoData.id;
+    const docId = videoData.id;
     const docRef = doc(db, GCS_VIDEOS_COLLECTION, docId);
     const firestoreData = {
       ...videoData,

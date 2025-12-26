@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { MessageSquare, Film, Trash2, ExternalLink, Youtube, Loader2, RefreshCw, AlertCircle, X, Shield, Key, Copy, Globe, Link2, Eye } from "lucide-react";
+import { MessageSquare, Film, Trash2, ExternalLink, Youtube, Loader2, RefreshCw, AlertCircle, X, Copy, Globe, Link2, Eye } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -21,7 +21,6 @@ import { getAllVideosForUser } from "@/integrations/firebase/videoService";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ClientComments } from "./ClientComments";
-import { createAndSaveSecurityCode, getSecurityCodeByYoutubeVideoId, getSecurityCodeByCode, deleteSecurityCode } from "@/integrations/firebase/securityCodeService";
 import { deleteVideo, toggleVideoPublicAccess } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
@@ -45,12 +44,7 @@ const VideosTable = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isSecurityCodeDialogOpen, setIsSecurityCodeDialogOpen] = useState(false);
-  const [selectedVideoForCode, setSelectedVideoForCode] = useState<YouTubeVideo | null>(null);
-  const [clientName, setClientName] = useState("");
-  const [isGeneratingCode, setIsGeneratingCode] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [generatedSecurityCode, setGeneratedSecurityCode] = useState<string>("");
   const [activeTab, setActiveTab] = useState("videos");
   const [selectedClientComments, setSelectedClientComments] = useState<{
     clientName: string;
@@ -253,13 +247,6 @@ const VideosTable = () => {
     fetchGcsVideos();
   };
 
-  const handleGenerateSecurityCode = (video: YouTubeVideo) => {
-    setSelectedVideoForCode(video);
-    setClientName("");
-    setGeneratedSecurityCode("");
-    setIsSecurityCodeDialogOpen(true);
-  };
-
   const fetchGcsVideos = async () => {
     if (!currentUser) {
       console.log('No current user, skipping GCS videos fetch');
@@ -301,86 +288,38 @@ const VideosTable = () => {
   };
 
   const handleCreateSecurityCode = async () => {
-    if (!selectedVideoForCode || !clientName.trim() || !currentUser) {
-      toast.error('Please enter a client name and ensure you are logged in');
-      return;
-    }
-
-    setIsGeneratingCode(true);
-    try {
-      const securityCodeRecord = await createAndSaveSecurityCode(
-        'youtube',
-        selectedVideoForCode.title,
-        clientName.trim(),
-        selectedVideoForCode.youtubeId,
-        selectedVideoForCode.videoUrl,
-        currentUser.uid
-      );
-      
-      setGeneratedSecurityCode(securityCodeRecord.securityCode);
-      toast.success('Security code generated successfully!');
-      
-      // Reset form after success
-      setTimeout(() => {
-        setIsSecurityCodeDialogOpen(false);
-        setSelectedVideoForCode(null);
-        setClientName("");
-        setGeneratedSecurityCode("");
-      }, 2000);
-    } catch (error: any) {
-      console.error('Error generating security code:', error);
-      toast.error(error.message || 'Failed to generate security code');
-    } finally {
-      setIsGeneratingCode(false);
-    }
+    // This function is no longer needed
   };
 
   const copySecurityCode = () => {
-    if (generatedSecurityCode) {
-      navigator.clipboard.writeText(generatedSecurityCode);
-      toast.success('Security code copied to clipboard!');
-    }
+    // This function is no longer needed
   };
 
   const handleViewClientComments = async (video: YouTubeVideo) => {
     try {
-      // Get the security code for this YouTube video
-      const securityCodeRecord = await getSecurityCodeByYoutubeVideoId(video.youtubeId);
-      
-      if (!securityCodeRecord) {
-        toast.error('No security code found for this video. Please generate one first.');
-        return;
-      }
-      
-      // Set the client comments data with real values
       setSelectedClientComments({
-        clientName: securityCodeRecord.clientName,
-        securityCode: securityCodeRecord.securityCode,
+        clientName: video.title,
+        securityCode: video.id,
         videoTitle: video.title
       });
       setActiveTab("client-comments");
     } catch (error: any) {
-      console.error('Error fetching security code:', error);
-      toast.error(error.message || 'Failed to fetch security code');
+      console.error('Error setting comments view:', error);
+      toast.error(error.message || 'Failed to load comments');
     }
   };
 
-  const handleViewClientCommentsGcs = async (securityCode: string, videoTitle: string) => {
+  const handleViewClientCommentsGcs = async (videoId: string, videoTitle: string) => {
     try {
-      const securityCodeRecord = await getSecurityCodeByCode(securityCode);
-      if (!securityCodeRecord) {
-        toast.error('No security code found for this video.');
-        return;
-      }
       setSelectedClientComments({
-        clientName: securityCodeRecord.clientName,
-        securityCode: securityCodeRecord.securityCode,
+        clientName: videoTitle,
+        securityCode: videoId,
         videoTitle
       });
       setActiveTab('client-comments');
     } catch (error: any) {
-      console.error('Error fetching security code:', error);
-      toast.error(error.message || 'Failed to fetch security code');
+      console.error('Error setting comments view:', error);
+      toast.error(error.message || 'Failed to load comments');
     }
   };
 
@@ -390,14 +329,8 @@ const VideosTable = () => {
       // Delete from YouTube first
       await youtubeService.deleteVideo(videoId);
 
-      // Try to find associated security code (if any)
-      const scRecord = await getSecurityCodeByYoutubeVideoId(videoId);
-      if (scRecord && scRecord.securityCode) {
-        // Delete security code document (videoSecurityCodes)
-        await deleteSecurityCode(scRecord.securityCode);
-        // Delete the video record stored under the security code in Firestore
-        await deleteVideo(scRecord.securityCode, 'youtube');
-      }
+      // Delete the video record from Firestore
+      await deleteVideo(videoId, 'youtube');
 
       toast.success(`Video "${videoTitle}" deleted successfully`);
       // Refresh videos after deletion
@@ -412,18 +345,17 @@ const VideosTable = () => {
   };
 
   const handleDeleteGcs = async (record: any) => {
-    const securityCode = record.securityCode;
-    setDeletingVideoId(securityCode || record.fileName || null);
+    const videoId = record.id;
+    setDeletingVideoId(videoId || null);
     try {
       // Delete file from GCS
       if (record.fileName) {
         await gcsService.deleteFile(record.fileName);
       }
 
-      // Delete security code doc and video record in Firestore
-      if (securityCode) {
-        await deleteSecurityCode(securityCode);
-        await deleteVideo(securityCode, 'gcs');
+      // Delete video record in Firestore
+      if (videoId) {
+        await deleteVideo(videoId, 'gcs');
       }
 
       toast.success(`Video "${record.title || record.fileName}" deleted successfully`);
@@ -652,17 +584,6 @@ const VideosTable = () => {
                                   <ExternalLink className="h-4 w-4" />
                                   <span className="sr-only">Open in YouTube</span>
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => handleGenerateSecurityCode(video)}
-                                  title="Generate security code"
-                                  disabled={!currentUser}
-                                >
-                                  <Shield className="h-4 w-4" />
-                                  <span className="sr-only">Generate security code</span>
-                                </Button>
                               </div>
                               <Button
                                 size="sm"
@@ -810,23 +731,9 @@ const VideosTable = () => {
                                   size="icon"
                                   className="h-8 w-8"
                                   onClick={() => {
-                                    setSelectedVideoForCode(video as any);
-                                    setClientName(video.clientName || '');
-                                    setIsSecurityCodeDialogOpen(true);
-                                  }}
-                                  title="Generate new security code"
-                                >
-                                  <Shield className="h-4 w-4" />
-                                  <span className="sr-only">Generate security code</span>
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => {
                                     setSelectedClientComments({
                                       clientName: video.clientName || 'Unknown',
-                                      securityCode: video.securityCode,
+                                      securityCode: video.id,
                                       videoTitle: video.title || 'Untitled',
                                     });
                                     setActiveTab('client-comments');
@@ -840,11 +747,11 @@ const VideosTable = () => {
                                   variant="ghost"
                                   size="icon"
                                   className="h-8 w-8 text-destructive"
-                                  disabled={deletingVideoId === (video.securityCode || video.fileName)}
+                                  disabled={deletingVideoId === video.id}
                                   onClick={() => handleDeleteGcs(video)}
                                   title="Delete video"
                                 >
-                                  {deletingVideoId === (video.securityCode || video.fileName) ? (
+                                  {deletingVideoId === video.id ? (
                                     <Loader2 className="h-4 w-4 animate-spin" />
                                   ) : (
                                     <Trash2 className="h-4 w-4" />
@@ -892,107 +799,6 @@ const VideosTable = () => {
           </TabsContent>
         </Tabs>
       </CardContent>
-      
-      {/* Security Code Generation Dialog */}
-      {selectedVideoForCode && (
-        <Dialog open={isSecurityCodeDialogOpen} onOpenChange={setIsSecurityCodeDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Shield className="h-5 w-5 text-primary" />
-                Generate Security Code
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <Label>Video</Label>
-                <div className="p-3 bg-muted rounded-lg">
-                  <p className="font-medium text-sm">{selectedVideoForCode.title}</p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Uploaded: {selectedVideoForCode.uploadDate}
-                  </p>
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="clientName">Client Name *</Label>
-                <Input
-                  id="clientName"
-                  placeholder="Enter client name"
-                  value={clientName}
-                  onChange={(e) => setClientName(e.target.value)}
-                  disabled={isGeneratingCode || !!generatedSecurityCode}
-                />
-              </div>
-              
-              {generatedSecurityCode && (
-                <div className="space-y-3 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
-                      Security Code Generated
-                    </h4>
-                  </div>
-                  <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-green-300 dark:border-green-700 rounded-md px-3 py-2">
-                    <code className="text-lg font-mono text-green-700 dark:text-green-300">
-                      {generatedSecurityCode}
-                    </code>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={copySecurityCode}
-                      className="ml-2 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30"
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <p className="text-xs text-green-600 dark:text-green-400">
-                    This code has been saved to Firebase and can be shared with the client.
-                  </p>
-                </div>
-              )}
-              
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setIsSecurityCodeDialogOpen(false);
-                    setSelectedVideoForCode(null);
-                    setClientName("");
-                    setGeneratedSecurityCode("");
-                  }}
-                  disabled={isGeneratingCode}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={handleCreateSecurityCode}
-                  disabled={!clientName.trim() || isGeneratingCode || !!generatedSecurityCode || !currentUser}
-                  className="flex-1"
-                >
-                  {isGeneratingCode ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Generating...
-                    </>
-                  ) : generatedSecurityCode ? (
-                    <>
-                      <Key className="mr-2 h-4 w-4" />
-                      Code Generated
-                    </>
-                  ) : (
-                    <>
-                      <Shield className="mr-2 h-4 w-4" />
-                      Generate Code
-                    </>
-                  )}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
-      )}
     </Card>
   );
 };

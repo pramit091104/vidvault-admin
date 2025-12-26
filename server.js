@@ -75,20 +75,18 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 app.post('/api/signed-url', async (req, res) => {
   try {
     if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
-    const { videoId, securityCode, service } = req.body;
-    console.log('[/api/signed-url] request body:', { videoId, securityCode, service });
+    const { videoId, service } = req.body;
+    console.log('[/api/signed-url] request body:', { videoId, service });
     
     // Clean up the input ID (remove doubles extensions if present)
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
     
     console.log(`\n🔍 Searching for: "${cleanId}"`);
 
-    // EXPANDED SEARCH PATHS
-    // We added 'uploads/' and root checks with/without extension
+    // SEARCH PATHS
     const potentialPaths = [
-      `videos/${securityCode}/${cleanId}`,
       `videos/${cleanId}`,
-      `uploads/${cleanId}`,           // <--- Added 'uploads' folder check
+      `uploads/${cleanId}`,           // <--- Check 'uploads' folder
       cleanId,                        // <--- Check Root (Exact match)
       `${cleanId}.mp4`,               // <--- Check Root + .mp4
       `uploads/${cleanId}.mp4`,       // <--- Check Uploads + .mp4

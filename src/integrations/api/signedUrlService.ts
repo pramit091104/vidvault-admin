@@ -7,7 +7,6 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
  */
 export const requestSignedUrl = async (
   videoId: string,
-  securityCode: string,
   service: 'youtube' | 'gcs'
 ): Promise<string> => {
   // If it's YouTube, we don't need a backend signature
@@ -17,7 +16,6 @@ export const requestSignedUrl = async (
 
   // Ensure we don't send undefined/null values
   const safeVideoId = videoId || '';
-  const safeSecurityCode = securityCode || 'public';
 
   try {
     const response = await fetch(`${API_BASE_URL}/signed-url`, {
@@ -27,13 +25,12 @@ export const requestSignedUrl = async (
       },
       body: JSON.stringify({
         videoId: safeVideoId,
-        securityCode: safeSecurityCode,
         service,
       }),
     });
 
     if (!response.ok) {
-      // Try to parse the specific error from the "Detective" server
+      // Try to parse the specific error from the server
       let errorMessage = response.statusText;
       try {
         const errorData = await response.json();

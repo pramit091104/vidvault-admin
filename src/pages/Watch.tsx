@@ -24,7 +24,6 @@ interface PublicVideo {
   service: 'youtube' | 'gcs';
   youtubeVideoId?: string;
   publicUrl?: string;
-  securityCode?: string;
 }
 
 const Watch = () => {
@@ -80,7 +79,6 @@ const Watch = () => {
           publicUrl: videoData.service === 'youtube' 
             ? (videoData as YouTubeVideoRecord).publicUrl 
             : (videoData as GCSVideoRecord).publicUrl,
-          securityCode: videoData.securityCode
         };
         
         setVideo(mappedVideo);
@@ -93,7 +91,6 @@ const Watch = () => {
               const targetId = (videoData as any).fileName || mappedVideo.id;
               const url = await requestSignedUrl(
                 targetId,
-                mappedVideo.securityCode || mappedVideo.slug,
                 'gcs'
               );
               console.log("Signed URL received successfully");

@@ -5,12 +5,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Loader2, CheckCircle2, Youtube, Shield, Copy, Cloud, Globe, Link2, Eye } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Youtube, Copy, Cloud, Globe, Link2, Eye } from "lucide-react";
 import { toast } from "sonner";
 import { youtubeService } from "@/integrations/youtube/youtubeService";
 import { gcsService } from "@/integrations/gcs/gcsService";
 import { Progress } from "@/components/ui/progress";
-import { createAndSaveSecurityCode } from "@/integrations/firebase/securityCodeService";
 import { saveYouTubeVideo, saveGCSVideo } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
@@ -30,7 +29,6 @@ const UploadSection = () => {
   const [youtubeVideoUrl, setYoutubeVideoUrl] = useState("");
   const [gcsVideoUrl, setGcsVideoUrl] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
-  const [securityCode, setSecurityCode] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isPublicWebsite, setIsPublicWebsite] = useState<boolean>(false);
   const [publicSlug, setPublicSlug] = useState<string>("");
@@ -124,7 +122,6 @@ const UploadSection = () => {
     setUploadProgress(0);
     setYoutubeVideoUrl("");
     setGcsVideoUrl("");
-    setSecurityCode("");
     setPublicSlug("");
     setPublicUrl("");
     
@@ -155,28 +152,6 @@ const UploadSection = () => {
         
         const youtubeVideoId = result.videoId || result.videoUrl?.split('v=')[1]?.split('&')[0];
         
-        // Generate security code first
-        let generatedSecurityCode = '';
-        try {
-          const securityCodeRecord = await createAndSaveSecurityCode(
-            'youtube',
-            title.trim(),
-            clientName.trim(),
-            youtubeVideoId,
-            result.videoUrl,
-            currentUser?.uid
-          );
-          generatedSecurityCode = securityCodeRecord.securityCode;
-          setSecurityCode(generatedSecurityCode);
-          toast.success('Security code generated successfully!');
-        } catch (securityError: any) {
-          console.error('Security code generation error:', securityError);
-          toast.error('Video uploaded but security code generation failed');
-          setYoutubeVideoUrl(result.videoUrl);
-          setUploadSuccess(true);
-          return;
-        }
-        
         // Generate public slug if enabled
         let generatedSlug = '';
         if (isPublicWebsite) {
@@ -192,7 +167,7 @@ const UploadSection = () => {
           }
         }
         
-        // Save to Firebase YouTube collection using security code as document ID
+        // Save to Firebase YouTube collection
         const videoId = uuidv4();
         try {
           await saveYouTubeVideo({
@@ -204,7 +179,7 @@ const UploadSection = () => {
             youtubeVideoId,
             youtubeVideoUrl: result.videoUrl,
             privacyStatus,
-            securityCode: generatedSecurityCode,
+            securityCode: '',
             isActive: true,
             accessCount: 0,
             uploadStatus: 'completed',
@@ -213,7 +188,7 @@ const UploadSection = () => {
             publicSlug: generatedSlug,
             publicUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
             viewCount: 0,
-          }, generatedSecurityCode);
+          });
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
           toast.error('Video uploaded but failed to save to database');
@@ -239,28 +214,6 @@ const UploadSection = () => {
           }
         );
         
-        // Generate security code first
-        let generatedSecurityCode = '';
-        try {
-          const securityCodeRecord = await createAndSaveSecurityCode(
-            'gcs',
-            title.trim(),
-            clientName.trim(),
-            undefined, // No YouTube video ID for GCS
-            result.publicUrl,
-            currentUser?.uid
-          );
-          generatedSecurityCode = securityCodeRecord.securityCode;
-          setSecurityCode(generatedSecurityCode);
-          toast.success('Security code generated successfully!');
-        } catch (securityError: any) {
-          console.error('Security code generation error:', securityError);
-          toast.error('Video uploaded but security code generation failed');
-          setGcsVideoUrl(result.publicUrl);
-          setUploadSuccess(true);
-          return;
-        }
-        
         // Generate public slug if enabled
         let generatedSlug = '';
         if (isPublicWebsite) {
@@ -276,7 +229,7 @@ const UploadSection = () => {
           }
         }
         
-        // Save to Firebase GCS collection using security code as document ID
+        // Save to Firebase GCS collection
         const videoId = uuidv4();
         try {
           await saveGCSVideo({
@@ -290,7 +243,7 @@ const UploadSection = () => {
             size: result.size,
             contentType: result.contentType,
             privacyStatus,
-            securityCode: generatedSecurityCode,
+            securityCode: '',
             isActive: true,
             accessCount: 0,
             isPubliclyAccessible: privacyStatus === 'public',
@@ -299,7 +252,7 @@ const UploadSection = () => {
             publicSlug: generatedSlug,
             publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
             viewCount: 0,
-          }, generatedSecurityCode);
+          });
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
           toast.error('Video uploaded but failed to save to database');
@@ -335,13 +288,6 @@ const UploadSection = () => {
       setUploadProgress(0);
     } finally {
       setIsUploading(false);
-    }
-  };
-
-  const copySecurityCode = () => {
-    if (securityCode) {
-      navigator.clipboard.writeText(securityCode);
-      toast.success('Security code copied to clipboard!');
     }
   };
 
@@ -500,33 +446,6 @@ const UploadSection = () => {
               </p>
             </div>
             
-            {securityCode && (
-              <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4 space-y-3">
-                <div className="flex items-center gap-2">
-                  <Shield className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  <h4 className="text-sm font-medium text-green-800 dark:text-green-200">
-                    Security Code Generated
-                  </h4>
-                </div>
-                <div className="flex items-center justify-between bg-white dark:bg-gray-800 border border-green-300 dark:border-green-700 rounded-md px-3 py-2">
-                  <code className="text-lg font-mono text-green-700 dark:text-green-300">
-                    {securityCode}
-                  </code>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={copySecurityCode}
-                    className="ml-2 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300 hover:bg-green-100 dark:hover:bg-green-900/30"
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-green-600 dark:text-green-400">
-                  Share this code with users who need access to this video. Each code can be used to track video access.
-                </p>
-              </div>
-            )}
-            
             {publicUrl && (
               <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 space-y-3">
                 <div className="flex items-center gap-2">
@@ -592,62 +511,6 @@ const UploadSection = () => {
             </>
           )}
         </Button>
-
-        <div className="bg-secondary/50 border border-border rounded-lg p-4 space-y-2">
-          {uploadService === 'youtube' ? (
-            <>
-              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <Youtube className="h-4 w-4" />
-                YouTube Integration
-              </h4>
-              <p className="text-xs text-muted-foreground">
-                Videos will be uploaded to your YouTube channel. Make sure you have:
-              </p>
-              <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                <li>Configured YouTube API credentials</li>
-                <li>Authorized the application to upload videos</li>
-                <li>
-                  <strong>Created a YouTube channel</strong> (visit{" "}
-                  <a
-                    href="https://www.youtube.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    youtube.com
-                  </a>{" "}
-                  to create one if needed)
-                </li>
-              </ul>
-            </>
-          ) : (
-            <>
-              <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
-                <Cloud className="h-4 w-4" />
-                Google Cloud Storage Integration
-              </h4>
-              <p className="text-xs text-muted-foreground">
-                Videos will be uploaded to Google Cloud Storage. Make sure you have:
-              </p>
-              <ul className="text-xs text-muted-foreground space-y-1 list-disc list-inside">
-                <li>Configured Google Cloud Storage credentials</li>
-                <li>Set up a GCS bucket with appropriate permissions</li>
-                <li>
-                  <strong>Enabled the Cloud Storage API</strong> (visit{" "}
-                  <a
-                    href="https://console.cloud.google.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-primary hover:underline"
-                  >
-                    Google Cloud Console
-                  </a>{" "}
-                  to configure)
-                </li>
-              </ul>
-            </>
-          )}
-        </div>
       </CardContent>
     </Card>
   );
