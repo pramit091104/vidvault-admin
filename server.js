@@ -144,14 +144,22 @@ app.post('/api/gcs/upload', upload.single('file'), async (req, res) => {
       resumable: false,
     });
 
-    // Try to make public (optional). If it fails, we still return success.
+    // Do NOT call makePublic() since uniform bucket-level access may be enabled.
+    // Instead return a short-lived signed URL for immediate read access.
+    let signedUrl = null;
     try {
-      await gcsFile.makePublic();
+      const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+      const [url] = await gcsFile.getSignedUrl({
+        version: 'v4',
+        action: 'read',
+        expires: expiresAt,
+      });
+      signedUrl = url;
     } catch (e) {
-      console.warn('Could not make uploaded file public:', e.message);
+      console.warn('Could not generate signed URL for uploaded file:', e.message);
     }
 
-    res.status(201).json({ success: true, fileName });
+    res.status(201).json({ success: true, fileName, signedUrl });
   } catch (error) {
     console.error('GCS upload error:', error);
     res.status(500).json({ error: error.message });
