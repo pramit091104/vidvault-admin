@@ -16,7 +16,6 @@ const Index = () => {
       <nav className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg"></div>
             <h2 className="text-xl font-bold text-white">Previu</h2>
           </div>
           <ul className="flex items-center gap-8">
@@ -67,13 +66,7 @@ const Index = () => {
           <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-4000"></div>
         </div>
         
-        <div className="relative z-10 text-center space-y-8 px-4 max-w-6xl">
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="px-4 py-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full text-sm text-white font-medium">
-              🎬 Trusted by 500+ Video Creators Worldwide
-            </div>
-          </div>
-          
+        <div className="relative z-10 text-center space-y-8 px-4 max-w-6xl">          
           <div className="space-y-6">
             <h1 className="text-6xl md:text-8xl font-bold text-white leading-tight">
               <span className="bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
@@ -105,29 +98,6 @@ const Index = () => {
               <Play className="mr-2 h-5 w-5" />
               Watch Demo
             </Button>
-          </div>
-          
-          <div className="flex items-center justify-center gap-12 pt-12 text-gray-400">
-            <div className="flex items-center gap-3">
-              <div className="flex -space-x-1">
-                {[1,2,3,4].map(i => (
-                  <div key={i} className="w-8 h-8 bg-gradient-to-br from-purple-400 to-pink-400 rounded-full border-2 border-white/20"></div>
-                ))}
-              </div>
-              <span className="text-white font-medium">500+ Happy Creators</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex">
-                {[1,2,3,4,5].map(i => (
-                  <Star key={i} className="h-5 w-5 text-yellow-400 fill-current" />
-                ))}
-              </div>
-              <span className="text-white font-medium">4.9/5 Rating</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-green-400" />
-              <span className="text-white font-medium">60% Faster Delivery</span>
-            </div>
           </div>
         </div>
       </section>
