@@ -78,7 +78,7 @@ const VideosTable = () => {
         
         // Update the video record with the new slug
         await toggleVideoPublicAccess(
-          video.securityCode,
+          video.id,
           video.service,
           newPublicStatus,
           slugToUse
@@ -86,7 +86,7 @@ const VideosTable = () => {
         
         // Update local state with both public status and slug
         setAllVideos(prev => prev.map(v => 
-          v.securityCode === video.securityCode 
+          v.id === video.id 
             ? { ...v, isPublic: newPublicStatus, publicSlug: slugToUse }
             : v
         ));
@@ -101,14 +101,14 @@ const VideosTable = () => {
       
       // Normal toggle for existing slugs
       await toggleVideoPublicAccess(
-        video.securityCode,
+        video.id,
         video.service,
         newPublicStatus,
         slugToUse
       );
       
       setAllVideos(prev => prev.map(v => 
-        v.securityCode === video.securityCode 
+        v.id === video.id 
           ? { ...v, isPublic: newPublicStatus }
           : v
       ));
@@ -434,10 +434,6 @@ const VideosTable = () => {
 
         {/* Main Content with Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-1">
-            <TabsTrigger value="videos">Videos</TabsTrigger>
-          </TabsList>
-          
           <TabsContent value="videos" className="space-y-4">
             <div className="flex items-center gap-2">
               <Button
