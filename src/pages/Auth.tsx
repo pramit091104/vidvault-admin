@@ -32,7 +32,7 @@ const Auth = () => {
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
       
-      <Card className="w-full max-w-md relative animate-fade-in-up border-border/50 backdrop-blur-sm bg-card/95">
+      <Card className="w-full max-w-md relative animate-fade-in-up border-border/50 bg-card/95">
         <CardHeader className="space-y-4">
           <div className="flex items-center justify-center gap-3">
           </div>

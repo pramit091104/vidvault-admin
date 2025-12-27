@@ -299,7 +299,7 @@ const UploadSection = () => {
   };
 
   return (
-    <Card className="border-border/50 bg-card/95 backdrop-blur-sm">
+    <Card className="border-border/50 bg-card/95">
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <Upload className="h-5 w-5 text-primary" />

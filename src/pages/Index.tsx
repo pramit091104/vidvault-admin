@@ -13,7 +13,7 @@ const Index = () => {
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Navigation Header */}
-      <nav className="sticky top-0 z-50 bg-slate-900/80 backdrop-blur-md border-b border-slate-800">
+      <nav className="sticky top-0 z-50 bg-slate-900/95 border-b border-slate-800">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold text-white">Previu</h2>
@@ -39,7 +39,7 @@ const Index = () => {
               <Button
                 onClick={() => navigate("/auth")}
                 size="sm"
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold shadow-lg hover:shadow-purple-500/25 transition-all duration-300"
+                className="bg-gray-700 hover:bg-gray-600 text-white font-bold"
               >
                 LOG IN
               </Button>
@@ -57,13 +57,11 @@ const Index = () => {
       </nav>
 
       {/* Hero Section */}
-      <section id="home" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden">
-        {/* Animated background elements */}
+      <section id="home" className="min-h-screen flex items-center justify-center bg-slate-900 relative overflow-hidden">
+        {/* Simplified background elements */}
         <div className="absolute inset-0">
-          <div className="absolute inset-0 bg-grid-pattern opacity-10"></div>
-          <div className="absolute top-0 left-0 w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse"></div>
-          <div className="absolute top-0 right-0 w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-2000"></div>
-          <div className="absolute bottom-0 left-1/2 w-96 h-96 bg-blue-600 rounded-full mix-blend-multiply filter blur-3xl opacity-20 animate-pulse animation-delay-4000"></div>
+          <div className="absolute top-0 left-0 w-64 h-64 bg-purple-600/10 rounded-full blur-2xl"></div>
+          <div className="absolute top-0 right-0 w-64 h-64 bg-pink-600/10 rounded-full blur-2xl"></div>
         </div>
         
         <div className="relative z-10 text-center space-y-8 px-4 max-w-6xl">          
@@ -84,26 +82,17 @@ const Index = () => {
             <Button
               onClick={() => navigate("/auth")}
               size="lg"
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold group px-10 py-4 text-lg shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105"
+              className="bg-gray-700 hover:bg-gray-600 text-white font-bold group px-10 py-4 text-lg shadow-lg transition-all duration-300 transform hover:scale-105"
             >
               Start Free Trial
               <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-2 transition-transform" />
-            </Button>
-            <Button
-              onClick={() => scrollToSection("about")}
-              size="lg"
-              variant="outline"
-              className="border-2 border-white/20 hover:border-white/40 text-white hover:bg-white/10 px-10 py-4 text-lg backdrop-blur-sm transition-all duration-300"
-            >
-              <Play className="mr-2 h-5 w-5" />
-              Watch Demo
             </Button>
           </div>
         </div>
       </section>
 
       {/* Problem Section */}
-      <section className="py-24 bg-gradient-to-b from-slate-900 to-slate-800">
+      <section className="py-24 bg-slate-800">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-20">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full text-sm text-red-400 font-medium mb-6">
@@ -120,8 +109,7 @@ const Index = () => {
           </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-red-500/50 transition-all duration-300">
-              <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-pink-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
               <div className="relative z-10">
                 <div className="w-20 h-20 bg-red-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <MessageSquare className="h-10 w-10 text-red-400" />
@@ -137,8 +125,7 @@ const Index = () => {
               </div>
             </div>
             
-            <div className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-red-500/50 transition-all duration-300">
-              <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-pink-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
               <div className="relative z-10">
                 <div className="w-20 h-20 bg-red-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Lock className="h-10 w-10 text-red-400" />
@@ -154,8 +141,7 @@ const Index = () => {
               </div>
             </div>
             
-            <div className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-red-500/50 transition-all duration-300">
-              <div className="absolute inset-0 bg-gradient-to-r from-red-500/5 to-pink-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
               <div className="relative z-10">
                 <div className="w-20 h-20 bg-red-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <BarChart3 className="h-10 w-10 text-red-400" />
@@ -175,13 +161,9 @@ const Index = () => {
       </section>
 
       {/* Solution Section */}
-      <section className="py-24 bg-gradient-to-b from-slate-800 to-slate-900 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-green-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
-          <div className="absolute bottom-0 left-0 w-96 h-96 bg-blue-500 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse animation-delay-2000"></div>
-        </div>
+      <section className="py-24 bg-slate-900">
         
-        <div className="max-w-7xl mx-auto px-4 relative z-10">
+        <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-20">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-500/10 border border-green-500/20 rounded-full text-sm text-green-400 font-medium mb-6">
               <CheckCircle className="h-4 w-4" />
@@ -198,7 +180,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
             <div className="space-y-8">
-              <div className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-green-500/50 transition-all duration-300">
+              <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <CheckCircle className="h-6 w-6 text-green-400" />
@@ -216,7 +198,7 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-green-500/50 transition-all duration-300">
+              <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <CheckCircle className="h-6 w-6 text-green-400" />
@@ -234,7 +216,7 @@ const Index = () => {
                 </div>
               </div>
               
-              <div className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-green-500/50 transition-all duration-300">
+              <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <CheckCircle className="h-6 w-6 text-green-400" />
@@ -254,12 +236,12 @@ const Index = () => {
             </div>
             
             <div className="relative">
-              <div className="bg-gradient-to-br from-slate-800 to-slate-700 rounded-3xl p-8 border border-slate-600 shadow-2xl">
+              <div className="bg-slate-800 rounded-3xl p-8 border border-slate-600 shadow-xl">
                 <div className="space-y-6">
-                  <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-600">
+                  <div className="bg-slate-900/50 rounded-2xl p-6 border border-slate-600">
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
                         <span className="text-white font-medium">Live Collaboration Session</span>
                       </div>
                       <span className="text-green-400 text-sm font-medium">Active</span>
@@ -273,19 +255,19 @@ const Index = () => {
                   </div>
                   
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-600">
+                    <div className="bg-slate-900/50 rounded-2xl p-6 border border-slate-600">
                       <Users className="h-8 w-8 text-purple-400 mb-3" />
                       <p className="text-3xl font-bold text-white">12</p>
                       <p className="text-sm text-gray-400">Active Clients</p>
                     </div>
-                    <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-600">
+                    <div className="bg-slate-900/50 rounded-2xl p-6 border border-slate-600">
                       <MessageSquare className="h-8 w-8 text-blue-400 mb-3" />
                       <p className="text-3xl font-bold text-white">48</p>
                       <p className="text-sm text-gray-400">Comments Today</p>
                     </div>
                   </div>
                   
-                  <div className="bg-slate-900/50 backdrop-blur-sm rounded-2xl p-6 border border-slate-600">
+                  <div className="bg-slate-900/50 rounded-2xl p-6 border border-slate-600">
                     <div className="flex items-center justify-between mb-4">
                       <span className="text-gray-400">Recent Activity</span>
                       <span className="text-green-400 text-sm">Live</span>
@@ -313,7 +295,7 @@ const Index = () => {
       </section>
 
       {/* Features Section */}
-      <section className="py-24 bg-gradient-to-b from-slate-900 to-slate-800">
+      <section className="py-24 bg-slate-800">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-6xl font-bold mb-8 text-white">
@@ -326,8 +308,7 @@ const Index = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            <div className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-purple-500/50 transition-all duration-300 hover:transform hover:scale-105">
-              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-pink-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
               <div className="relative z-10">
                 <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Upload className="h-8 w-8 text-purple-400" />
@@ -343,8 +324,7 @@ const Index = () => {
               </div>
             </div>
             
-            <div className="group relative bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-green-500/50 transition-all duration-300 hover:transform hover:scale-105">
-              <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-blue-500/5 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+            <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
               <div className="relative z-10">
                 <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Shield className="h-8 w-8 text-green-400" />
@@ -432,7 +412,7 @@ const Index = () => {
       </section>
 
       {/* Benefits Section */}
-      <section id="about" className="py-24 bg-gradient-to-b from-slate-800 to-slate-900">
+      <section id="about" className="py-24 bg-slate-900">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-20">
             <h2 className="text-5xl md:text-6xl font-bold mb-8 text-white">
@@ -446,7 +426,7 @@ const Index = () => {
           
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             <div className="space-y-8">
-              <div className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-green-500/50 transition-all duration-300">
+              <div className="group bg-slate-800/50 rounded-2xl p-8 border border-slate-700 hover:border-gray-600 transition-all duration-300">
                 <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <TrendingUp className="h-6 w-6 text-green-400" />
@@ -517,11 +497,6 @@ const Index = () => {
                       <span>10x productivity boost</span>
                     </div>
                   </div>
-                </div>
-              </div>
-              
-              <div className="group bg-slate-800/50 backdrop-blur-sm rounded-2xl p-8 border border-slate-700 hover:border-cyan-500/50 transition-all duration-300">
-                <div className="flex items-start gap-4">
                   <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <BarChart3 className="h-6 w-6 text-cyan-400" />
                   </div>
@@ -561,14 +536,10 @@ const Index = () => {
       </section>
       
       {/* CTA Section */}
-      <section id="contact" className="py-24 bg-gradient-to-b from-slate-900 to-slate-800 relative overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-purple-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse"></div>
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-pink-600 rounded-full mix-blend-multiply filter blur-3xl opacity-10 animate-pulse animation-delay-2000"></div>
-        </div>
+      <section id="contact" className="py-24 bg-slate-800">
         
-        <div className="max-w-5xl mx-auto px-4 relative z-10 text-center">
-          <div className="bg-slate-800/50 backdrop-blur-sm rounded-3xl p-16 border border-slate-700 shadow-2xl">
+        <div className="max-w-5xl mx-auto px-4 text-center">
+          <div className="bg-slate-800/50 rounded-3xl p-16 border border-slate-700 shadow-xl">
             <div className="mb-8">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-500/20 to-pink-500/20 border border-purple-500/30 rounded-full text-sm text-purple-300 font-medium">
                 <Zap className="h-4 w-4" />
@@ -587,7 +558,7 @@ const Index = () => {
               <Button
                 onClick={() => navigate("/auth")}
                 size="lg"
-                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white font-bold group px-12 py-4 text-lg shadow-2xl hover:shadow-purple-500/25 transition-all duration-300 transform hover:scale-105"
+                className="bg-gray-700 hover:bg-gray-600 text-white font-bold group px-12 py-4 text-lg shadow-lg transition-all duration-300 transform hover:scale-105"
               >
                 Start Free Trial
                 <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-2 transition-transform" />
@@ -595,7 +566,7 @@ const Index = () => {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-2 border-white/20 hover:border-white/40 text-white hover:bg-white/10 px-12 py-4 text-lg backdrop-blur-sm transition-all duration-300"
+                className="border-2 border-white/20 hover:border-white/40 text-white hover:bg-white/10 px-12 py-4 text-lg transition-all duration-300"
               >
                 Schedule Demo
               </Button>

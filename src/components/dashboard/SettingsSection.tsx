@@ -164,7 +164,7 @@ const SettingsSection = () => {
   return (
     <div className="space-y-6">
       {/* Profile Section */}
-      <Card className="border-border/50 bg-card/95 backdrop-blur-sm">
+      <Card className="border-border/50 bg-card/95">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <User className="h-5 w-5 text-primary" />
@@ -254,7 +254,7 @@ const SettingsSection = () => {
       </Card>
 
       {/* Account Management */}
-      <Card className="border-border/50 bg-card/95 backdrop-blur-sm">
+      <Card className="border-border/50 bg-card/95">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Settings className="h-5 w-5 text-primary" />

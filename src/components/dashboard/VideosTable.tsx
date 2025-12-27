@@ -339,7 +339,7 @@ const VideosTable = () => {
 
 
   return (
-    <Card className="border-border/50 bg-card/95 backdrop-blur-sm">
+    <Card className="border-border/50 bg-card/95">
       <CardHeader>
       <div className="flex items-center justify-between">
         <div>

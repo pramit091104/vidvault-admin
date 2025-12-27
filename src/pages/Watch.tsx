@@ -409,7 +409,7 @@ const Watch = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card/95 backdrop-blur px-4 py-4">
+      <header className="border-b bg-card/95 px-4 py-4">
         <div className="max-w-6xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
             <div className="p-2 rounded-lg bg-primary/10"></div>
