@@ -2,8 +2,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MessageSquare, Film, Trash2, ExternalLink, Youtube, Loader2, RefreshCw, AlertCircle, X, Copy, Globe, Link2, Eye } from "lucide-react";
@@ -24,6 +22,7 @@ import { ClientComments } from "./ClientComments";
 import { deleteVideo, toggleVideoPublicAccess } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
+import TimestampedComments from "./TimestampedComments";
 
 interface YouTubeVideo {
   id: string;
@@ -295,33 +294,7 @@ const VideosTable = () => {
     // This function is no longer needed
   };
 
-  const handleViewClientComments = async (video: YouTubeVideo) => {
-    try {
-      setSelectedClientComments({
-        clientName: video.title,
-        securityCode: video.id,
-        videoTitle: video.title
-      });
-      setActiveTab("client-comments");
-    } catch (error: any) {
-      console.error('Error setting comments view:', error);
-      toast.error(error.message || 'Failed to load comments');
-    }
-  };
 
-  const handleViewClientCommentsGcs = async (videoId: string, videoTitle: string) => {
-    try {
-      setSelectedClientComments({
-        clientName: videoTitle,
-        securityCode: videoId,
-        videoTitle
-      });
-      setActiveTab('client-comments');
-    } catch (error: any) {
-      console.error('Error setting comments view:', error);
-      toast.error(error.message || 'Failed to load comments');
-    }
-  };
 
   const handleDelete = async (videoId: string, videoTitle: string) => {
     setDeletingVideoId(videoId);
@@ -517,8 +490,8 @@ const VideosTable = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {videos.map((video) => (
-                          <TableRow key={video.id} className="hover:bg-secondary/30">
+                        {videos.map((video, index) => (
+                          <TableRow key={video.id || `youtube-${index}`} className="hover:bg-secondary/30">
                             <TableCell>
                               {video.thumbnailUrl ? (
                                 <img
@@ -564,16 +537,10 @@ const VideosTable = () => {
                             </TableCell>
                             <TableCell className="text-right space-x-2">
                               <div className="flex items-center gap-1">
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => handleViewClientComments(video)}
-                                  title="View client comments"
-                                >
-                                  <MessageSquare className="h-4 w-4 text-blue-500" />
-                                  <span className="sr-only">View client comments</span>
-                                </Button>
+                                <TimestampedComments 
+                                  videoId={video.id} 
+                                  videoTitle={video.title}
+                                />
                                 <Button
                                   variant="ghost"
                                   size="icon"
@@ -644,8 +611,8 @@ const VideosTable = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {gcsVideos.map((video) => (
-                          <TableRow key={video.securityCode} className="hover:bg-secondary/30">
+                        {gcsVideos.map((video, index) => (
+                          <TableRow key={video.id || video.securityCode || `gcs-${index}`} className="hover:bg-secondary/30">
                             <TableCell>
                               <p className="font-mono text-sm max-w-[100px] truncate" title={video.fileName}>
                                 {video.fileName?.length > 15 ? video.fileName.substring(0, 15) + '...' : video.fileName}
@@ -705,23 +672,10 @@ const VideosTable = () => {
                                   <ExternalLink className="h-4 w-4" />
                                   <span className="sr-only">View video</span>
                                 </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8"
-                                  onClick={() => {
-                                    setSelectedClientComments({
-                                      clientName: video.clientName || 'Unknown',
-                                      securityCode: video.id,
-                                      videoTitle: video.title || 'Untitled',
-                                    });
-                                    setActiveTab('client-comments');
-                                  }}
-                                  title="View comments"
-                                >
-                                  <MessageSquare className="h-4 w-4" />
-                                  <span className="sr-only">View comments</span>
-                                </Button>
+                                <TimestampedComments 
+                                  videoId={video.id} 
+                                  videoTitle={video.title || 'Untitled'}
+                                />
                                 <Button
                                   variant="ghost"
                                   size="icon"

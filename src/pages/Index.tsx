@@ -16,8 +16,6 @@ const Index = () => {
       <nav className="sticky top-0 z-50 bg-card border-b border-border/50 backdrop-blur-sm">
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-lg bg-primary/10">
-            </div>
             <h2 className="text-xl font-bold text-foreground">Previu</h2>
           </div>
           <ul className="flex items-center gap-8">
@@ -62,8 +60,6 @@ const Index = () => {
       <section id="home" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 relative overflow-hidden">
         <div className="relative z-10 text-center space-y-8 px-4 animate-fade-in-up max-w-4xl">
           <div className="flex items-center justify-center gap-4 mb-8">
-            <div className="p-4 rounded-2xl bg-primary/10 animate-glow-pulse">
-            </div>
           </div>
           
           <div className="space-y-4">
