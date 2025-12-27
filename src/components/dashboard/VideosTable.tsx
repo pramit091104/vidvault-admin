@@ -18,7 +18,6 @@ import { gcsService } from "@/integrations/gcs/gcsService";
 import { getAllVideosForUser } from "@/integrations/firebase/videoService";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ClientComments } from "./ClientComments";
 import { deleteVideo, toggleVideoPublicAccess } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
@@ -45,11 +44,7 @@ const VideosTable = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [activeTab, setActiveTab] = useState("videos");
-  const [selectedClientComments, setSelectedClientComments] = useState<{
-    clientName: string;
-    securityCode: string;
-    videoTitle: string;
-  } | null>(null);
+  
   const [deletingVideoId, setDeletingVideoId] = useState<string | null>(null);
   const [serviceView, setServiceView] = useState<'youtube' | 'gcs'>('youtube');
   const [gcsVideos, setGcsVideos] = useState<any[]>([]);
@@ -439,9 +434,8 @@ const VideosTable = () => {
 
         {/* Main Content with Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-1">
             <TabsTrigger value="videos">Videos</TabsTrigger>
-            <TabsTrigger value="client-comments">Client Comments</TabsTrigger>
           </TabsList>
           
           <TabsContent value="videos" className="space-y-4">
@@ -713,23 +707,7 @@ const VideosTable = () => {
             )}
           </TabsContent>
           
-          <TabsContent value="client-comments" className="space-y-4">
-            {selectedClientComments ? (
-              <ClientComments
-                clientName={selectedClientComments.clientName}
-                securityCode={selectedClientComments.securityCode}
-                videoTitle={selectedClientComments.videoTitle}
-              />
-            ) : (
-              <div className="text-center py-12 text-muted-foreground">
-                <MessageSquare className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                <p className="font-medium mb-2">No video selected</p>
-                <p className="text-sm">
-                  Select a video from the Videos tab to view client comments
-                </p>
-              </div>
-            )}
-          </TabsContent>
+          
         </Tabs>
       </CardContent>
     </Card>
