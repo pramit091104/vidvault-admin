@@ -26,7 +26,7 @@ class RazorpayService {
   // Replace the createOrder method in razorpayService.ts:
   async createOrder(paymentRequest: PaymentRequest) {
     try {
-      const response = await fetch('http://localhost:3001/api/razorpay/create-order', {
+      const response = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -35,30 +35,39 @@ class RazorpayService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create payment order');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create payment order');
       }
 
       const order = await response.json();
       return order;
     } catch (error) {
       console.error('Error creating Razorpay order:', error);
-      throw new Error('Failed to create payment order');
+      throw error;
     }
   }
 
   // Replace the verifyPayment method:
   verifyPayment(verification: PaymentVerification) {
     try {
-      // This will be handled by the backend now
-      return fetch('http://localhost:3001/api/razorpay/verify-payment', {
+      return fetch('/api/razorpay/verify-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(verification),
       })
-        .then(response => response.json())
-        .then(data => data.isValid);
+        .then(response => {
+          if (!response.ok) {
+            throw new Error('Payment verification failed');
+          }
+          return response.json();
+        })
+        .then(data => data.isValid)
+        .catch(error => {
+          console.error('Error verifying payment:', error);
+          return false;
+        });
     } catch (error) {
       console.error('Error verifying payment:', error);
       return false;
