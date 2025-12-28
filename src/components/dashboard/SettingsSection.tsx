@@ -12,14 +12,14 @@ import {
   Settings, 
   LogOut, 
   RefreshCw, 
-  Shield, 
   Camera,
   Loader2,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Trash2 // Imported Trash2
 } from "lucide-react";
 import { toast } from "sonner";
-import { onAuthStateChanged, signOut, updateProfile as updateFirebaseProfile } from "firebase/auth";
+import { onAuthStateChanged, signOut, updateProfile as updateFirebaseProfile, deleteUser } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 import { youtubeService } from "@/integrations/youtube/youtubeService";
 
@@ -35,7 +35,9 @@ const SettingsSection = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);  
+  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false); 
+  const [isDeleting, setIsDeleting] = useState(false); // New state for deletion
+  
   // Form states
   const [displayName, setDisplayName] = useState("");
   const [photoURL, setPhotoURL] = useState("");
@@ -76,7 +78,6 @@ const SettingsSection = () => {
         photoURL: photoURL || null
       });
 
-      // Update local state
       setUser(prev => prev ? {
         ...prev,
         displayName: displayName.trim(),
@@ -99,7 +100,6 @@ const SettingsSection = () => {
     setIsSigningOut(true);
     try {
       await signOut(auth);
-      // Clear YouTube service tokens
       localStorage.removeItem("youtube_access_token");
       toast.success("Signed out successfully");
     } catch (error: any) {
@@ -113,11 +113,8 @@ const SettingsSection = () => {
   const handleSwitchAccount = async () => {
     setIsSwitchingAccount(true);
     try {
-      // Clear current authentication
       await signOut(auth);
       localStorage.removeItem("youtube_access_token");
-      
-      // Re-authenticate with YouTube service
       await youtubeService.authenticate();
       toast.success("Account switched successfully!");
     } catch (error: any) {
@@ -125,6 +122,37 @@ const SettingsSection = () => {
       toast.error(error.message || "Failed to switch account");
     } finally {
       setIsSwitchingAccount(false);
+    }
+  };
+
+  // --- NEW DELETE FUNCTION ---
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "CRITICAL WARNING: Are you sure you want to PERMANENTLY delete your account?\n\nThis action cannot be undone. All your data and settings will be lost forever."
+    );
+
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        await deleteUser(currentUser);
+        localStorage.removeItem("youtube_access_token");
+        toast.success("Account deleted successfully.");
+        // UI will update via the onAuthStateChanged listener
+      }
+    } catch (error: any) {
+      console.error("Error deleting account:", error);
+      
+      // Firebase security feature: sensitive actions require recent login
+      if (error.code === 'auth/requires-recent-login') {
+        toast.error("Security requirement: Please sign out and sign in again to verify your identity before deleting your account.");
+      } else {
+        toast.error(error.message || "Failed to delete account");
+      }
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -300,7 +328,7 @@ const SettingsSection = () => {
                 </p>
               </div>
               <Button
-                variant="destructive"
+                variant="secondary"
                 onClick={handleSignOut}
                 disabled={isSigningOut}
               >
@@ -317,6 +345,34 @@ const SettingsSection = () => {
                 )}
               </Button>
             </div>
+
+            {/* DELETE ACCOUNT SECTION */}
+            <div className="flex items-center justify-between p-4 border border-destructive/50 bg-destructive/5 rounded-lg">
+              <div className="space-y-1">
+                <h4 className="font-medium text-destructive">Delete Account</h4>
+                <p className="text-sm text-muted-foreground">
+                  Permanently remove your account and all associated data
+                </p>
+              </div>
+              <Button
+                variant="destructive"
+                onClick={handleDeleteAccount}
+                disabled={isDeleting}
+              >
+                {isDeleting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Deleting...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete Account
+                  </>
+                )}
+              </Button>
+            </div>
+
           </div>
         </CardContent>
       </Card>

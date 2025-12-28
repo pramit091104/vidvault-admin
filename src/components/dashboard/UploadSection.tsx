@@ -50,7 +50,7 @@ const UploadSection = () => {
         if (uploadService === 'youtube') {
           toast.error("Failed to initialize YouTube service. Please check your configuration.");
         } else {
-          toast.error("Failed to initialize Google Cloud Storage service. Please check your configuration.");
+          toast.error("Failed to initialize Cloud Storage service. Please check your configuration.");
         }
       } finally {
         setIsInitializing(false);
@@ -260,7 +260,7 @@ const UploadSection = () => {
         
         setGcsVideoUrl(result.publicUrl);
         setUploadSuccess(true);
-        toast.success('Video uploaded successfully to Google Cloud Storage!');
+        toast.success('Video uploaded successfully to Cloud Storage!');
         window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
       }
     } catch (error: any) {
@@ -282,7 +282,7 @@ const UploadSection = () => {
           toast.error(error.message || "Failed to upload video to YouTube");
         }
       } else {
-        toast.error(error.message || "Failed to upload video to Google Cloud Storage");
+        toast.error(error.message || "Failed to upload video to Cloud Storage");
       }
       
       setUploadProgress(0);
@@ -306,7 +306,7 @@ const UploadSection = () => {
           Upload Video
         </CardTitle>
         <CardDescription>
-          Upload your video to YouTube or Google Cloud Storage
+          Upload your video to YouTube or Cloud Storage
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
@@ -326,7 +326,7 @@ const UploadSection = () => {
               <SelectItem value="gcs">
                 <div className="flex items-center gap-2">
                   <Cloud className="h-4 w-4" />
-                  Google Cloud Storage
+                  Cloud Storage
                 </div>
               </SelectItem>
             </SelectContent>
@@ -488,7 +488,7 @@ const UploadSection = () => {
           ) : isUploading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Uploading to {uploadService === 'youtube' ? 'YouTube...' : 'Google Cloud Storage...'}
+              Uploading to {uploadService === 'youtube' ? 'YouTube...' : 'Cloud Storage...'}
             </>
           ) : uploadSuccess ? (
             <>
@@ -505,7 +505,7 @@ const UploadSection = () => {
               ) : (
                 <>
                   <Cloud className="mr-2 h-4 w-4" />
-                  Upload to Google Cloud Storage
+                  Upload to Cloud Storage
                 </>
               )}
             </>
