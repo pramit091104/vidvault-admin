@@ -18,6 +18,10 @@
       "handle": "filesystem"
     },
     {
+      "src": "/api/razorpay/(.*)",
+      "dest": "/api/razorpay/$1"
+    },
+    {
       "src": "/api/(.*)",
       "dest": "/server.js"
     },

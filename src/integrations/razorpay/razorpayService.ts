@@ -1,5 +1,3 @@
-import Razorpay from 'razorpay';
-
 export interface PaymentRequest {
   amount: number; // Amount in smallest currency unit (e.g., paise for INR)
   currency?: string;
@@ -35,7 +33,12 @@ class RazorpayService {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
         throw new Error(errorData.error || 'Failed to create payment order');
       }
 
@@ -43,31 +46,33 @@ class RazorpayService {
       return order;
     } catch (error) {
       console.error('Error creating Razorpay order:', error);
-      throw error;
+      throw new Error(error instanceof Error ? error.message : 'Failed to create payment order');
     }
   }
 
   // Replace the verifyPayment method:
-  verifyPayment(verification: PaymentVerification) {
+  async verifyPayment(verification: PaymentVerification) {
     try {
-      return fetch('/api/razorpay/verify-payment', {
+      const response = await fetch('/api/razorpay/verify-payment', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(verification),
-      })
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Payment verification failed');
-          }
-          return response.json();
-        })
-        .then(data => data.isValid)
-        .catch(error => {
-          console.error('Error verifying payment:', error);
-          return false;
-        });
+      });
+
+      if (!response.ok) {
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch {
+          errorData = { error: `HTTP ${response.status}: ${response.statusText}` };
+        }
+        throw new Error(errorData.error || 'Payment verification failed');
+      }
+
+      const data = await response.json();
+      return data.isValid;
     } catch (error) {
       console.error('Error verifying payment:', error);
       return false;
