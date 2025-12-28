@@ -19,30 +19,26 @@ export interface PaymentVerification {
 }
 
 class RazorpayService {
-  private instance: Razorpay;
-
   constructor() {
-    if (!process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID) {
-      throw new Error('Razorpay key ID is not configured');
-    }
-    
-    this.instance = new Razorpay({
-      key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-      key_secret: process.env.RAZORPAY_KEY_SECRET,
-    });
+    // No need to initialize Razorpay instance here since we're using backend API
   }
 
+  // Replace the createOrder method in razorpayService.ts:
   async createOrder(paymentRequest: PaymentRequest) {
     try {
-      const options = {
-        amount: paymentRequest.amount,
-        currency: paymentRequest.currency || 'INR', // Default to INR
-        receipt: paymentRequest.receipt || `order_${Date.now()}`,
-        notes: paymentRequest.notes,
-        payment_capture: 1, // Auto capture payment
-      };
+      const response = await fetch('http://localhost:3001/api/razorpay/create-order', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(paymentRequest),
+      });
 
-      const order = await this.instance.orders.create(options);
+      if (!response.ok) {
+        throw new Error('Failed to create payment order');
+      }
+
+      const order = await response.json();
       return order;
     } catch (error) {
       console.error('Error creating Razorpay order:', error);
@@ -50,21 +46,24 @@ class RazorpayService {
     }
   }
 
+  // Replace the verifyPayment method:
   verifyPayment(verification: PaymentVerification) {
     try {
-      const crypto = require('crypto');
-      const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || '');
-      hmac.update(verification.orderId + '|' + verification.paymentId);
-      const generatedSignature = hmac.digest('hex');
-      
-      return generatedSignature === verification.signature;
+      // This will be handled by the backend now
+      return fetch('http://localhost:3001/api/razorpay/verify-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(verification),
+      })
+        .then(response => response.json())
+        .then(data => data.isValid);
     } catch (error) {
       console.error('Error verifying payment:', error);
       return false;
     }
   }
-
-  // Add more methods as needed (refund, fetch payments, etc.)
 }
 
 export const razorpayService = new RazorpayService();

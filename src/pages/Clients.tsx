@@ -33,6 +33,8 @@ import {
   ClientRecord 
 } from "@/integrations/firebase/clientService";
 import { useAuth } from "@/contexts/AuthContext";
+import { PaymentModal } from "@/components/payment/PaymentModal";
+import { PaymentSummary } from "@/components/payment/PaymentSummary";
 
 interface Client extends ClientRecord {
   isEditing?: boolean;
@@ -192,9 +194,7 @@ const Clients = () => {
     toast.success('All client data copied to clipboard');
   };
 
-  const handleCellEdit = (field: keyof Client, value: string | number) => {
-    if (!editingClient) return;
-    
+  const handleCellEdit = (field: string, value: string | number) => {
     setEditingClient(prev => {
       if (!prev) return null;
       
@@ -206,6 +206,36 @@ const Clients = () => {
       
       return { ...prev, [field]: value };
     });
+  };
+
+  const handlePaymentComplete = async (clientId: string, paymentType: 'pre' | 'post' | 'final', amount: number) => {
+    try {
+      const client = clients.find(c => c.id === clientId);
+      if (!client) return;
+
+      const updatedClient = { ...client };
+      
+      // Update the appropriate payment field
+      if (paymentType === 'pre') {
+        updatedClient.prePayment = amount;
+      } else if (paymentType === 'post') {
+        updatedClient.paidPayment = amount;
+      } else if (paymentType === 'final') {
+        updatedClient.finalPayment = amount;
+      }
+
+      await updateClient(clientId, updatedClient);
+      
+      // Update local state
+      setClients(prev => prev.map(c => 
+        c.id === clientId ? updatedClient : c
+      ));
+      
+      toast.success(`${paymentType.charAt(0).toUpperCase() + paymentType.slice(1)} payment processed successfully`);
+    } catch (error) {
+      console.error('Error updating payment:', error);
+      toast.error('Failed to update payment record');
+    }
   };
 
   const filteredClients = clients.filter(client => {
@@ -435,6 +465,20 @@ const Clients = () => {
                           >
                             <Share2 className="h-4 w-4" />
                           </Button>
+                          {client.id && (
+                            <PaymentModal
+                              client={{
+                                id: client.id,
+                                clientName: client.clientName,
+                                prePayment: client.prePayment,
+                                paidPayment: client.paidPayment,
+                                finalPayment: client.finalPayment
+                              }}
+                              onPaymentComplete={(paymentType, amount) => 
+                                handlePaymentComplete(client.id!, paymentType, amount)
+                              }
+                            />
+                          )}
                         </>
                       )}
                     </div>

@@ -4,13 +4,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, Loader2, CheckCircle2, Youtube, Copy, Cloud, Globe, Link2, Eye } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Copy, Cloud, Globe, Link2, Eye } from "lucide-react";
 import { toast } from "sonner";
-import { youtubeService } from "@/integrations/youtube/youtubeService";
 import { gcsService } from "@/integrations/gcs/gcsService";
 import { Progress } from "@/components/ui/progress";
-import { saveYouTubeVideo, saveGCSVideo } from "@/integrations/firebase/videoService";
+import { saveGCSVideo } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 import { v4 as uuidv4 } from 'uuid';
@@ -21,12 +19,9 @@ const UploadSection = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
-  const [privacyStatus, setPrivacyStatus] = useState<"private" | "unlisted" | "public">("private");
-  const [uploadService, setUploadService] = useState<"youtube" | "gcs">("youtube");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
-  const [youtubeVideoUrl, setYoutubeVideoUrl] = useState("");
   const [gcsVideoUrl, setGcsVideoUrl] = useState("");
   const [isInitializing, setIsInitializing] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
@@ -35,23 +30,14 @@ const UploadSection = () => {
   const [publicUrl, setPublicUrl] = useState<string>("");
 
   useEffect(() => {
-    // Initialize services based on selected upload service
+    // Initialize GCS service
     const initializeServices = async () => {
       try {
         setIsInitializing(true);
-        
-        // Always initialize YouTube service in case user switches to it
-        await youtubeService.initialize();
-        
-        // Initialize GCS service
         await gcsService.initialize();
       } catch (error: any) {
-        console.error("Failed to initialize services:", error);
-        if (uploadService === 'youtube') {
-          toast.error("Failed to initialize YouTube service. Please check your configuration.");
-        } else {
-          toast.error("Failed to initialize Cloud Storage service. Please check your configuration.");
-        }
+        console.error("Failed to initialize GCS service:", error);
+        toast.error("Failed to initialize Cloud Storage service. Please check your configuration.");
       } finally {
         setIsInitializing(false);
       }
@@ -65,7 +51,7 @@ const UploadSection = () => {
     initializeServices();
 
     return () => unsubscribe();
-  }, [uploadService]);
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -120,171 +106,76 @@ const UploadSection = () => {
     setIsUploading(true);
     setUploadSuccess(false);
     setUploadProgress(0);
-    setYoutubeVideoUrl("");
     setGcsVideoUrl("");
     setPublicSlug("");
     setPublicUrl("");
     
     try {
-      if (uploadService === 'youtube') {
-        // YouTube Upload Logic
-        const isAuthenticated = await youtubeService.isAuthenticated();
-        if (!isAuthenticated) {
-          toast.info("Please sign in to YouTube to continue");
-          const authenticated = await youtubeService.authenticate();
-          if (!authenticated) {
-            setIsUploading(false);
-            return;
-          }
+      // Google Cloud Storage Upload Logic
+      const result = await gcsService.uploadVideo(
+        file,
+        {
+          title: title.trim(),
+          description: description?.trim() || '',
+          clientName: clientName.trim(),
+          privacyStatus: 'private', // Default to private for Cloud Storage
+        },
+        (progress) => {
+          setUploadProgress(progress);
         }
-        
-        const result = await youtubeService.uploadVideo(
-          file,
-          {
-            title: title.trim(),
-            description: description?.trim() || undefined,
-            privacyStatus,
-          },
-          (progress) => {
-            setUploadProgress(progress);
-          }
-        );
-        
-        const youtubeVideoId = result.videoId || result.videoUrl?.split('v=')[1]?.split('&')[0];
-        
-        // Generate public slug if enabled
-        let generatedSlug = '';
-        if (isPublicWebsite) {
-          try {
-            generatedSlug = generateVideoSlug(clientName.trim(), title.trim());
-            setPublicSlug(generatedSlug);
-            const url = createPublicUrl(generatedSlug);
-            setPublicUrl(url);
-            toast.success('Public website created successfully!');
-          } catch (slugError: any) {
-            console.error('Slug generation error:', slugError);
-            toast.error('Video uploaded but failed to create public website');
-          }
-        }
-        
-        // Save to Firebase YouTube collection
-        const videoId = uuidv4();
+      );
+      
+      // Generate public slug if enabled
+      let generatedSlug = '';
+      if (isPublicWebsite) {
         try {
-          await saveYouTubeVideo({
-            id: videoId,
-            title: title.trim(),
-            description: description?.trim() || '',
-            clientName: clientName.trim(),
-            userId: currentUser?.uid,
-            youtubeVideoId,
-            youtubeVideoUrl: result.videoUrl,
-            privacyStatus,
-            securityCode: '',
-            isActive: true,
-            accessCount: 0,
-            uploadStatus: 'completed',
-            uploadedAt: new Date(),
-            isPublic: isPublicWebsite,
-            publicSlug: generatedSlug,
-            publicUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
-            viewCount: 0,
-          });
-        } catch (firebaseError: any) {
-          console.error('Firebase save error:', firebaseError);
-          toast.error('Video uploaded but failed to save to database');
+          generatedSlug = generateVideoSlug(clientName.trim(), title.trim());
+          setPublicSlug(generatedSlug);
+          const url = createPublicUrl(generatedSlug);
+          setPublicUrl(url);
+          toast.success('Public website created successfully!');
+        } catch (slugError: any) {
+          console.error('Slug generation error:', slugError);
+          toast.error('Video uploaded but failed to create public website');
         }
-        
-        setYoutubeVideoUrl(result.videoUrl);
-        setUploadSuccess(true);
-        toast.success('Video uploaded successfully to YouTube!');
-        window.dispatchEvent(new CustomEvent("youtube-video-uploaded"));
-        
-      } else {
-        // Google Cloud Storage Upload Logic
-        const result = await gcsService.uploadVideo(
-          file,
-          {
-            title: title.trim(),
-            description: description?.trim() || '',
-            clientName: clientName.trim(),
-            privacyStatus: 'private', // Default to private for Cloud Storage
-          },
-          (progress) => {
-            setUploadProgress(progress);
-          }
-        );
-        
-        // Generate public slug if enabled
-        let generatedSlug = '';
-        if (isPublicWebsite) {
-          try {
-            generatedSlug = generateVideoSlug(clientName.trim(), title.trim());
-            setPublicSlug(generatedSlug);
-            const url = createPublicUrl(generatedSlug);
-            setPublicUrl(url);
-            toast.success('Public website created successfully!');
-          } catch (slugError: any) {
-            console.error('Slug generation error:', slugError);
-            toast.error('Video uploaded but failed to create public website');
-          }
-        }
-        
-        // Save to Firebase GCS collection
-        const videoId = uuidv4();
-        try {
-          await saveGCSVideo({
-            id: videoId,
-            title: title.trim(),
-            description: description?.trim() || '',
-            clientName: clientName.trim(),
-            userId: currentUser?.uid,
-            fileName: result.fileName,
-            publicUrl: result.publicUrl,
-            size: result.size,
-            contentType: result.contentType,
-            privacyStatus: 'private', // Default to private for Cloud Storage
-            securityCode: '',
-            isActive: true,
-            accessCount: 0,
-            isPubliclyAccessible: false, // Default to false for Cloud Storage
-            uploadedAt: new Date(),
-            isPublic: isPublicWebsite,
-            publicSlug: generatedSlug,
-            publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
-            viewCount: 0,
-          });
-        } catch (firebaseError: any) {
-          console.error('Firebase save error:', firebaseError);
-          toast.error('Video uploaded but failed to save to database');
-        }
-        
-        setGcsVideoUrl(result.publicUrl);
-        setUploadSuccess(true);
-        toast.success('Video uploaded successfully to Cloud Storage!');
-        window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
       }
+      
+      // Save to Firebase GCS collection
+      const videoId = uuidv4();
+      try {
+        await saveGCSVideo({
+          id: videoId,
+          title: title.trim(),
+          description: description?.trim() || '',
+          clientName: clientName.trim(),
+          userId: currentUser?.uid,
+          fileName: result.fileName,
+          publicUrl: result.publicUrl,
+          size: result.size,
+          contentType: result.contentType,
+          privacyStatus: 'private', // Default to private for Cloud Storage
+          securityCode: '',
+          isActive: true,
+          accessCount: 0,
+          isPubliclyAccessible: false, // Default to false for Cloud Storage
+          uploadedAt: new Date(),
+          isPublic: isPublicWebsite,
+          publicSlug: generatedSlug,
+          publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
+          viewCount: 0,
+        });
+      } catch (firebaseError: any) {
+        console.error('Firebase save error:', firebaseError);
+        toast.error('Video uploaded but failed to save to database');
+      }
+      
+      setGcsVideoUrl(result.publicUrl);
+      setUploadSuccess(true);
+      toast.success('Video uploaded successfully to Cloud Storage!');
+      window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
     } catch (error: any) {
       console.error("Upload error:", error);
-      
-      if (uploadService === 'youtube') {
-        if (error.isYouTubeSignupRequired || error.message?.includes("YouTube channel")) {
-          toast.error(
-            error.message || "Your Google account needs a YouTube channel to upload videos. Please create one at youtube.com first.",
-            {
-              duration: 8000,
-              action: {
-                label: "Open YouTube",
-                onClick: () => window.open("https://www.youtube.com", "_blank"),
-              },
-            }
-          );
-        } else {
-          toast.error(error.message || "Failed to upload video to YouTube");
-        }
-      } else {
-        toast.error(error.message || "Failed to upload video to Cloud Storage");
-      }
-      
+      toast.error(error.message || "Failed to upload video to Cloud Storage");
       setUploadProgress(0);
     } finally {
       setIsUploading(false);
@@ -306,33 +197,10 @@ const UploadSection = () => {
           Upload Video
         </CardTitle>
         <CardDescription>
-          Upload your video to YouTube or Cloud Storage
+          Upload your video to Cloud Storage
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="uploadService">Upload Service *</Label>
-          <Select value={uploadService} onValueChange={(value: "youtube" | "gcs") => setUploadService(value)}>
-            <SelectTrigger className="bg-background/50">
-              <SelectValue placeholder="Select upload service" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="youtube">
-                <div className="flex items-center gap-2">
-                  <Youtube className="h-4 w-4" />
-                  YouTube
-                </div>
-              </SelectItem>
-              <SelectItem value="gcs">
-                <div className="flex items-center gap-2">
-                  <Cloud className="h-4 w-4" />
-                  Cloud Storage
-                </div>
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
         <div className="space-y-2">
           <Label htmlFor="title">Video Title *</Label>
           <Input
@@ -365,22 +233,6 @@ const UploadSection = () => {
             className="bg-background/50 min-h-[100px]"
             rows={4} />
         </div>
-
-        {uploadService === 'youtube' && (
-        <div className="space-y-2">
-          <Label htmlFor="privacy">Privacy Status</Label>
-          <Select value={privacyStatus} onValueChange={(value: "private" | "unlisted" | "public") => setPrivacyStatus(value)}>
-            <SelectTrigger className="bg-background/50">
-              <SelectValue placeholder="Select privacy status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="private">Private</SelectItem>
-              <SelectItem value="unlisted">Unlisted</SelectItem>
-              <SelectItem value="public">Public</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        )}
 
         <div className="space-y-2">
           <Label htmlFor="publicWebsite">Public Access</Label>
@@ -490,7 +342,7 @@ const UploadSection = () => {
           ) : isUploading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Uploading to {uploadService === 'youtube' ? 'YouTube...' : 'Cloud Storage...'}
+              Uploading to Cloud Storage...
             </>
           ) : uploadSuccess ? (
             <>
@@ -499,17 +351,8 @@ const UploadSection = () => {
             </>
           ) : (
             <>
-              {uploadService === 'youtube' ? (
-                <>
-                  <Youtube className="mr-2 h-4 w-4" />
-                  Upload to YouTube
-                </>
-              ) : (
-                <>
-                  <Cloud className="mr-2 h-4 w-4" />
-                  Upload to Cloud Storage
-                </>
-              )}
+              <Cloud className="mr-2 h-4 w-4" />
+              Upload to Cloud Storage
             </>
           )}
         </Button>
