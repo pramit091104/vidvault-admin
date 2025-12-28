@@ -56,12 +56,18 @@ export const getClients = async (userId?: string): Promise<ClientRecord[]> => {
     }
     
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data(),
-      createdAt: doc.data().createdAt?.toDate(),
-      updatedAt: doc.data().updatedAt?.toDate(),
-    })) as ClientRecord[];
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data() as Omit<ClientRecord, 'id'> & {
+        createdAt?: any;
+        updatedAt?: any;
+      };
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+      } as ClientRecord;
+    });
   } catch (error) {
     console.error('Error fetching clients:', error);
     throw new Error('Failed to fetch clients');
