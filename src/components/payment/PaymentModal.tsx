@@ -10,6 +10,7 @@ import { CreditCard, IndianRupee, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { createPaymentRecord, updatePaymentStatus } from "@/integrations/firebase/paymentService";
 import { apiService } from "@/services/apiService";
+import { loadRazorpay } from "@/lib/loadRazorpay";
 
 interface PaymentModalProps {
   client: {
@@ -52,32 +53,6 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
     }
   ];
 
-  const loadRazorpay = (): Promise<any> => {
-    return new Promise((resolve) => {
-      if (typeof window !== 'undefined' && (window as any).Razorpay) {
-        resolve((window as any).Razorpay);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.async = true;
-      script.onload = () => {
-        if ((window as any).Razorpay) {
-          resolve((window as any).Razorpay);
-        } else {
-          console.error('Razorpay SDK failed to load');
-          resolve(null);
-        }
-      };
-      script.onerror = () => {
-        console.error('Failed to load Razorpay SDK');
-        resolve(null);
-      };
-      document.body.appendChild(script);
-    });
-  };
-
   const handlePayment = async (paymentType: 'pre' | 'post' | 'final', amount: number) => {
     if (amount <= 0) {
       toast.error('Amount must be greater than 0');
@@ -118,7 +93,7 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
         razorpayOrderId: order.id
       });
 
-      // Load Razorpay
+      // Load Razorpay checkout script
       const Razorpay = await loadRazorpay();
       if (!Razorpay) {
         throw new Error('Failed to load payment gateway');
