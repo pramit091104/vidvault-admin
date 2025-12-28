@@ -584,7 +584,13 @@ const VideosTable = () => {
                             </TableCell>
                             <TableCell>
                               <span className="text-sm text-muted-foreground">
-                                {video.uploadedAt ? new Date(video.uploadedAt.seconds * 1000).toLocaleDateString() : 'N/A'}
+                                {video.uploadedAt ? 
+                                  (video.uploadedAt.seconds ? 
+                                    new Date(video.uploadedAt.seconds * 1000).toLocaleDateString() : 
+                                    new Date(video.uploadedAt).toLocaleDateString()
+                                  ) : 
+                                  'N/A'
+                                }
                               </span>
                             </TableCell>
                             <TableCell className="text-right">

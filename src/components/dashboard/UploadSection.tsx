@@ -207,7 +207,7 @@ const UploadSection = () => {
             title: title.trim(),
             description: description?.trim() || '',
             clientName: clientName.trim(),
-            privacyStatus,
+            privacyStatus: 'private', // Default to private for Cloud Storage
           },
           (progress) => {
             setUploadProgress(progress);
@@ -242,11 +242,11 @@ const UploadSection = () => {
             publicUrl: result.publicUrl,
             size: result.size,
             contentType: result.contentType,
-            privacyStatus,
+            privacyStatus: 'private', // Default to private for Cloud Storage
             securityCode: '',
             isActive: true,
             accessCount: 0,
-            isPubliclyAccessible: privacyStatus === 'public',
+            isPubliclyAccessible: false, // Default to false for Cloud Storage
             uploadedAt: new Date(),
             isPublic: isPublicWebsite,
             publicSlug: generatedSlug,
@@ -366,6 +366,7 @@ const UploadSection = () => {
             rows={4} />
         </div>
 
+        {uploadService === 'youtube' && (
         <div className="space-y-2">
           <Label htmlFor="privacy">Privacy Status</Label>
           <Select value={privacyStatus} onValueChange={(value: "private" | "unlisted" | "public") => setPrivacyStatus(value)}>
@@ -379,6 +380,7 @@ const UploadSection = () => {
             </SelectContent>
           </Select>
         </div>
+        )}
 
         <div className="space-y-2">
           <Label htmlFor="publicWebsite">Public Access</Label>
