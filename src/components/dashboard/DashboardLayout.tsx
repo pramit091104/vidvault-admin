@@ -1,5 +1,5 @@
-import { ReactNode } from "react";
-import {  Upload, Film, MessageSquare, Settings, LogOut } from "lucide-react";
+import { ReactNode, useState, useEffect } from "react";
+import { Upload, Film, MessageSquare, Settings, LogOut, Users, Menu, X, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -12,8 +12,20 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout = ({ children, activeSection, onSectionChange }: DashboardLayoutProps) => {
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const navigate = useNavigate();
   const { logout, currentUser } = useAuth();
+
+  // Close sidebar when clicking on a nav item on mobile
+  const handleNavClick = (section: string) => {
+    onSectionChange(section);
+    setIsSidebarOpen(false);
+  };
+
+  // Toggle sidebar state
+  const toggleSidebar = () => {
+    setIsSidebarOpen(!isSidebarOpen);
+  };
 
   const handleLogout = async () => {
     try {
@@ -25,15 +37,35 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
   };
 
   const navItems = [
+    { id: "overview", label: "Dashboard Overview", icon: BarChart3 },
     { id: "upload", label: "Upload Video", icon: Upload },
     { id: "videos", label: "Manage Videos", icon: Film },
+    { id: "clients", label: "Clients", icon: Users },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Toggle Button - Visible on all screen sizes */}
+      <button
+        onClick={toggleSidebar}
+        className={cn(
+          "fixed z-50 p-2 rounded-md text-foreground bg-card/90 shadow-md transition-all duration-300",
+          isSidebarOpen ? 'left-64' : 'left-4 md:left-4',
+          "top-4"
+        )}
+        aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
+      >
+        {isSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+      </button>
+
       {/* Sidebar */}
-      <aside className="fixed left-0 top-0 h-full w-64 border-r border-border bg-card/50 backdrop-blur-sm p-6 space-y-8 animate-fade-in">
+      <aside 
+        className={cn(
+          "fixed left-0 top-0 h-full w-64 border-r border-border bg-card/95 p-6 space-y-8 transition-all duration-300 ease-in-out z-40",
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
         {/* Logo */}
         <div className="flex items-center gap-3">
           <div>
@@ -50,7 +82,7 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
             return (
               <button
                 key={item.id}
-                onClick={() => onSectionChange(item.id)}
+                onClick={() => handleNavClick(item.id)}
                 className={cn(
                   "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
                   isActive
@@ -78,12 +110,24 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
         </div>
       </aside>
 
+      {/* Overlay - Shown when sidebar is open */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 md:bg-transparent"
+          onClick={toggleSidebar}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Main Content */}
-      <main className="ml-64 p-8">
+      <main className={cn(
+        "p-8 transition-all duration-300",
+        isSidebarOpen ? "md:ml-64" : "md:ml-16" // Adjust margin based on sidebar state
+      )}>
         <div className="max-w-7xl mx-auto space-y-8 animate-fade-in-up">
           {/* Header */}
           <header className="space-y-2">
-            <h2 className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <h2 className="text-3xl font-bold text-foreground">
               Welcome back{currentUser?.displayName ? `, ${currentUser.displayName}` : ""}
             </h2>
             <p className="text-muted-foreground">

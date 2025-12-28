@@ -13,7 +13,10 @@ import {
   Timestamp 
 } from 'firebase/firestore';
 import { db } from './config';
+import { deleteCommentsByVideoId } from './commentService';
 import { increment } from 'firebase/firestore';
+import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
+import { logger } from '../../lib/logger';
 
 // Collections for different upload services
 export const YOUTUBE_VIDEOS_COLLECTION = 'youtubeClientCodes';
@@ -75,8 +78,8 @@ export const saveYouTubeVideo = async (
     };
     await setDoc(docRef, firestoreData);
   } catch (error) {
-    console.error('Error saving YouTube video:', error);
-    throw new Error('Failed to save YouTube video to Firestore');
+    logger.error('Error saving YouTube video', error);
+    throw error;
   }
 };
 
@@ -97,8 +100,8 @@ export const saveGCSVideo = async (
     };
     await setDoc(docRef, firestoreData);
   } catch (error) {
-    console.error('Error saving GCS video:', error);
-    throw new Error('Failed to save GCS video to Firestore');
+    logger.error('Error saving GCS video', error);
+    throw error;
   }
 };
 
@@ -120,8 +123,8 @@ export const getYouTubeVideo = async (videoId: string): Promise<YouTubeVideoReco
     }
     return null;
   } catch (error) {
-    console.error('Error retrieving YouTube video:', error);
-    throw new Error('Failed to retrieve YouTube video from Firestore');
+    logger.error('Error retrieving YouTube video', error);
+    throw error;
   }
 };
 
@@ -143,8 +146,8 @@ export const getGCSVideo = async (videoId: string): Promise<GCSVideoRecord | nul
     }
     return null;
   } catch (error) {
-    console.error('Error retrieving GCS video:', error);
-    throw new Error('Failed to retrieve GCS video from Firestore');
+    logger.error('Error retrieving GCS video', error);
+    throw error;
   }
 };
 
@@ -156,8 +159,7 @@ export const getAllVideosForUser = async (
   maxResults: number = 50
 ): Promise<VideoRecord[]> => {
   try {
-    console.log('getAllVideosForUser called with userId:', userId);
-    
+   
     // Get YouTube videos
     const youtubeQuery = query(
       collection(db, YOUTUBE_VIDEOS_COLLECTION),
@@ -167,9 +169,7 @@ export const getAllVideosForUser = async (
       limit(maxResults)
     );
     
-    console.log('Executing YouTube query...');
     const youtubeSnapshot = await getDocs(youtubeQuery);
-    console.log('YouTube videos found:', youtubeSnapshot.size);
     const youtubeVideos: YouTubeVideoRecord[] = [];
     
     youtubeSnapshot.forEach((doc) => {
@@ -193,13 +193,10 @@ export const getAllVideosForUser = async (
         limit(maxResults)
       );
       
-      console.log('Executing GCS query (with isActive)...');
       const gcsSnapshot = await getDocs(gcsQuery);
-      console.log('GCS videos found (with isActive):', gcsSnapshot.size);
       
       gcsSnapshot.forEach((doc) => {
         const data = doc.data();
-        console.log('GCS video doc:', doc.id, data);
         gcsVideos.push({
           ...data,
           uploadedAt: data.uploadedAt.toDate(),
@@ -239,11 +236,10 @@ export const getAllVideosForUser = async (
     // Combine and sort by upload date
     const allVideos = [...youtubeVideos, ...gcsVideos];
     const sorted = allVideos.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()).slice(0, maxResults);
-    console.log('Total videos returned:', sorted.length);
     return sorted;
   } catch (error) {
-    console.error('Error retrieving all videos for user:', error);
-    throw new Error('Failed to retrieve videos from Firestore');
+    logger.error('Error retrieving all videos for user', error);
+    throw error;
   }
 };
 
@@ -263,8 +259,8 @@ export const updateVideoAccess = async (
       lastAccessed: Timestamp.now(),
     });
   } catch (error) {
-    console.error('Error updating video access:', error);
-    throw new Error('Failed to update video access in Firestore');
+    logger.error('Error updating video access', error);
+    throw error;
   }
 };
 
@@ -281,8 +277,8 @@ export const deactivateVideo = async (
     
     await updateDoc(docRef, { isActive: false });
   } catch (error) {
-    console.error('Error deactivating video:', error);
-    throw new Error('Failed to deactivate video in Firestore');
+    logger.error('Error deactivating video', error);
+    throw error;
   }
 };
 
@@ -294,13 +290,19 @@ export const deleteVideo = async (
   service: 'youtube' | 'gcs'
 ): Promise<void> => {
   try {
+    // First delete all comments associated with this video
+    await deleteCommentsByVideoId(videoId);
+    
+    // Then delete the video record
     const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
     const docRef = doc(db, collectionName, videoId);
     
     await deleteDoc(docRef);
+    
+    logger.info(`Successfully deleted video ${videoId} and its comments`);
   } catch (error) {
-    console.error('Error deleting video:', error);
-    throw new Error('Failed to delete video from Firestore');
+    logger.error('Error deleting video', error);
+    throw error;
   }
 };
 
@@ -351,8 +353,8 @@ export const getPublicVideoBySlug = async (slug: string): Promise<VideoRecord | 
     
     return null;
   } catch (error) {
-    console.error('Error retrieving public video by slug:', error);
-    throw new Error('Failed to retrieve public video from Firestore');
+    logger.error('Error retrieving public video by slug', error);
+    throw error;
   }
 };
 
@@ -380,7 +382,7 @@ export const updateVideoViewCount = async (
       });
     }
   } catch (error) {
-    console.error('Error updating video view count:', error);
+    logger.error('Error updating video view count', error);
     // Don't throw error for view count updates to avoid breaking user experience
   }
 };
@@ -405,7 +407,7 @@ export const toggleVideoPublicAccess = async (
     
     await updateDoc(docRef, updateData);
   } catch (error) {
-    console.error('Error toggling video public access:', error);
-    throw new Error('Failed to update video public access in Firestore');
+    logger.error('Error toggling video public access', error);
+    throw error;
   }
 };

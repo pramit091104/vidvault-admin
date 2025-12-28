@@ -22,6 +22,7 @@ import { deleteVideo, toggleVideoPublicAccess } from "@/integrations/firebase/vi
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 import TimestampedComments from "./TimestampedComments";
+import { logger } from '../../lib/logger';
 
 interface YouTubeVideo {
   id: string;
@@ -59,7 +60,7 @@ const VideosTable = () => {
       const videos = await getAllVideosForUser(currentUser.uid);
       setAllVideos(videos);
     } catch (error: any) {
-      console.error('Error fetching all videos:', error);
+      logger.error('Error fetching all videos:', error);
       toast.error('Failed to fetch videos');
     } finally {
       setIsLoading(false);
@@ -115,14 +116,16 @@ const VideosTable = () => {
       
       toast.success(`Video is now ${newPublicStatus ? 'public' : 'private'}`);
     } catch (error: any) {
-      console.error('Error toggling public access:', error);
+      logger.error('Error toggling public access:', error);
       toast.error('Failed to update public access');
     }
   };
 
   const copyPublicUrl = (video: any) => {
     if (!video.publicSlug) {
-      toast.error('Public URL not available');
+      const errorMsg = 'Video URL not available';
+      logger.error(errorMsg, { videoId: video.id });
+      toast.error(errorMsg);
       return;
     }
     
@@ -130,6 +133,7 @@ const VideosTable = () => {
     navigator.clipboard.writeText(publicUrl);
     toast.success('Public URL copied to clipboard!');
   };
+
   const handleSignIn = async () => {
     try {
       setIsLoading(true);
@@ -138,7 +142,7 @@ const VideosTable = () => {
       setIsAuthenticated(true);
       await fetchVideos(false);
     } catch (error: any) {
-      console.error('Error signing in:', error);
+      logger.error('Error signing in:', error);
       setError(error.message || 'Failed to sign in with YouTube');
       setIsAuthenticated(false);
     } finally {
@@ -166,7 +170,7 @@ const VideosTable = () => {
       const fetchedVideos = await youtubeService.getMyVideos(50);
       setVideos(fetchedVideos);
     } catch (err: any) {
-      console.error("Error fetching videos:", err);
+      logger.error("Error fetching videos:", err);
       setError(err.message || "Failed to load videos");
       
       if (err.message?.includes("Token missing read permissions") || 
@@ -249,66 +253,34 @@ const VideosTable = () => {
     }
     try {
       setIsLoadingGcs(true);
-      console.log('Fetching GCS videos for user:', currentUser.uid);
       const all = await getAllVideosForUser(currentUser.uid, 100);
-      console.log('All videos retrieved:', all);
-      console.log('Total videos:', all.length);
-      
-      // Log each video's service type
-      all.forEach((v, idx) => {
-        console.log(`Video ${idx}:`, { 
-          title: v.title, 
-          service: (v as any).service, 
-          hasService: 'service' in v,
-          publicUrl: (v as any).publicUrl 
-        });
-      });
       
       const gcs = all.filter((v: any) => {
-        console.log('Checking video:', v.title, 'service:', v.service, 'equals gcs:', v.service === 'gcs');
         return v.service === 'gcs';
-      });
-      console.log('GCS videos filtered:', gcs.length, 'videos');
-      gcs.forEach((v, idx) => {
-        console.log(`GCS Video ${idx}:`, { title: v.title, publicUrl: (v as any).publicUrl });
       });
       setGcsVideos(gcs);
     } catch (err: any) {
-      console.error('Error fetching GCS videos:', err);
+      logger.error('Error fetching GCS videos:', err);
       console.error('Error details:', err.message, err.code);
     } finally {
       setIsLoadingGcs(false);
     }
   };
 
-  const handleCreateSecurityCode = async () => {
-    // This function is no longer needed
-  };
-
-  const copySecurityCode = () => {
-    // This function is no longer needed
-  };
-
-
-
-  const handleDelete = async (videoId: string, videoTitle: string) => {
-    setDeletingVideoId(videoId);
-    try {
-      // Delete from YouTube first
-      await youtubeService.deleteVideo(videoId);
-
-      // Delete the video record from Firestore
-      await deleteVideo(videoId, 'youtube');
-
-      toast.success(`Video "${videoTitle}" deleted successfully`);
-      // Refresh videos after deletion
-      await fetchVideos(false);
-      await fetchGcsVideos();
-    } catch (error: any) {
-      console.error('Error deleting video:', error);
-      toast.error(error.message || 'Failed to delete video');
-    } finally {
-      setDeletingVideoId(null);
+  const handleDeleteVideo = async (videoId: string, service: 'youtube' | 'gcs') => {
+    if (!currentUser) return;
+    
+    if (window.confirm('Are you sure you want to delete this video? This action cannot be undone.')) {
+      try {
+        await deleteVideo(videoId, service);
+        await fetchGcsVideos();
+        toast.success('Video deleted successfully');
+      } catch (error) {
+        logger.error('Error deleting video', error);
+        toast.error('Failed to delete video');
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -330,13 +302,12 @@ const VideosTable = () => {
       await fetchGcsVideos();
       await fetchVideos(false);
     } catch (error: any) {
-      console.error('Error deleting GCS video:', error);
+      logger.error('Error deleting GCS video:', error);
       toast.error(error.message || 'Failed to delete GCS video');
     } finally {
       setDeletingVideoId(null);
     }
   };
-
 
   return (
     <Card className="border-border/50 bg-card/95">
@@ -546,7 +517,7 @@ const VideosTable = () => {
                                 size="sm"
                                 variant="destructive"
                                 className="h-8 min-w-[32px]"
-                                onClick={() => handleDelete(video.id, video.title)}
+                                onClick={() => handleDeleteVideo(video.id, 'youtube')}
                                 disabled={!!deletingVideoId}
                                 title="Delete video"
                               >
@@ -646,11 +617,11 @@ const VideosTable = () => {
                                   className="h-8 w-8"
                                   onClick={() => {
                                     if (!video.publicUrl) {
-                                      toast.error('Video URL not available');
-                                      console.error('Video publicUrl is missing:', video);
+                                      const errorMsg = 'Video URL not available';
+                                      logger.error(errorMsg, { videoId: video.id });
+                                      toast.error(errorMsg);
                                       return;
                                     }
-                                    console.log('Opening video:', video.publicUrl);
                                     const opened = window.open(video.publicUrl, '_blank');
                                     if (!opened) {
                                       toast.error('Could not open video. Please check popup blocker settings.');

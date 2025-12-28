@@ -1,4 +1,4 @@
-import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp, collection, addDoc, query, where, getDocs, orderBy, limit, QueryConstraint } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp, collection, addDoc, query, where, getDocs, orderBy, limit, QueryConstraint, deleteDoc } from 'firebase/firestore';
 import { db } from './config';
 
 // Simple cache for storing comment queries
@@ -324,5 +324,33 @@ export const getVideoCommentCount = async (
   } catch (error) {
     console.error('Error fetching comment count:', error);
     throw new Error('Failed to fetch comment count');
+  }
+};
+
+/**
+ * Deletes all timestamped comments for a specific video
+ */
+export const deleteCommentsByVideoId = async (videoId: string): Promise<void> => {
+  try {
+    const commentsRef = collection(db, 'timestampedComments');
+    const q = query(commentsRef, where('videoId', '==', videoId));
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      console.log(`No comments found for videoId: ${videoId}`);
+      return;
+    }
+    
+    // Delete all comment documents for this video
+    const deletePromises = querySnapshot.docs.map(doc => deleteDoc(doc.ref));
+    await Promise.all(deletePromises);
+    
+    // Clear cache for this video
+    clearVideoCommentsCache(videoId);
+    
+    console.log(`Deleted ${querySnapshot.size} comments for videoId: ${videoId}`);
+  } catch (error) {
+    console.error('Error deleting comments:', error);
+    throw new Error('Failed to delete comments');
   }
 };

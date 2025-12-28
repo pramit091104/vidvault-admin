@@ -1,64 +1,95 @@
-# VidVault Admin Dashboard
+# 🎥 VidVault Admin Dashboard
 
-A modern, accessible, and performant admin dashboard for managing video content with YouTube integration. Built with React, TypeScript, and shadcn/ui components.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![TypeScript](https://img.shields.io/badge/TypeScript-4.9.5-blue.svg)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.2.0-61dafb.svg)](https://reactjs.org/)
+[![Vite](https://img.shields.io/badge/Vite-4.0.0-646CFF.svg)](https://vitejs.dev/)
+
+A modern, accessible, and performant admin dashboard for managing video content with YouTube and seamless storage integration. Built with React 18, TypeScript, and shadcn/ui components.
 
 ## ✨ Features
 
-- **Video Management**
-  - Upload videos to YouTube
-  - Track video status and analytics
-  - Manage video metadata and settings
+### 🎬 Video Management
+- Upload and manage videos with seamless storage integration.
+- YouTube integration for video publishing.
+- Track video status and analytics.
 
-- **User Authentication**
-  - Secure login with Firebase Authentication
-  - Role-based access control
-  - Session management
+### 🔐 Authentication & Security
+- Secure authentication with Role Base Access Control.
+- Protected routes and API endpoints.
+- Session management.
 
-- **Responsive Design**
-  - Fully responsive layout
-  - Mobile-friendly interface
-  - Dark/light mode support
+### 🎨 Modern UI/UX
+- Responsive design for all devices
+- Dark/light mode support
+- Intuitive dashboard layout
+- Real-time updates
 
-- **Accessibility**
-  - WCAG 2.1 AA compliant
-  - Keyboard navigation
-  - Screen reader support
-  - Focus management
+### ⚡ Performance
+- Code splitting and lazy loading
+- Optimized asset loading
+- Efficient state management
+- Fast refresh development experience
 
 ## 🚀 Tech Stack
 
-- **Frontend**
-  - React 18 with TypeScript
-  - Vite (Build Tool)
-  - React Router (Routing)
-  - React Hook Form (Form Management)
-  - TanStack Query (Data Fetching)
-  - Sonner (Toasts)
+### Frontend
+- **Framework**: React 18 with TypeScript
+- **Build Tool**: Vite 4.x
+- **State Management**: React Context + TanStack Query
+- **Form Handling**: React Hook Form
+- **Styling**: Tailwind CSS + shadcn/ui
+- **Icons**: Lucide Icons
+- **Data Visualization**: Recharts
 
-- **UI Components**
-  - shadcn/ui (Radix UI + Tailwind CSS)
-  - Tailwind CSS (Styling)
-  - Lucide Icons
-  - Recharts (Data Visualization)
+### Backend
+- **Runtime**: Node.js (Express)
+- **Authentication**: Firebase Admin SDK
+- **Storage**: Seamless cloud storage integration
+- **APIs**: YouTube Data API v3
 
-- **Backend**
-  - Express.js
-  - Firebase Admin SDK
-  - YouTube Data API v3
+### Development Tools
+- **Linting**: ESLint + Prettier
+- **Testing**: Jest + React Testing Library
+- **Type Checking**: TypeScript
+- **Git Hooks**: Husky + lint-staged
 
-- **Development**
-  - ESLint + Prettier (Code Quality)
-  - TypeScript (Type Checking)
-  - Vite (Development Server)
+## 🏗️ Project Structure
 
-## 📦 Prerequisites
+```
+src/
+├── app/                 # Next.js app directory (API routes)
+│   └── api/             # API routes
+│
+├── components/          # Reusable UI components
+│   ├── dashboard/       # Dashboard-specific components
+│   └── ui/              # shadcn/ui components
+│
+├── contexts/            # React context providers
+├── hooks/               # Custom React hooks
+├── integrations/        # Third-party service integrations
+│   ├── api/             # API client and services
+│   ├── firebase/        # Firebase configuration
+│   ├── gcs/             # Google Cloud Storage
+│   └── youtube/         # YouTube API integration
+│
+├── lib/                 # Utility functions and helpers
+├── pages/               # Page components
+├── router/              # Application routing
+├── styles/              # Global styles and Tailwind config
+└── test/                # Test files
+```
+
+## Getting Started
+
+### Prerequisites
 
 - Node.js 18+ and npm 9+
 - Firebase project with Authentication enabled
+-   # Cloud storage provider account
 - YouTube Data API v3 credentials
-- Google OAuth 2.0 client ID
 
-## 🛠️ Setup & Installation
+### Installation
 
 1. **Clone the repository**
    ```bash
@@ -71,8 +102,8 @@ A modern, accessible, and performant admin dashboard for managing video content 
    npm install
    ```
 
-3. **Set up environment variables**
-   Create a `.env` file in the root directory with the following variables:
+3. **Environment Setup**
+   Create a `.env` file in the root directory:
    ```env
    # Firebase
    VITE_FIREBASE_API_KEY=your-firebase-api-key
@@ -82,98 +113,94 @@ A modern, accessible, and performant admin dashboard for managing video content 
    VITE_FIREBASE_MESSAGING_SENDER_ID=your-messaging-sender-id
    VITE_FIREBASE_APP_ID=your-app-id
    
+   # Storage Configuration
+   VITE_STORAGE_BUCKET=your-bucket-name
+   VITE_STORAGE_PROJECT_ID=your-project-id
+   
    # YouTube API
    VITE_YOUTUBE_API_KEY=your-youtube-api-key
    
-   # Server
+   # API Configuration
    VITE_API_URL=http://localhost:3001
    PORT=3001
    NODE_ENV=development
    ```
 
-4. **Start the development server**
+4. **Start Development Servers**
    ```bash
-   # Start frontend and backend in development mode
+   # Start both frontend and backend
    npm run dev:all
    ```
+   - Frontend: `http://localhost:5173`
+   - Backend API: `http://localhost:3001`
 
-   This will start:
-   - Frontend at `http://localhost:5173`
-   - Backend at `http://localhost:3001`
+## 🛠️ Development
 
-## 🏗️ Project Structure
+### Available Scripts
 
-```
-src/
-├── assets/            # Static assets
-├── components/        # Reusable UI components
-│   ├── dashboard/     # Dashboard specific components
-│   ├── ui/            # shadcn/ui components
-│   └── ...
-├── contexts/          # React contexts
-├── hooks/             # Custom React hooks
-├── integrations/      # Third-party integrations
-│   └── youtube/       # YouTube API service
-├── lib/               # Utility functions
-├── pages/             # Page components
-├── styles/            # Global styles
-└── types/             # TypeScript type definitions
-```
-
-## 🔧 Available Scripts
-
-- `npm run dev` - Start the Vite development server
-- `npm run server` - Start the Express backend server
-- `npm run dev:all` - Start both frontend and backend in development mode
-- `npm run build` - Build the application for production
-- `npm run preview` - Preview the production build locally
+- `npm run dev` - Start Vite dev server
+- `npm run server` - Start backend server
+- `npm run dev:all` - Start both frontend and backend
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
 - `npm run lint` - Run ESLint
+- `npm run format` - Format code with Prettier
+- `npm test` - Run tests
+- `npm test:watch` - Run tests in watch mode
+- `npm run type-check` - Run TypeScript type checking
 
 ## 🧪 Testing
 
-To run tests:
+Run the test suite:
 
 ```bash
-# Run unit tests
+# Run all tests
 npm test
 
 # Run tests in watch mode
-npm test -- --watch
+npm run test:watch
+
+# Generate coverage report
+npm run test:coverage
 ```
 
-## 🌍 Production Deployment
+## 🚀 Deployment
 
-### Building for Production
+### Production Build
 
 ```bash
-# Build the frontend
+# Create production build
 npm run build
 
-# Start the production server
+# Start production server
 npm start
 ```
 
-### Environment Variables for Production
+### Environment Variables (Production)
 
-Make sure to set the following environment variables in your production environment:
+Set these environment variables in your production environment:
 
-- `NODE_ENV=production`
-- `PORT=3000` (or your preferred port)
-- Firebase production credentials
-- YouTube API production key
-
-## 📝 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```bash
+NODE_ENV=production
+PORT=3000
+VITE_API_URL=https://your-api-domain.com
+# Add other production environment variables
+```
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please read our [Contributing Guide](CONTRIBUTING.md) to get started.
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add some amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-## 📄 Documentation
+## � License
 
-For detailed documentation, please refer to the [Wiki](https://github.com/your-username/vidvault-admin/wiki).
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ## 📬 Contact
 
-For any questions or feedback, please open an issue or contact the maintainers.
+For any questions or feedback, please [open an issue](https://github.com/your-username/vidvault-admin/issues) or contact the maintainers.
+
+---

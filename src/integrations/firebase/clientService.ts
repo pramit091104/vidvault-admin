@@ -1,0 +1,115 @@
+import { 
+  collection, 
+  doc, 
+  setDoc, 
+  getDoc, 
+  getDocs, 
+  query, 
+  where, 
+  updateDoc, 
+  deleteDoc,
+  orderBy,
+  Timestamp,
+  addDoc
+} from 'firebase/firestore';
+import { db } from './config';
+
+export const CLIENTS_COLLECTION = 'clients';
+
+export interface ClientRecord {
+  id?: string;
+  clientName: string;
+  work: string;
+  status: "Done" | "Not paid yet" | "In progress" | "Not started";
+  prePayment: number;
+  paidPayment: number;
+  finalPayment: number;
+  duration: string;
+  userId?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
+}
+
+// Create a new client
+export const createClient = async (clientData: Omit<ClientRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
+  try {
+    const docRef = await addDoc(collection(db, CLIENTS_COLLECTION), {
+      ...clientData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+    return docRef.id;
+  } catch (error) {
+    console.error('Error creating client:', error);
+    throw new Error('Failed to create client');
+  }
+};
+
+// Get all clients for a user
+export const getClients = async (userId?: string): Promise<ClientRecord[]> => {
+  try {
+    let q;
+    if (userId) {
+      q = query(collection(db, CLIENTS_COLLECTION), where('userId', '==', userId), orderBy('createdAt', 'desc'));
+    } else {
+      q = query(collection(db, CLIENTS_COLLECTION), orderBy('createdAt', 'desc'));
+    }
+    
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      createdAt: doc.data().createdAt?.toDate(),
+      updatedAt: doc.data().updatedAt?.toDate(),
+    })) as ClientRecord[];
+  } catch (error) {
+    console.error('Error fetching clients:', error);
+    throw new Error('Failed to fetch clients');
+  }
+};
+
+// Get a single client by ID
+export const getClient = async (clientId: string): Promise<ClientRecord | null> => {
+  try {
+    const docRef = doc(db, CLIENTS_COLLECTION, clientId);
+    const docSnap = await getDoc(docRef);
+    
+    if (docSnap.exists()) {
+      return {
+        id: docSnap.id,
+        ...docSnap.data(),
+        createdAt: docSnap.data().createdAt?.toDate(),
+        updatedAt: docSnap.data().updatedAt?.toDate(),
+      } as ClientRecord;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching client:', error);
+    throw new Error('Failed to fetch client');
+  }
+};
+
+// Update a client
+export const updateClient = async (clientId: string, clientData: Partial<ClientRecord>): Promise<void> => {
+  try {
+    const docRef = doc(db, CLIENTS_COLLECTION, clientId);
+    await updateDoc(docRef, {
+      ...clientData,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error updating client:', error);
+    throw new Error('Failed to update client');
+  }
+};
+
+// Delete a client
+export const deleteClient = async (clientId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, CLIENTS_COLLECTION, clientId);
+    await deleteDoc(docRef);
+  } catch (error) {
+    console.error('Error deleting client:', error);
+    throw new Error('Failed to delete client');
+  }
+};
