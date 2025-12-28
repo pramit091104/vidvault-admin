@@ -1,3 +1,5 @@
+// In PaymentModal.tsx, replace the entire file with:
+
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,8 +8,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, IndianRupee, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { apiService, PaymentRequest } from "@/services/apiService";
 import { createPaymentRecord, updatePaymentStatus } from "@/integrations/firebase/paymentService";
+import { apiService } from "@/services/apiService";
 
 interface PaymentModalProps {
   client: {
@@ -18,12 +20,6 @@ interface PaymentModalProps {
     finalPayment: number;
   };
   onPaymentComplete: (paymentType: 'pre' | 'post' | 'final', amount: number) => void;
-}
-
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
 }
 
 export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) => {
@@ -56,12 +52,28 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
     }
   ];
 
-  const loadRazorpayScript = () => {
+  const loadRazorpay = (): Promise<any> => {
     return new Promise((resolve) => {
+      if (typeof window !== 'undefined' && (window as any).Razorpay) {
+        resolve((window as any).Razorpay);
+        return;
+      }
+
       const script = document.createElement('script');
       script.src = 'https://checkout.razorpay.com/v1/checkout.js';
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
+      script.async = true;
+      script.onload = () => {
+        if ((window as any).Razorpay) {
+          resolve((window as any).Razorpay);
+        } else {
+          console.error('Razorpay SDK failed to load');
+          resolve(null);
+        }
+      };
+      script.onerror = () => {
+        console.error('Failed to load Razorpay SDK');
+        resolve(null);
+      };
       document.body.appendChild(script);
     });
   };
@@ -88,13 +100,7 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
         }
       });
 
-      // Load Razorpay script
-      const scriptLoaded = await loadRazorpayScript();
-      if (!scriptLoaded) {
-        throw new Error('Failed to load payment gateway');
-      }
-
-      // Create order
+      // Create order through our API
       const order = await apiService.createOrder({
         amount: amount * 100, // Convert to paise
         currency: 'INR',
@@ -104,10 +110,6 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
           client_name: client.clientName,
           payment_type: paymentType,
           payment_id: paymentId
-        },
-        customer: {
-          name: client.clientName,
-          email: `${client.clientName.replace(/\s+/g, '').toLowerCase()}@example.com`
         }
       });
 
@@ -115,6 +117,12 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
       await updatePaymentStatus(paymentId, 'processing', {
         razorpayOrderId: order.id
       });
+
+      // Load Razorpay
+      const Razorpay = await loadRazorpay();
+      if (!Razorpay) {
+        throw new Error('Failed to load payment gateway');
+      }
 
       // Open Razorpay checkout
       const options = {
@@ -126,8 +134,8 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
         order_id: order.id,
         handler: async (response: any) => {
           try {
-            // Verify payment
-            const isValid = await apiService.verifyPayment({
+            // Verify payment through our API
+            const { isValid } = await apiService.verifyPayment({
               orderId: response.razorpay_order_id,
               paymentId: response.razorpay_payment_id,
               signature: response.razorpay_signature
@@ -161,12 +169,12 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
         }
       };
 
-      const rzp = new window.Razorpay(options);
+      const rzp = new Razorpay(options);
       rzp.open();
 
     } catch (error) {
       console.error('Payment error:', error);
-      toast.error('Payment failed. Please try again.');
+      toast.error(error.message || 'Payment failed. Please try again.');
     } finally {
       setIsProcessing(false);
     }
@@ -198,80 +206,67 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
             {paymentOptions.map((option) => {
               const status = getPaymentStatus(option.type);
               return (
-                <div
+                <div 
                   key={option.type}
-                  className={`p-4 rounded-lg border-2 transition-all cursor-pointer ${
-                    selectedPayment === option.type
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950'
-                      : 'border-gray-200 dark:border-gray-700 hover:border-gray-300'
+                  className={`border rounded-lg p-4 cursor-pointer transition-colors ${
+                    selectedPayment === option.type ? 'border-primary ring-2 ring-primary/20' : 'hover:bg-accent/50'
                   }`}
-                  onClick={() => setSelectedPayment(option.type)}
+                  onClick={() => {
+                    setSelectedPayment(option.type);
+                    setCustomAmount(option.amount > 0 ? option.amount.toString() : '');
+                  }}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full ${option.color}`} />
-                      <div>
-                        <h4 className="font-semibold">{option.label}</h4>
-                        <p className="text-sm text-gray-600 dark:text-gray-400">
-                          {option.description}
-                        </p>
-                      </div>
+                    <div>
+                      <h4 className="font-medium">{option.label}</h4>
+                      <p className="text-sm text-muted-foreground">{option.description}</p>
                     </div>
-                    <div className="text-right">
-                      <div className="font-bold text-lg">
-                        ₹{option.amount.toLocaleString('en-IN')}
-                      </div>
-                      <Badge
-                        variant={status === 'paid' ? 'default' : 'secondary'}
-                        className="text-xs"
-                      >
-                        {status === 'paid' ? (
-                          <>
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                            Paid
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="h-3 w-3 mr-1" />
-                            Pending
-                          </>
-                        )}
-                      </Badge>
-                    </div>
+                    <Badge 
+                      variant={status === 'paid' ? 'success' : 'outline'}
+                      className={`${status === 'paid' ? 'bg-green-100 text-green-800' : ''}`}
+                    >
+                      {status === 'paid' ? 'Paid' : 'Pending'}
+                    </Badge>
                   </div>
+                  {status === 'pending' && (
+                    <div className="mt-3">
+                      <Label htmlFor={`amount-${option.type}`} className="text-sm font-medium">
+                        Amount (INR)
+                      </Label>
+                      <Input
+                        id={`amount-${option.type}`}
+                        type="number"
+                        value={selectedPayment === option.type ? customAmount : ''}
+                        onChange={(e) => setCustomAmount(e.target.value)}
+                        placeholder="Enter amount"
+                        className="mt-1"
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
 
-          {selectedPayment && (
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="custom-amount">Custom Amount (Optional)</Label>
-                <Input
-                  id="custom-amount"
-                  type="number"
-                  placeholder="Enter custom amount"
-                  value={customAmount}
-                  onChange={(e) => setCustomAmount(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              
-              <Button
-                onClick={() => {
-                  const amount = customAmount ? parseFloat(customAmount) : 
-                    paymentOptions.find(p => p.type === selectedPayment)?.amount || 0;
-                  handlePayment(selectedPayment, amount);
-                }}
-                disabled={isProcessing}
-                className="w-full"
-              >
-                {isProcessing ? 'Processing...' : `Pay ₹${customAmount || 
-                  paymentOptions.find(p => p.type === selectedPayment)?.amount.toLocaleString('en-IN')}`}
-              </Button>
-            </div>
-          )}
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setIsOpen(false)}
+              disabled={isProcessing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedPayment && customAmount) {
+                  handlePayment(selectedPayment, parseFloat(customAmount));
+                }
+              }}
+              disabled={!selectedPayment || !customAmount || isProcessing}
+            >
+              {isProcessing ? 'Processing...' : 'Proceed to Pay'}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
