@@ -116,27 +116,27 @@ const Watch = () => {
           
           if (volumeContainer && volumeSlider) {
             // Hide volume slider initially
-            volumeSlider.style.display = 'none';
-            volumeSlider.style.opacity = '0';
-            volumeSlider.style.transition = 'opacity 0.2s ease';
+            (volumeSlider as HTMLElement).style.display = 'none';
+            (volumeSlider as HTMLElement).style.opacity = '0';
+            (volumeSlider as HTMLElement).style.transition = 'opacity 0.2s ease';
 
             // Make volume container clickable to toggle
-            volumeContainer.style.cursor = 'pointer';
+            (volumeContainer as HTMLElement).style.cursor = 'pointer';
 
             volumeContainer.addEventListener('click', (e) => {
               e.preventDefault();
               e.stopPropagation();
 
-              const isVisible = volumeSlider.style.display !== 'none';
-              volumeSlider.style.display = isVisible ? 'none' : 'flex';
-              volumeSlider.style.opacity = isVisible ? '0' : '1';
+              const isVisible = (volumeSlider as HTMLElement).style.display !== 'none';
+              (volumeSlider as HTMLElement).style.display = isVisible ? 'none' : 'flex';
+              (volumeSlider as HTMLElement).style.opacity = isVisible ? '0' : '1';
             });
           }
         }
 
         // Remove all mute-related listeners
         if (playerRef.current) {
-          playerRef.current.off('volumechange');
+          playerRef.current.off('volumechange', () => {});
         }
       } catch (err) {
         if (!cancelled) console.error('Plyr initialization error:', err);
@@ -398,23 +398,169 @@ const Watch = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* Header: Full width */}
-      <header className="border-b bg-card/95 px-4 py-4 shrink-0">
-        <div className="w-full px-4 lg:px-6 flex justify-between items-center">
+      {/* Header: Full width - Better mobile spacing */}
+      <header className="border-b bg-card/95 px-3 py-3 sm:px-4 sm:py-4 shrink-0">
+        <div className="w-full px-2 sm:px-4 lg:px-6 flex justify-between items-center">
           <div className="flex items-center gap-2 cursor-pointer" onClick={() => navigate('/')}>
-            <div className="p-2 rounded-lg bg-primary/10"></div>
-            <h2 className="text-xl font-bold">Previu</h2>
+            <div className="p-1.5 sm:p-2 rounded-lg bg-primary/10"></div>
+            <h2 className="text-lg sm:text-xl font-bold">Previu</h2>
           </div>
-          <Button variant="outline" size="sm" onClick={handleShare}><Share2 className="h-4 w-4 mr-2" /> Share</Button>
+          <Button variant="outline" size="sm" className="h-8 px-2 sm:h-9 sm:px-3" onClick={handleShare}>
+            <Share2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="hidden sm:inline ml-1 sm:ml-2">Share</span>
+          </Button>
         </div>
       </header>
 
-      {/* Main Content: Full width fluid layout */}
-      <main className="w-full max-w-[1920px] mx-auto px-4 lg:px-8 py-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* Main Content: Responsive layout - mobile first approach */}
+      <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+        {/* Mobile layout: Stacked */}
+        <div className="lg:hidden space-y-4 sm:space-y-6">
+          {/* Video Section */}
+          <div className="space-y-4 sm:space-y-6">
+            <div 
+              className={`relative bg-black rounded-lg overflow-hidden shadow-lg flex items-center justify-center group ${getVideoContainerClass()}`} 
+              style={videoDimensions && videoDimensions.width < videoDimensions.height ? { aspectRatio: `${videoDimensions.width}/${videoDimensions.height}` } : undefined}
+            >
+              {videoError && (
+                <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center text-white">
+                <p className="text-red-400 font-semibold mb-2">Playback Error</p>
+                <p className="text-sm text-gray-300">{videoError}</p>
+              </div>
+              )}
+              {video.service === 'youtube' ? (
+                <iframe src={`https://www.youtube.com/embed/${video.youtubeVideoId}`} title={video.title} className="w-full h-full" allowFullScreen />
+              ) : (
+                signedVideoUrl && (
+                  <video
+                    key={signedVideoUrl}
+                    ref={videoRef}
+                    className="w-full h-full bg-black"
+                    poster={video.thumbnailUrl}
+                    playsInline
+                    preload="metadata"
+                    crossOrigin="anonymous"
+                    onError={handleVideoError}
+                    onLoadedMetadata={handleVideoMetadata}
+                  >
+                    <source src={signedVideoUrl} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                )
+              )}
+            </div>
+            
+            {/* Video Info */}
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 line-clamp-2">{video.title}</h1>
+              <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+                <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {video.viewCount} views</span>
+                <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {format(video.uploadedAt, 'MMM dd, yyyy')}</span>
+              </div>
+            </div>
+              
+            {/* Description */}
+            <Card>
+              <CardContent className="p-4 sm:p-6">
+                <h3 className="font-semibold mb-2 text-sm sm:text-base">Description</h3>
+                <p className="text-muted-foreground whitespace-pre-wrap text-sm sm:text-base line-clamp-3 sm:line-clamp-none">{video.description || "No description provided."}</p>
+              </CardContent>
+            </Card>
+
+            {/* Mobile Comments Section */}
+            <Card className="border-2">
+              <CardContent className="p-4 space-y-4">
+                <div className="border-b pb-4">
+                  <h3 className="font-semibold text-lg">Comments</h3>
+                </div>
+
+                {/* Comment Form */}
+                <div className="space-y-4 p-4 bg-muted/50 rounded-xl border border-border/50">
+                  <div className="flex items-center gap-3 text-sm font-medium text-muted-foreground">
+                    <Clock className="h-5 w-5 text-primary" />
+                    <span>{formatTimestamp(currentTime)}</span>
+                  </div>
+
+                  {capturedTime > 0 && (
+                    <div className="flex items-center gap-3 text-xs font-medium p-3 bg-primary/10 text-primary rounded-lg border border-primary/20">
+                      <Clock className="h-4 w-4" />
+                      <span>Captured: {formatTimestamp(capturedTime)}</span>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleCaptureTime}
+                    variant="outline"
+                    size="sm"
+                    className="w-full h-9 font-medium text-xs"
+                  >
+                    Capture Timestamp
+                  </Button>
+
+                  <Textarea
+                    placeholder="Share your thoughts..."
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    className="resize-none text-sm border-border/50 focus:border-primary/50 bg-background min-h-[80px]"
+                  />
+
+                  <Button
+                    onClick={handlePostComment}
+                    disabled={isPostingComment}
+                    className="w-full h-10 font-medium"
+                  >
+                    {isPostingComment ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Post"
+                    )}
+                  </Button>
+                </div>
+
+                {/* Comments List */}
+                <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
+                  <div className="flex items-center justify-between pb-2 border-b border-border/50 sticky top-0 bg-card z-10">
+                    <span className="text-sm font-medium text-muted-foreground">Recent</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleManualRefreshComments}
+                      disabled={isRefreshingComments || loadingComments}
+                      className="h-8 w-8 p-0 hover:bg-muted/50"
+                    >
+                      <RefreshCw className={`h-4 w-4 ${isRefreshingComments ? 'animate-spin' : ''}`} />
+                    </Button>
+                  </div>
+                  {loadingComments ? (
+                    <div className="flex items-center justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                    </div>
+                  ) : videoComments.length === 0 ? (
+                    <div className="text-center py-8">
+                      <p className="text-sm text-muted-foreground">No comments yet.</p>
+                    </div>
+                  ) : (
+                    videoComments.map((comment, idx) => (
+                      <div key={idx} className="border-l-2 border-primary/30 pl-3 py-2 bg-muted/30 rounded-r-lg">
+                        <div className="flex items-center justify-between gap-2 mb-1">
+                          <span className="font-semibold text-sm truncate max-w-[120px]">{comment.userName}</span>
+                          <span className="text-xs text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded">{formatTimestamp(comment.timestamp)}</span>
+                        </div>
+                        <p className="text-sm text-foreground leading-relaxed break-words">{comment.comment}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        {/* Desktop layout: Side by side */}
+        <div className="hidden lg:grid lg:grid-cols-4 gap-4 sm:gap-6">
         
-        {/* Video Column: Spans 3 columns (75% width). 
-            Uses aspect ratio detection to center portrait videos properly. */}
-        <div className="lg:col-span-3 space-y-6">
+        {/* Desktop: Video Column */}
+        <div className="lg:col-span-3 space-y-4 sm:space-y-6">
           <div className={`relative bg-black rounded-lg overflow-hidden shadow-lg flex items-center justify-center group ${getVideoContainerClass()}`} style={videoDimensions && videoDimensions.width < videoDimensions.height ? { aspectRatio: `${videoDimensions.width}/${videoDimensions.height}` } : {}}>
             {videoError && (
               <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center text-white">
@@ -445,29 +591,29 @@ const Watch = () => {
           </div>
           
           <div>
-            <h1 className="text-2xl lg:text-3xl font-bold mb-2">{video.title}</h1>
-            <div className="flex gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-1"><Eye className="h-4 w-4" /> {video.viewCount} views</span>
-              <span className="flex items-center gap-1"><Calendar className="h-4 w-4" /> {format(video.uploadedAt, 'MMM dd, yyyy')}</span>
+            <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold mb-2 line-clamp-2">{video.title}</h1>
+            <div className="flex flex-wrap gap-3 sm:gap-4 text-xs sm:text-sm text-muted-foreground">
+              <span className="flex items-center gap-1"><Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {video.viewCount} views</span>
+              <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> {format(video.uploadedAt, 'MMM dd, yyyy')}</span>
             </div>
           </div>
             
           <Card>
-            <CardContent className="p-6">
-              <h3 className="font-semibold mb-2">Description</h3>
-              <p className="text-muted-foreground whitespace-pre-wrap">{video.description || "No description provided."}</p>
+            <CardContent className="p-4 sm:p-6">
+              <h3 className="font-semibold mb-2 text-sm sm:text-base">Description</h3>
+              <p className="text-muted-foreground whitespace-pre-wrap text-sm sm:text-base line-clamp-3 sm:line-clamp-none">{video.description || "No description provided."}</p>
             </CardContent>
           </Card>
         </div>
 
-        {/* Sidebar Column: Spans 1 column (25% width), fills the rest of the space */}
+        {/* Desktop: Sidebar Column */}
         <div className="lg:col-span-1 space-y-6 flex flex-col h-full">
           <Card>
-            <CardContent className="p-6 space-y-6">
-              <h3 className="font-semibold">Details</h3>
+            <CardContent className="p-4 sm:p-6 space-y-6">
+              <h3 className="font-semibold text-sm sm:text-base">Details</h3>
               <div>
                 <p className="text-xs text-muted-foreground">Client</p>
-                <p className="font-medium">{video.clientName}</p>
+                <p className="font-medium text-sm sm:text-base">{video.clientName}</p>
               </div>
             </CardContent>
           </Card>
@@ -521,7 +667,7 @@ const Watch = () => {
                 </Button>
               </div>
 
-              {/* Comments List - Now set to fill available height */}
+              {/* Comments List - Desktop */}
               <div className="space-y-4 overflow-y-auto pr-2 custom-scrollbar flex-1 min-h-[300px]">
                  <div className="flex items-center justify-between pb-2 border-b border-border/50 sticky top-0 bg-card z-10">
                   <span className="text-sm font-medium text-muted-foreground">Recent</span>
@@ -557,6 +703,7 @@ const Watch = () => {
               </div>
             </CardContent>
           </Card>
+        </div>
         </div>
       </main>
     </div>

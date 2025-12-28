@@ -1,9 +1,11 @@
 import { useNavigate } from "react-router-dom";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Shield, Users, Zap, Upload, MessageSquare, Lock, BarChart3, CheckCircle, Star, TrendingUp, AlertCircle } from "lucide-react";
+import { ArrowRight, Play, Shield, Users, Zap, Upload, MessageSquare, Lock, BarChart3, CheckCircle, Star, TrendingUp, AlertCircle, Menu, X } from "lucide-react";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const scrollToSection = (id: string) => {
     const element = document.getElementById(id);
@@ -18,7 +20,9 @@ const Index = () => {
           <div className="flex items-center gap-2">
             <h2 className="text-xl font-bold text-white">Previu</h2>
           </div>
-          <ul className="flex items-center gap-8">
+          
+          {/* Desktop Navigation */}
+          <ul className="hidden md:flex items-center gap-8">
             <li>
               <button
                 onClick={() => scrollToSection("home")}
@@ -53,7 +57,60 @@ const Index = () => {
               </button>
             </li>
           </ul>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg text-gray-300 hover:text-white hover:bg-slate-800 transition-colors"
+          >
+            {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+          </button>
         </div>
+
+        {/* Mobile Menu */}
+        {isMobileMenuOpen && (
+          <div className="md:hidden bg-slate-900/95 border-t border-slate-800">
+            <div className="px-4 py-4 space-y-4">
+              <button
+                onClick={() => {
+                  scrollToSection("home");
+                  setIsMobileMenuOpen(false);
+                }}
+                className="block w-full text-left text-gray-300 hover:text-white transition-colors font-medium py-2"
+              >
+                HOME
+              </button>
+              <button
+                onClick={() => {
+                  scrollToSection("about");
+                  setIsMobileMenuOpen(false);
+                }}
+                className="block w-full text-left text-gray-300 hover:text-white transition-colors font-medium py-2"
+              >
+                ABOUT
+              </button>
+              <Button
+                onClick={() => {
+                  navigate("/auth");
+                  setIsMobileMenuOpen(false);
+                }}
+                size="sm"
+                className="w-full bg-gray-700 hover:bg-gray-600 text-white font-bold"
+              >
+                LOG IN
+              </Button>
+              <button
+                onClick={() => {
+                  scrollToSection("contact");
+                  setIsMobileMenuOpen(false);
+                }}
+                className="block w-full text-left text-gray-300 hover:text-white transition-colors font-medium py-2"
+              >
+                CONTACT
+              </button>
+            </div>
+          </div>
+        )}
       </nav>
 
       {/* Hero Section */}
@@ -66,12 +123,12 @@ const Index = () => {
         
         <div className="relative z-10 text-center space-y-8 px-4 max-w-6xl">          
           <div className="space-y-6">
-            <h1 className="text-6xl md:text-8xl font-bold text-white leading-tight">
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-bold text-white leading-tight">
               <span className="bg-gradient-to-r from-white via-purple-200 to-pink-200 bg-clip-text text-transparent">
                 Previu
               </span>
             </h1>
-            <p className="text-xl md:text-3xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light">
+            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light px-4">
               The professional video collaboration platform that transforms 
               <span className="text-white font-semibold"> how creators work with clients</span>. 
               Share drafts securely, get precise feedback, and deliver projects 60% faster.
@@ -99,11 +156,11 @@ const Index = () => {
               <AlertCircle className="h-4 w-4" />
               The Problem We're Solving
             </div>
-            <h2 className="text-5xl md:text-6xl font-bold mb-8 text-white">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-8 text-white">
               Video Collaboration is
               <span className="bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent"> Broken</span>
             </h2>
-            <p className="text-xl text-gray-400 max-w-4xl mx-auto leading-relaxed">
+            <p className="text-lg sm:text-xl text-gray-400 max-w-4xl mx-auto leading-relaxed px-4">
               Content creators and agencies are losing time, money, and clients due to inefficient collaboration workflows
             </p>
           </div>
@@ -169,11 +226,11 @@ const Index = () => {
               <CheckCircle className="h-4 w-4" />
               Our Solution
             </div>
-            <h2 className="text-5xl md:text-6xl font-bold mb-8 text-white">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-8 text-white">
               The Future of
               <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent"> Video Collaboration</span>
             </h2>
-            <p className="text-xl text-gray-400 max-w-4xl mx-auto leading-relaxed">
+            <p className="text-lg sm:text-xl text-gray-400 max-w-4xl mx-auto leading-relaxed px-4">
               One platform that transforms chaos into clarity, frustration into satisfaction, and delays into faster delivery
             </p>
           </div>

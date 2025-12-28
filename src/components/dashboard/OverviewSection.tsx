@@ -208,17 +208,17 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
 
     return (
       <Card className="hover:shadow-lg transition-shadow duration-300">
-        <CardContent className="p-6">
+        <CardContent className="p-4 md:p-6">
           <div className="flex items-center justify-between">
-            <div className="space-y-2">
+            <div className="space-y-2 flex-1 min-w-0">
               <p className="text-sm font-medium text-muted-foreground">{title}</p>
-              <p className="text-3xl font-bold">{value}</p>
+              <p className="text-2xl md:text-3xl font-bold truncate">{value}</p>
               {description && (
                 <p className="text-xs text-muted-foreground">{description}</p>
               )}
             </div>
-            <div className={`p-3 rounded-lg ${colorClasses[color as keyof typeof colorClasses]}`}>
-              <Icon className="h-6 w-6" />
+            <div className={`p-3 rounded-lg ${colorClasses[color as keyof typeof colorClasses]} flex-shrink-0 ml-4`}>
+              <Icon className="h-5 w-5 md:h-6 md:w-6" />
             </div>
           </div>
         </CardContent>
@@ -253,9 +253,9 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
   };
 
   return (
-    <div className="space-y-8">
-      {/* Main Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="space-y-6 md:space-y-8">
+      {/* Main Stats Grid - Better mobile layout */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <StatCard
           title="Total Clients"
           value={loading ? "..." : stats.totalClients}
@@ -288,15 +288,15 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
         />
       </div>
 
-      {/* Recent Activity */}
+      {/* Recent Activity - Better mobile spacing */}
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+            <Clock className="h-5 w-5 md:h-6 md:w-6" />
             Recent Activity
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 md:p-6">
           {loading ? (
             <div className="space-y-4">
               {[1, 2, 3, 4].map((i) => (
@@ -313,17 +313,17 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
             <div className="space-y-4">
               {recentActivities.map((activity) => (
                 <div key={activity.id} className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${getActivityColor(activity.type)}`}>
+                  <div className={`p-2 rounded-lg ${getActivityColor(activity.type)} flex-shrink-0`}>
                     {getActivityIcon(activity.type)}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{activity.message}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
                       <span>{activity.timestamp}</span>
                       {activity.client && (
                         <>
                           <span>•</span>
-                          <span>{activity.client}</span>
+                          <span className="truncate max-w-[120px]">{activity.client}</span>
                         </>
                       )}
                     </div>
@@ -340,36 +340,36 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
         </CardContent>
       </Card>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Better mobile layout */}
       <Card>
-        <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
+        <CardHeader className="pb-4">
+          <CardTitle className="text-lg md:text-xl">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <CardContent className="p-4 md:p-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <button 
               onClick={() => onSectionChange('upload')}
-              className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              className="p-4 border rounded-lg hover:bg-accent transition-colors text-left touch-manipulation"
             >
               <Video className="h-6 w-6 mb-2 text-blue-500" />
-              <h3 className="font-semibold">Upload New Video</h3>
-              <p className="text-sm text-muted-foreground">Share a draft with clients</p>
+              <h3 className="font-semibold text-sm md:text-base">Upload New Video</h3>
+              <p className="text-sm text-muted-foreground mt-1">Share a draft with clients</p>
             </button>
             <button 
               onClick={() => onSectionChange('clients')}
-              className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              className="p-4 border rounded-lg hover:bg-accent transition-colors text-left touch-manipulation"
             >
               <Users className="h-6 w-6 mb-2 text-green-500" />
-              <h3 className="font-semibold">Add New Client</h3>
-              <p className="text-sm text-muted-foreground">Invite a client to collaborate</p>
+              <h3 className="font-semibold text-sm md:text-base">Add New Client</h3>
+              <p className="text-sm text-muted-foreground mt-1">Invite a client to collaborate</p>
             </button>
             <button 
               onClick={() => onSectionChange('videos')}
-              className="p-4 border rounded-lg hover:bg-accent transition-colors text-left"
+              className="p-4 border rounded-lg hover:bg-accent transition-colors text-left touch-manipulation"
             >
               <BarChart3 className="h-6 w-6 mb-2 text-purple-500" />
-              <h3 className="font-semibold">Manage Videos</h3>
-              <p className="text-sm text-muted-foreground">View and organize all videos</p>
+              <h3 className="font-semibold text-sm md:text-base">Manage Videos</h3>
+              <p className="text-sm text-muted-foreground mt-1">View and organize all videos</p>
             </button>
           </div>
         </CardContent>

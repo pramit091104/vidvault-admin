@@ -46,23 +46,23 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Toggle Button - Visible on all screen sizes */}
+      {/* Toggle Button - Improved mobile positioning */}
       <button
         onClick={toggleSidebar}
         className={cn(
-          "fixed z-50 p-2 rounded-md text-foreground bg-card/90 shadow-md transition-all duration-300",
-          isSidebarOpen ? 'left-64' : 'left-4 md:left-4',
-          "top-4"
+          "fixed z-50 p-3 rounded-lg text-foreground bg-card/95 shadow-lg transition-all duration-300 md:p-2",
+          isSidebarOpen ? 'left-64 md:left-64' : 'left-4 md:left-4',
+          "top-4 touch-manipulation"
         )}
         aria-label={isSidebarOpen ? "Collapse sidebar" : "Expand sidebar"}
       >
-        {isSidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        {isSidebarOpen ? <X className="h-6 w-6 md:h-5 md:w-5" /> : <Menu className="h-6 w-6 md:h-5 md:w-5" />}
       </button>
 
-      {/* Sidebar */}
+      {/* Sidebar - Improved mobile experience */}
       <aside 
         className={cn(
-          "fixed left-0 top-0 h-full w-64 border-r border-border bg-card/95 p-6 space-y-8 transition-all duration-300 ease-in-out z-40",
+          "fixed left-0 top-0 h-full w-72 md:w-64 border-r border-border bg-card/95 p-4 md:p-6 space-y-8 transition-all duration-300 ease-in-out z-40",
           isSidebarOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -74,7 +74,7 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
           </div>
         </div>
 
-        {/* Navigation */}
+        {/* Navigation - Improved touch targets */}
         <nav className="space-y-2">
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -84,53 +84,53 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
                 key={item.id}
                 onClick={() => handleNavClick(item.id)}
                 className={cn(
-                  "w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200",
+                  "w-full flex items-center gap-3 px-4 py-4 md:py-3 rounded-xl md:rounded-lg transition-all duration-200 touch-manipulation",
                   isActive
                     ? "bg-primary/10 text-primary border border-primary/20"
                     : "text-muted-foreground hover:bg-secondary hover:text-foreground"
                 )}
               >
-                <Icon className="h-5 w-5" />
-                <span className="font-medium">{item.label}</span>
+                <Icon className="h-6 w-6 md:h-5 md:w-5" />
+                <span className="font-medium text-base md:text-sm">{item.label}</span>
               </button>
             );
           })}
         </nav>
 
-        {/* Logout */}
-        <div className="absolute bottom-6 left-6 right-6">
+        {/* Logout - Improved mobile touch target */}
+        <div className="absolute bottom-6 left-4 right-4 md:left-6 md:right-6">
           <Button
             onClick={handleLogout}
             variant="outline"
-            className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground"
+            className="w-full justify-start gap-3 text-muted-foreground hover:text-foreground py-4 md:py-3 text-base md:text-sm touch-manipulation"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-6 w-6 md:h-5 md:w-5" />
             Logout
           </Button>
         </div>
       </aside>
 
-      {/* Overlay - Shown when sidebar is open */}
+      {/* Overlay - Improved mobile overlay */}
       {isSidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black/50 z-30 md:bg-transparent"
+          className="fixed inset-0 bg-black/60 z-30 md:bg-black/40 md:hidden"
           onClick={toggleSidebar}
           aria-hidden="true"
         />
       )}
 
-      {/* Main Content */}
+      {/* Main Content - Better mobile spacing */}
       <main className={cn(
-        "p-8 transition-all duration-300",
-        isSidebarOpen ? "md:ml-64" : "md:ml-16" // Adjust margin based on sidebar state
+        "p-4 md:p-8 transition-all duration-300",
+        isSidebarOpen ? "md:ml-64" : "md:ml-16"
       )}>
-        <div className="max-w-7xl mx-auto space-y-8 animate-fade-in-up">
-          {/* Header */}
+        <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 animate-fade-in-up">
+          {/* Header - Responsive typography */}
           <header className="space-y-2">
-            <h2 className="text-3xl font-bold text-foreground">
+            <h2 className="text-2xl md:text-3xl font-bold text-foreground">
               Welcome back{currentUser?.displayName ? `, ${currentUser.displayName}` : ""}
             </h2>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm md:text-base">
               Manage your client drafts seamlessly
             </p>
           </header>

@@ -59,22 +59,22 @@ const Auth = () => {
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
       
       <Card className="w-full max-w-md relative animate-fade-in-up border-border/50 bg-card/95">
-        <CardHeader className="space-y-4">
+        <CardHeader className="space-y-4 p-6 sm:p-8">
           <div className="text-center space-y-2">
-            <CardTitle className="text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+            <CardTitle className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
               Previu
             </CardTitle>
-            <CardDescription className="text-muted-foreground">
+            <CardDescription className="text-muted-foreground text-sm sm:text-base">
               {isLogin ? "Sign in to your account" : "Create a new account"}
             </CardDescription>
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-6 sm:p-8 pt-0">
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
+                <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
                 <Input
                   id="name"
                   type="text"
@@ -83,12 +83,13 @@ const Auth = () => {
                   placeholder="John Doe"
                   required={!isLogin}
                   disabled={isLoading}
+                  className="h-11 touch-manipulation"
                 />
               </div>
             )}
             
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email" className="text-sm font-medium">Email</Label>
               <Input
                 id="email"
                 type="email"
@@ -97,16 +98,17 @@ const Auth = () => {
                 placeholder="you@example.com"
                 required
                 disabled={isLoading}
+                className="h-11 touch-manipulation"
               />
             </div>
             
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="password" className="text-sm font-medium">Password</Label>
                 {isLogin && (
                   <button
                     type="button"
-                    className="text-xs text-muted-foreground hover:underline"
+                    className="text-xs text-muted-foreground hover:underline touch-manipulation"
                     onClick={() => {/* Add forgot password functionality */}}
                   >
                     Forgot password?
@@ -122,16 +124,17 @@ const Auth = () => {
                 required
                 minLength={6}
                 disabled={isLoading}
+                className="h-11 touch-manipulation"
               />
             </div>
 
             {error && (
-              <div className="p-2 text-sm text-red-500 bg-red-50 rounded-md">
+              <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
                 {error}
               </div>
             )}
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
+            <Button type="submit" className="w-full h-11 text-base font-medium touch-manipulation" disabled={isLoading}>
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
@@ -139,12 +142,12 @@ const Auth = () => {
             </Button>
           </form>
 
-          <div className="relative my-4">
+          <div className="relative my-6">
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-border" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
+              <span className="bg-background px-3 text-muted-foreground">
                 Or continue with
               </span>
             </div>
@@ -153,7 +156,7 @@ const Auth = () => {
           <Button
             variant="outline"
             onClick={handleGoogleSignIn}
-            className="w-full"
+            className="w-full h-11 text-base font-medium touch-manipulation"
             disabled={isLoading}
           >
             {isLoading ? (
@@ -169,7 +172,7 @@ const Auth = () => {
             Google
           </Button>
 
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-sm text-muted-foreground pt-4">
             {isLogin ? "Don't have an account? " : "Already have an account? "}
             <button
               type="button"
@@ -177,7 +180,7 @@ const Auth = () => {
                 setError("");
                 setIsLogin(!isLogin);
               }}
-              className="font-medium text-primary hover:underline"
+              className="font-medium text-primary hover:underline touch-manipulation"
               disabled={isLoading}
             >
               {isLogin ? "Sign up" : "Sign in"}
