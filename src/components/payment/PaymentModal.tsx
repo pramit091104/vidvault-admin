@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { CreditCard, IndianRupee, CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { razorpayService, PaymentRequest } from "@/integrations/razorpay/razorpayService";
+import { apiService, PaymentRequest } from "@/services/apiService";
 import { createPaymentRecord, updatePaymentStatus } from "@/integrations/firebase/paymentService";
 
 interface PaymentModalProps {
@@ -95,7 +95,7 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
       }
 
       // Create order
-      const order = await razorpayService.createOrder({
+      const order = await apiService.createOrder({
         amount: amount * 100, // Convert to paise
         currency: 'INR',
         receipt: `payment_${paymentId}`,
@@ -127,7 +127,7 @@ export const PaymentModal = ({ client, onPaymentComplete }: PaymentModalProps) =
         handler: async (response: any) => {
           try {
             // Verify payment
-            const isValid = razorpayService.verifyPayment({
+            const isValid = await apiService.verifyPayment({
               orderId: response.razorpay_order_id,
               paymentId: response.razorpay_payment_id,
               signature: response.razorpay_signature
