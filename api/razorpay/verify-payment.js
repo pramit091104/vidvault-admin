@@ -35,17 +35,33 @@ try {
 }
 
 export default async function handler(req, res) {
+  console.log('🔍 Verify Payment Handler - Request received:', {
+    method: req.method,
+    origin: req.headers.origin,
+    url: req.url,
+    timestamp: new Date().toISOString()
+  });
+
   // Enable CORS for your domain
   const allowedOrigins = [
     'https://previu.online',
     'https://www.previu.online',
     'http://localhost:8080',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'http://localhost:3000'
   ];
   
   const origin = req.headers.origin;
-  if (allowedOrigins.includes(origin)) {
+  
+  // Allow Vercel preview deployments (they follow the pattern *.vercel.app)
+  const isVercelDomain = origin && origin.match(/^https:\/\/.*\.vercel\.app$/);
+  const isAllowedOrigin = allowedOrigins.includes(origin);
+  
+  if (isAllowedOrigin || isVercelDomain) {
     res.setHeader('Access-Control-Allow-Origin', origin);
+    console.log('✅ CORS allowed for origin:', origin);
+  } else {
+    console.log('⚠️ CORS not allowed for origin:', origin);
   }
   
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
