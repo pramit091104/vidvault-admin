@@ -119,3 +119,43 @@ export const deleteClient = async (clientId: string): Promise<void> => {
     throw new Error('Failed to delete client');
   }
 };
+
+// Get client by name (for payment integration)
+export const getClientByName = async (clientName: string, userId?: string): Promise<ClientRecord | null> => {
+  try {
+    let q;
+    if (userId) {
+      q = query(
+        collection(db, CLIENTS_COLLECTION), 
+        where('clientName', '==', clientName),
+        where('userId', '==', userId),
+        limit(1)
+      );
+    } else {
+      q = query(
+        collection(db, CLIENTS_COLLECTION), 
+        where('clientName', '==', clientName),
+        limit(1)
+      );
+    }
+    
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      const data = doc.data() as Omit<ClientRecord, 'id'> & {
+        createdAt?: any;
+        updatedAt?: any;
+      };
+      return {
+        id: doc.id,
+        ...data,
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+      } as ClientRecord;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error fetching client by name:', error);
+    throw new Error('Failed to fetch client by name');
+  }
+};

@@ -25,3 +25,4 @@ gcs-key.json
 *.sw?
 .vercel
 .env*.local
+.kiro

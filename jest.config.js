@@ -23,6 +23,9 @@ export default {
       }
     }]
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(uuid)/)'
+  ],
   testEnvironment: 'jsdom',
   globals: {
     'import.meta': {

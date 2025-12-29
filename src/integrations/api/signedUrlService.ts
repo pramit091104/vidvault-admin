@@ -36,7 +36,11 @@ export const requestSignedUrl = async (
         const errorData = await response.json();
         if (errorData.error) errorMessage = errorData.error;
       } catch (e) {
-        // ignore json parse error
+        // If we can't parse JSON, it might be HTML (like a 404 page)
+        const text = await response.text();
+        if (text.includes('<!DOCTYPE html>') || text.includes('<html>')) {
+          errorMessage = 'Server returned HTML instead of JSON - check if API server is running correctly';
+        }
       }
       
       throw new Error(errorMessage);

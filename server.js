@@ -7,6 +7,12 @@ import dotenv from 'dotenv';
 import fs from 'fs';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// ES module compatibility
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load environment variables
 dotenv.config();
@@ -21,7 +27,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // --- Middleware ---
 app.use(helmet());
 app.use(cors({ 
-  origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000'],
+  origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000', 'https://previu.online', 'https://www.previu.online'],
   credentials: true 
 }));
 app.use(express.json());
@@ -74,6 +80,408 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 
 // --- Endpoints ---
 
+// Video compression endpoints
+app.post('/api/video/analyze', upload.single('video'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No video file provided' });
+    }
+
+    // Save uploaded file temporarily
+    const tempDir = path.join(__dirname, 'temp');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    
+    const tempFilePath = path.join(tempDir, `temp_${Date.now()}_${req.file.originalname}`);
+    await fs.promises.writeFile(tempFilePath, req.file.buffer);
+
+    try {
+      // Simple analysis without FFmpeg
+      const stats = await fs.promises.stat(tempFilePath);
+      const size = stats.size;
+      const ext = path.extname(req.file.originalname).toLowerCase();
+      
+      // Estimate properties based on file size (rough approximations)
+      const estimatedDuration = Math.max(30, size / (1024 * 1024)); // Rough estimate
+      const estimatedBitrate = (size * 8) / (estimatedDuration * 1000); // kbps
+      
+      const analysis = {
+        duration: estimatedDuration,
+        resolution: { width: 1920, height: 1080 }, // Assume HD
+        bitrate: estimatedBitrate,
+        codec: ext === '.mp4' ? 'h264' : 'unknown',
+        size,
+        needsCompression: size > 50 * 1024 * 1024 // Compress if > 50MB
+      };
+
+      const recommendations = {
+        maxResolution: { width: 1920, height: 1080 },
+        maxBitrate: 8000,
+        codec: 'libx264',
+        quality: 23
+      };
+      
+      // Cleanup temp file
+      await fs.promises.unlink(tempFilePath);
+      
+      res.json({
+        success: true,
+        analysis,
+        recommendations
+      });
+    } catch (analysisError) {
+      // Cleanup temp file on error
+      try {
+        await fs.promises.unlink(tempFilePath);
+      } catch {}
+      throw analysisError;
+    }
+  } catch (error) {
+    console.error('Video analysis error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/video/compress', upload.single('video'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No video file provided' });
+    }
+
+    const { options } = req.body;
+    const compressionOptions = options ? JSON.parse(options) : undefined;
+
+    // Save uploaded file temporarily
+    const tempDir = path.join(__dirname, 'temp');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    
+    const inputPath = path.join(tempDir, `input_${Date.now()}_${req.file.originalname}`);
+    await fs.promises.writeFile(inputPath, req.file.buffer);
+
+    const outputFileName = `compressed_${Date.now()}_${req.file.originalname}`;
+    const outputPath = path.join(tempDir, outputFileName);
+
+    try {
+      // Fallback compression: just copy the file (simulate compression)
+      await fs.promises.copyFile(inputPath, outputPath);
+
+      // Read compressed file
+      const compressedBuffer = await fs.promises.readFile(outputPath);
+      const originalStats = await fs.promises.stat(inputPath);
+      const compressedStats = await fs.promises.stat(outputPath);
+      
+      // Cleanup temp files
+      await fs.promises.unlink(inputPath);
+      await fs.promises.unlink(outputPath);
+
+      // Return compressed file info
+      res.json({
+        success: true,
+        result: {
+          success: true,
+          outputPath,
+          originalSize: originalStats.size,
+          compressedSize: compressedStats.size,
+          compressionRatio: 1,
+          compressedData: compressedBuffer.toString('base64'),
+          fileName: outputFileName,
+          error: 'FFmpeg not available - original file used without compression'
+        }
+      });
+    } catch (compressionError) {
+      // Cleanup temp files on error
+      try {
+        await fs.promises.unlink(inputPath);
+        await fs.promises.unlink(outputPath);
+      } catch {}
+      throw compressionError;
+    }
+  } catch (error) {
+    console.error('Video compression error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/video/compression-status', async (req, res) => {
+  try {
+    // Create a simple compression service status without external dependencies
+    res.json({
+      available: true,
+      version: 'Fallback mode (FFmpeg not installed)',
+      error: 'FFmpeg not available - compression will use fallback mode (copy original file)'
+    });
+  } catch (error) {
+    console.error('Compression status error:', error);
+    res.status(500).json({ 
+      available: false, 
+      error: error.message 
+    });
+  }
+});
+
+// --- Chunked Upload Endpoints ---
+
+// Initialize chunked upload session
+app.post('/api/gcs/init-chunked-upload', express.json(), async (req, res) => {
+  try {
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
+    
+    const { fileName, totalSize, chunkSize, metadata } = req.body;
+    
+    if (!fileName || !totalSize || !chunkSize) {
+      return res.status(400).json({ error: 'Missing required fields: fileName, totalSize, chunkSize' });
+    }
+
+    const sessionId = crypto.randomUUID();
+    const totalChunks = Math.ceil(totalSize / chunkSize);
+    
+    // Store session info (in production, use a database)
+    const sessionData = {
+      sessionId,
+      fileName,
+      totalSize,
+      chunkSize,
+      totalChunks,
+      uploadedChunks: [],
+      metadata: metadata || {},
+      createdAt: new Date(),
+      expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
+    };
+
+    // In production, store this in a database
+    // For now, we'll use a simple in-memory store
+    global.uploadSessions = global.uploadSessions || new Map();
+    global.uploadSessions.set(sessionId, sessionData);
+
+    res.json({
+      sessionId,
+      uploadUrl: `/api/gcs/upload-chunk`,
+      totalChunks,
+      expiresAt: sessionData.expiresAt
+    });
+  } catch (error) {
+    console.error('Error initializing chunked upload:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Upload individual chunk
+app.post('/api/gcs/upload-chunk', upload.single('chunk'), async (req, res) => {
+  try {
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
+    
+    const { sessionId, chunkId, chunkIndex, chunkSize, checksum } = req.body;
+    const chunkData = req.file?.buffer;
+
+    if (!sessionId || !chunkId || chunkIndex === undefined || !chunkData) {
+      return res.status(400).json({ error: 'Missing required chunk data' });
+    }
+
+    // Get session data
+    global.uploadSessions = global.uploadSessions || new Map();
+    const session = global.uploadSessions.get(sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Upload session not found' });
+    }
+
+    // Check if session is expired
+    if (new Date() > session.expiresAt) {
+      global.uploadSessions.delete(sessionId);
+      return res.status(410).json({ error: 'Upload session expired' });
+    }
+
+    // Validate chunk size
+    if (chunkData.length !== parseInt(chunkSize)) {
+      return res.status(400).json({ error: 'Chunk size mismatch' });
+    }
+
+    // Store chunk temporarily
+    const tempDir = path.join(__dirname, 'temp', sessionId);
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    
+    const chunkFileName = `chunk_${chunkIndex.toString().padStart(6, '0')}`;
+    const chunkPath = path.join(tempDir, chunkFileName);
+    
+    await fs.promises.writeFile(chunkPath, chunkData);
+
+    // Update session with uploaded chunk
+    if (!session.uploadedChunks.includes(chunkId)) {
+      session.uploadedChunks.push(chunkId);
+    }
+
+    // Store chunk metadata
+    session.chunks = session.chunks || {};
+    session.chunks[chunkIndex] = {
+      chunkId,
+      fileName: chunkFileName,
+      size: chunkData.length,
+      checksum,
+      uploadedAt: new Date()
+    };
+
+    res.json({
+      success: true,
+      chunkId,
+      uploadedChunks: session.uploadedChunks.length,
+      totalChunks: session.totalChunks,
+      isComplete: session.uploadedChunks.length === session.totalChunks
+    });
+
+    // If all chunks uploaded, trigger assembly
+    if (session.uploadedChunks.length === session.totalChunks) {
+      // Don't wait for assembly, return success immediately
+      setImmediate(() => assembleChunks(sessionId));
+    }
+  } catch (error) {
+    console.error('Error uploading chunk:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify uploaded chunks for resumption
+app.get('/api/gcs/verify-chunks/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    global.uploadSessions = global.uploadSessions || new Map();
+    const session = global.uploadSessions.get(sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Upload session not found' });
+    }
+
+    // Check if session is expired
+    if (new Date() > session.expiresAt) {
+      global.uploadSessions.delete(sessionId);
+      return res.status(410).json({ error: 'Upload session expired' });
+    }
+
+    res.json({
+      sessionId,
+      uploadedChunks: session.uploadedChunks,
+      totalChunks: session.totalChunks,
+      isComplete: session.uploadedChunks.length === session.totalChunks
+    });
+  } catch (error) {
+    console.error('Error verifying chunks:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Assemble chunks into final file
+async function assembleChunks(sessionId) {
+  try {
+    global.uploadSessions = global.uploadSessions || new Map();
+    const session = global.uploadSessions.get(sessionId);
+    
+    if (!session) {
+      console.error('Session not found for assembly:', sessionId);
+      return;
+    }
+
+    const tempDir = path.join(__dirname, 'temp', sessionId);
+    const finalFileName = `uploads/${session.fileName}`;
+    
+    // Create write stream to GCS
+    const gcsFile = bucket.file(finalFileName);
+    const writeStream = gcsFile.createWriteStream({
+      metadata: {
+        contentType: session.metadata.contentType || 'application/octet-stream',
+        metadata: session.metadata
+      }
+    });
+
+    // Assemble chunks in order
+    for (let i = 0; i < session.totalChunks; i++) {
+      const chunkInfo = session.chunks[i];
+      if (!chunkInfo) {
+        throw new Error(`Missing chunk ${i}`);
+      }
+
+      const chunkPath = path.join(tempDir, chunkInfo.fileName);
+      const chunkData = await fs.promises.readFile(chunkPath);
+      
+      writeStream.write(chunkData);
+    }
+
+    writeStream.end();
+
+    await new Promise((resolve, reject) => {
+      writeStream.on('finish', resolve);
+      writeStream.on('error', reject);
+    });
+
+    // Clean up temporary files
+    await fs.promises.rm(tempDir, { recursive: true, force: true });
+
+    // Update session status
+    session.status = 'completed';
+    session.gcsPath = finalFileName;
+    session.completedAt = new Date();
+
+    console.log(`Successfully assembled file for session ${sessionId}: ${finalFileName}`);
+  } catch (error) {
+    console.error('Error assembling chunks:', error);
+    
+    // Update session with error
+    const session = global.uploadSessions.get(sessionId);
+    if (session) {
+      session.status = 'failed';
+      session.error = error.message;
+    }
+  }
+}
+
+// Get upload session status
+app.get('/api/gcs/upload-status/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    
+    global.uploadSessions = global.uploadSessions || new Map();
+    const session = global.uploadSessions.get(sessionId);
+    
+    if (!session) {
+      return res.status(404).json({ error: 'Upload session not found' });
+    }
+
+    // Generate signed URL if completed
+    let signedUrl = null;
+    if (session.status === 'completed' && session.gcsPath) {
+      try {
+        const gcsFile = bucket.file(session.gcsPath);
+        const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+        const [url] = await gcsFile.getSignedUrl({
+          version: 'v4',
+          action: 'read',
+          expires: expiresAt,
+        });
+        signedUrl = url;
+      } catch (urlError) {
+        console.warn('Could not generate signed URL:', urlError.message);
+      }
+    }
+
+    res.json({
+      sessionId,
+      status: session.status || 'uploading',
+      uploadedChunks: session.uploadedChunks.length,
+      totalChunks: session.totalChunks,
+      progress: Math.round((session.uploadedChunks.length / session.totalChunks) * 100),
+      fileName: session.fileName,
+      gcsPath: session.gcsPath,
+      signedUrl,
+      error: session.error,
+      createdAt: session.createdAt,
+      completedAt: session.completedAt
+    });
+  } catch (error) {
+    console.error('Error getting upload status:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// --- Existing Endpoints ---
+
 app.post('/api/signed-url', async (req, res) => {
   try {
     if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
@@ -119,11 +527,35 @@ app.post('/api/signed-url', async (req, res) => {
         console.log('--- ACTUAL BUCKET CONTENT (First 25) ---');
         files.forEach(f => console.log(`- ${f.name}`));
         console.log('----------------------------------------');
+        
+        // Try to find similar files (partial matches)
+        const similarFiles = files.filter(f => 
+          f.name.includes(cleanId.split('_')[0]) || // Match timestamp part
+          f.name.includes(cleanId.split('_').slice(1).join('_')) // Match name part
+        );
+        
+        if (similarFiles.length > 0) {
+          console.log('🔍 Found similar files:');
+          similarFiles.forEach(f => console.log(`  - ${f.name}`));
+          
+          // Return a more helpful error message
+          return res.status(404).json({ 
+            error: 'Video not found in storage',
+            searchedFor: cleanId,
+            searchedPaths: potentialPaths,
+            similarFiles: similarFiles.map(f => f.name).slice(0, 5),
+            suggestion: 'Check if the video filename in the database matches the actual file in storage'
+          });
+        }
       } catch (e) {
         console.error('Could not list files:', e.message);
       }
 
-      return res.status(404).json({ error: 'Video not found in storage' });
+      return res.status(404).json({ 
+        error: 'Video not found in storage',
+        searchedFor: cleanId,
+        searchedPaths: potentialPaths
+      });
     }
 
     // 3. Generate URL

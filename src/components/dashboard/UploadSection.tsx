@@ -4,54 +4,66 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Loader2, CheckCircle2, Copy, Cloud, Globe, Link2, Eye } from "lucide-react";
+import { Upload, Loader2, CheckCircle2, Copy, Cloud, Globe, Link2, Eye, History, Zap, FileVideo } from "lucide-react";
 import { toast } from "sonner";
-import { gcsService } from "@/integrations/gcs/gcsService";
 import { Progress } from "@/components/ui/progress";
 import { saveGCSVideo } from "@/integrations/firebase/videoService";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 import { v4 as uuidv4 } from 'uuid';
 import { generateVideoSlug, createPublicUrl } from '@/lib/slugGenerator';
+import { useUploadResumption } from '@/hooks/useUploadResumption';
+import { useIntegratedUpload } from '@/hooks/useIntegratedUpload';
+import { UploadResumptionDialog } from './UploadResumptionDialog';
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 
 const UploadSection = () => {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [gcsVideoUrl, setGcsVideoUrl] = useState("");
-  const [isInitializing, setIsInitializing] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isPublicWebsite, setIsPublicWebsite] = useState<boolean>(false);
+  const [enableCompression, setEnableCompression] = useState<boolean>(true);
   const [publicSlug, setPublicSlug] = useState<string>("");
   const [publicUrl, setPublicUrl] = useState<string>("");
+  const [showResumptionDialog, setShowResumptionDialog] = useState(false);
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+
+  // Integrated upload hook
+  const {
+    isUploading,
+    uploadProgress,
+    compressionProgress,
+    currentChunk,
+    totalChunks,
+    error: uploadError,
+    result: uploadResult,
+    stage,
+    uploadFile,
+    resumeUpload,
+    reset: resetUpload
+  } = useIntegratedUpload();
+
+  // Upload resumption hook
+  const {
+    hasResumableUploads,
+    hasExpiredUploads,
+    cleanup
+  } = useUploadResumption();
 
   useEffect(() => {
-    // Initialize GCS service
-    const initializeServices = async () => {
-      try {
-        setIsInitializing(true);
-        await gcsService.initialize();
-      } catch (error: any) {
-        console.error("Failed to initialize GCS service:", error);
-        toast.error("Failed to initialize Cloud Storage service. Please check your configuration.");
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
     // Listen for auth state changes
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
     });
 
-    initializeServices();
+    // Clean up old upload states on component mount
+    cleanup();
 
     return () => unsubscribe();
-  }, []);
+  }, [cleanup]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -103,82 +115,98 @@ const UploadSection = () => {
       return;
     }
     
-    setIsUploading(true);
     setUploadSuccess(false);
-    setUploadProgress(0);
-    setGcsVideoUrl("");
     setPublicSlug("");
     setPublicUrl("");
+    resetUpload();
     
     try {
-      // Google Cloud Storage Upload Logic
-      const result = await gcsService.uploadVideo(
+      // Start integrated upload with chunking and optional compression
+      const result = await uploadFile({
         file,
-        {
+        metadata: {
           title: title.trim(),
           description: description?.trim() || '',
           clientName: clientName.trim(),
-          privacyStatus: 'private', // Default to private for Cloud Storage
         },
-        (progress) => {
-          setUploadProgress(progress);
+        enableCompression,
+        onProgress: (progress) => {
+          // Progress is handled by the hook
+        },
+        onChunkUploaded: (chunkId, chunkIndex) => {
+          // Chunk progress is handled by the hook
+        },
+        onCompressionProgress: (progress) => {
+          // Compression progress is handled by the hook
+        },
+        onError: (error) => {
+          console.error('Upload error:', error);
         }
-      );
-      
-      // Generate public slug if enabled
-      let generatedSlug = '';
-      if (isPublicWebsite) {
+      });
+
+      if (result.success) {
+        // Generate public slug if enabled
+        let generatedSlug = '';
+        if (isPublicWebsite) {
+          try {
+            generatedSlug = generateVideoSlug(clientName.trim(), title.trim());
+            setPublicSlug(generatedSlug);
+            const url = createPublicUrl(generatedSlug);
+            setPublicUrl(url);
+            toast.success('Public website created successfully!');
+          } catch (slugError: any) {
+            console.error('Slug generation error:', slugError);
+            toast.error('Video uploaded but failed to create public website');
+          }
+        }
+        
+        // Save to Firebase GCS collection
+        const videoId = uuidv4();
         try {
-          generatedSlug = generateVideoSlug(clientName.trim(), title.trim());
-          setPublicSlug(generatedSlug);
-          const url = createPublicUrl(generatedSlug);
-          setPublicUrl(url);
-          toast.success('Public website created successfully!');
-        } catch (slugError: any) {
-          console.error('Slug generation error:', slugError);
-          toast.error('Video uploaded but failed to create public website');
+          await saveGCSVideo({
+            id: videoId,
+            title: title.trim(),
+            description: description?.trim() || '',
+            clientName: clientName.trim(),
+            userId: currentUser?.uid,
+            fileName: result.fileName,
+            publicUrl: result.signedUrl || '',
+            size: result.finalSize,
+            contentType: file.type,
+            privacyStatus: 'private',
+            securityCode: '',
+            isActive: true,
+            accessCount: 0,
+            isPubliclyAccessible: false,
+            uploadedAt: new Date(),
+            isPublic: isPublicWebsite,
+            publicSlug: generatedSlug,
+            publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
+            viewCount: 0,
+          });
+        } catch (firebaseError: any) {
+          console.error('Firebase save error:', firebaseError);
+          toast.error('Video uploaded but failed to save to database');
         }
+        
+        setUploadSuccess(true);
+        
+        // Show compression info if applied
+        if (result.compressionApplied) {
+          const savedMB = ((result.originalSize - result.finalSize) / (1024 * 1024)).toFixed(1);
+          const savedPercent = Math.round((1 - result.compressionRatio) * 100);
+          toast.success(`Video uploaded and compressed! Saved ${savedMB}MB (${savedPercent}%)`);
+        } else {
+          toast.success('Video uploaded successfully!');
+        }
+        
+        window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
+      } else {
+        toast.error(result.error || "Failed to upload video");
       }
-      
-      // Save to Firebase GCS collection
-      const videoId = uuidv4();
-      try {
-        await saveGCSVideo({
-          id: videoId,
-          title: title.trim(),
-          description: description?.trim() || '',
-          clientName: clientName.trim(),
-          userId: currentUser?.uid,
-          fileName: result.fileName,
-          publicUrl: result.publicUrl,
-          size: result.size,
-          contentType: result.contentType,
-          privacyStatus: 'private', // Default to private for Cloud Storage
-          securityCode: '',
-          isActive: true,
-          accessCount: 0,
-          isPubliclyAccessible: false, // Default to false for Cloud Storage
-          uploadedAt: new Date(),
-          isPublic: isPublicWebsite,
-          publicSlug: generatedSlug,
-          publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
-          viewCount: 0,
-        });
-      } catch (firebaseError: any) {
-        console.error('Firebase save error:', firebaseError);
-        toast.error('Video uploaded but failed to save to database');
-      }
-      
-      setGcsVideoUrl(result.publicUrl);
-      setUploadSuccess(true);
-      toast.success('Video uploaded successfully to Cloud Storage!');
-      window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
     } catch (error: any) {
       console.error("Upload error:", error);
-      toast.error(error.message || "Failed to upload video to Cloud Storage");
-      setUploadProgress(0);
-    } finally {
-      setIsUploading(false);
+      toast.error(error.message || "Failed to upload video");
     }
   };
 
@@ -186,6 +214,46 @@ const UploadSection = () => {
     if (publicUrl) {
       navigator.clipboard.writeText(publicUrl);
       toast.success('Public URL copied to clipboard!');
+    }
+  };
+
+  const handleResumeUpload = async (sessionId: string) => {
+    if (!file) {
+      toast.error('Please select a file to resume the upload');
+      return;
+    }
+
+    try {
+      const result = await resumeUpload(sessionId, file, {
+        metadata: {
+          title: title.trim(),
+          description: description?.trim() || '',
+          clientName: clientName.trim(),
+        }
+      });
+
+      if (result.success) {
+        setUploadSuccess(true);
+        toast.success('Upload resumed and completed successfully!');
+      } else {
+        toast.error(result.error || 'Failed to resume upload');
+      }
+    } catch (error) {
+      console.error('Error resuming upload:', error);
+      toast.error('Failed to resume upload. Please try again.');
+    }
+  };
+
+  const handleStartFreshUpload = () => {
+    // Just start a new upload
+    handleUpload();
+  };
+
+  const showResumptionDialogIfNeeded = () => {
+    if (hasResumableUploads || hasExpiredUploads) {
+      setShowResumptionDialog(true);
+    } else {
+      handleUpload();
     }
   };
 
@@ -235,6 +303,28 @@ const UploadSection = () => {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="enableCompression">Video Optimization</Label>
+          <div className="flex items-center space-x-3 p-4 border border-border/50 rounded-lg bg-background/50">
+            <input
+              type="checkbox"
+              id="enableCompression"
+              checked={enableCompression}
+              onChange={(e) => setEnableCompression(e.target.checked)}
+              className="h-4 w-4 text-primary rounded border-border"
+            />
+            <div className="flex-1">
+              <Label htmlFor="enableCompression" className="text-sm font-medium text-foreground cursor-pointer">
+                Enable video compression
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Automatically compress large videos to reduce file size and improve upload speed. Recommended for files over 50MB.
+              </p>
+            </div>
+            <Zap className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="publicWebsite">Public Access</Label>
           <div className="flex items-center space-x-3 p-4 border border-border/50 rounded-lg bg-background/50">
             <input
@@ -279,25 +369,108 @@ const UploadSection = () => {
           )}
         </div>
 
-        {isUploading && uploadProgress > 0 && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Upload Progress</span>
-              <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
+        {/* Enhanced Progress Display */}
+        {isUploading && (
+          <div className="space-y-4 p-4 border border-border/50 rounded-lg bg-background/50">
+            <div className="flex items-center gap-2">
+              <FileVideo className="h-4 w-4 text-primary" />
+              <span className="text-sm font-medium">
+                {stage === 'compressing' && 'Compressing video...'}
+                {stage === 'uploading' && 'Uploading chunks...'}
+                {stage === 'assembling' && 'Assembling file...'}
+              </span>
+              <Badge variant="secondary" className="ml-auto">
+                {stage}
+              </Badge>
             </div>
-            <Progress value={uploadProgress} className="h-2" />
+
+            {/* Compression Progress */}
+            {stage === 'compressing' && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Compression Progress</span>
+                  <span className="text-muted-foreground">{Math.round(compressionProgress)}%</span>
+                </div>
+                <Progress value={compressionProgress} className="h-2" />
+              </div>
+            )}
+
+            {/* Upload Progress */}
+            {(stage === 'uploading' || stage === 'assembling') && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Upload Progress</span>
+                  <span className="text-muted-foreground">{Math.round(uploadProgress)}%</span>
+                </div>
+                <Progress value={uploadProgress} className="h-2" />
+                
+                {totalChunks > 0 && (
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>Chunk {currentChunk} of {totalChunks}</span>
+                    <span>{((file?.size || 0) / (1024 * 1024)).toFixed(1)} MB</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Assembly Progress */}
+            {stage === 'assembling' && (
+              <div className="text-sm text-muted-foreground">
+                Assembling chunks into final file...
+              </div>
+            )}
           </div>
         )}
 
-        {uploadSuccess && (
+        {/* Upload Error */}
+        {uploadError && (
+          <div className="p-4 border border-red-200 dark:border-red-800 rounded-lg bg-red-50 dark:bg-red-900/20">
+            <p className="text-sm text-red-600 dark:text-red-400">{uploadError}</p>
+          </div>
+        )}
+
+        {/* Success Display with Compression Info */}
+        {uploadSuccess && uploadResult && (
           <div className="space-y-4">
-            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 space-y-2">
-              <p className="text-sm text-muted-foreground">
-                Selected: {file.name}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Size: {(file.size / 1024 / 1024).toFixed(2)} MB
-              </p>
+            <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="h-5 w-5 text-green-500" />
+                <h4 className="text-sm font-medium">Upload Complete!</h4>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-muted-foreground">File:</span>
+                  <div className="font-medium">{uploadResult.fileName}</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Duration:</span>
+                  <div className="font-medium">{(uploadResult.uploadDuration / 1000).toFixed(1)}s</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Original Size:</span>
+                  <div className="font-medium">{(uploadResult.originalSize / (1024 * 1024)).toFixed(1)} MB</div>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Final Size:</span>
+                  <div className="font-medium">{(uploadResult.finalSize / (1024 * 1024)).toFixed(1)} MB</div>
+                </div>
+              </div>
+
+              {uploadResult.compressionApplied && (
+                <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md p-3">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Zap className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                    <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
+                      Video Compressed
+                    </span>
+                  </div>
+                  <div className="text-xs text-blue-600 dark:text-blue-400">
+                    Saved {((uploadResult.originalSize - uploadResult.finalSize) / (1024 * 1024)).toFixed(1)} MB 
+                    ({Math.round((1 - uploadResult.compressionRatio) * 100)}% reduction)
+                  </div>
+                </div>
+              )}
             </div>
             
             {publicUrl && (
@@ -331,18 +504,15 @@ const UploadSection = () => {
 
         <Button
           className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium"
-          onClick={handleUpload}
-          disabled={!file || !title || !clientName || isUploading || isInitializing}
+          onClick={showResumptionDialogIfNeeded}
+          disabled={!file || !title || !clientName || isUploading}
         >
-          {isInitializing ? (
+          {isUploading ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Initializing...
-            </>
-          ) : isUploading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Uploading to Cloud Storage...
+              {stage === 'compressing' && 'Compressing...'}
+              {stage === 'uploading' && 'Uploading...'}
+              {stage === 'assembling' && 'Assembling...'}
             </>
           ) : uploadSuccess ? (
             <>
@@ -356,7 +526,27 @@ const UploadSection = () => {
             </>
           )}
         </Button>
+
+        {/* Show resumption button if there are resumable uploads */}
+        {(hasResumableUploads || hasExpiredUploads) && (
+          <Button
+            variant="outline"
+            className="w-full"
+            onClick={() => setShowResumptionDialog(true)}
+          >
+            <History className="mr-2 h-4 w-4" />
+            Resume Previous Uploads ({hasResumableUploads ? 'Available' : 'Expired'})
+          </Button>
+        )}
       </CardContent>
+
+      {/* Upload Resumption Dialog */}
+      <UploadResumptionDialog
+        open={showResumptionDialog}
+        onOpenChange={setShowResumptionDialog}
+        onResumeUpload={handleResumeUpload}
+        onStartFreshUpload={handleStartFreshUpload}
+      />
     </Card>
   );
 };
