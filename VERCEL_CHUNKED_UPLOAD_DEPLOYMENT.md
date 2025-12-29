@@ -1,4 +1,4 @@
-# Vercel Chunked Upload Deployment Guide
+# Vercel Chunked Upload Deployment Guide - FIXED
 
 ## What's Been Fixed
 
@@ -6,13 +6,24 @@
 ✅ **GCS Initialization**: Proper credential parsing order implemented
 ✅ **API Routing**: Updated `vercel.json` with all chunked upload endpoints
 ✅ **Environment Variables**: Configured in `.env.vercel`
+✅ **404 Not Found Error**: Fixed serverless function session sharing issue
+
+## Critical Fix: Session Storage
+
+**Problem**: Vercel serverless functions don't share memory, so sessions created in one function weren't available in others.
+
+**Solution**: Implemented file-based session storage using `/tmp` directory:
+- `api/lib/sessionStorage.js` - Handles session persistence
+- Sessions stored as JSON files in `/tmp/upload-sessions/`
+- Automatic session expiration and cleanup
 
 ## New API Endpoints Created
 
 - `/api/gcs/init-chunked-upload` - Initialize upload session
-- `/api/gcs/upload-chunk` - Upload individual chunks
+- `/api/gcs/upload-chunk` - Upload individual chunks  
 - `/api/gcs/upload-status/:sessionId` - Get upload progress/status
 - `/api/gcs/verify-chunks/:sessionId` - Verify uploaded chunks for resumption
+- `/api/lib/sessionStorage.js` - Session persistence layer
 
 ## Deployment Steps
 

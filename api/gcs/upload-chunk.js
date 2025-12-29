@@ -1,5 +1,6 @@
 import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
+import { getSession, updateSession } from './lib/sessionStorage.js';
 
 // Initialize Google Cloud Storage
 let bucket = null;
@@ -45,6 +46,9 @@ export const config = {
 // Access global sessions
 global.uploadSessions = global.uploadSessions || new Map();
 
+// Access global sessions
+global.uploadSessions = global.uploadSessions || new Map();
+
 export default async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -74,16 +78,10 @@ export default async function handler(req, res) {
         });
       }
 
-      // Get upload session
-      const session = global.uploadSessions.get(sessionId);
+      // Get upload session from file storage
+      const session = await getSession(sessionId);
       if (!session) {
         return res.status(404).json({ error: 'Upload session not found' });
-      }
-
-      // Check if session is expired
-      if (new Date() > session.expiresAt) {
-        global.uploadSessions.delete(sessionId);
-        return res.status(410).json({ error: 'Upload session expired' });
       }
 
       // Validate chunk size
@@ -96,11 +94,16 @@ export default async function handler(req, res) {
         chunkId,
         index: parseInt(chunkIndex),
         size: chunkData.length,
-        data: chunkData,
+        data: chunkData.toString('base64'), // Store as base64 for JSON serialization
         checksum,
         uploadedAt: new Date()
       };
 
+      // Initialize chunks object if it doesn't exist
+      if (!session.chunks) {
+        session.chunks = {};
+      }
+      
       session.chunks[chunkIndex] = chunkInfo;
       
       // Update uploaded chunks list
@@ -109,6 +112,13 @@ export default async function handler(req, res) {
       }
 
       const isComplete = session.uploadedChunks.length === session.totalChunks;
+
+      // Update session in storage
+      await updateSession(sessionId, {
+        chunks: session.chunks,
+        uploadedChunks: session.uploadedChunks,
+        status: isComplete ? 'chunks_complete' : 'uploading'
+      });
 
       res.status(200).json({
         success: true,
@@ -133,14 +143,18 @@ export default async function handler(req, res) {
 // Assemble file from chunks
 async function assembleFile(sessionId) {
   try {
-    const session = global.uploadSessions.get(sessionId);
+    const session = await getSession(sessionId);
     if (!session) return;
 
-    session.status = 'assembling';
+    await updateSession(sessionId, { status: 'assembling' });
 
-    // Sort chunks by index
+    // Sort chunks by index and convert back from base64
     const sortedChunks = Object.values(session.chunks)
-      .sort((a, b) => a.index - b.index);
+      .sort((a, b) => a.index - b.index)
+      .map(chunk => ({
+        ...chunk,
+        data: Buffer.from(chunk.data, 'base64')
+      }));
 
     // Combine chunk data
     const buffers = sortedChunks.map(chunk => chunk.data);
@@ -171,20 +185,20 @@ async function assembleFile(sessionId) {
       expires: expiresAt,
     });
 
-    session.status = 'completed';
-    session.gcsPath = fileName;
-    session.signedUrl = signedUrl;
-    session.completedAt = new Date();
-
-    // Clean up chunk data to save memory
-    session.chunks = {};
+    // Update session with completion info
+    await updateSession(sessionId, {
+      status: 'completed',
+      gcsPath: fileName,
+      signedUrl,
+      completedAt: new Date(),
+      chunks: {} // Clear chunks to save space
+    });
 
   } catch (error) {
     console.error('Error assembling file:', error);
-    const session = global.uploadSessions.get(sessionId);
-    if (session) {
-      session.status = 'failed';
-      session.error = error.message;
-    }
+    await updateSession(sessionId, {
+      status: 'failed',
+      error: error.message
+    });
   }
 }

@@ -1,5 +1,6 @@
 import { Storage } from '@google-cloud/storage';
 import crypto from 'crypto';
+import { saveSession } from './lib/sessionStorage.js';
 
 // Initialize Google Cloud Storage
 let bucket = null;
@@ -25,6 +26,9 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
     console.warn('Failed to initialize GCS:', error.message);
   }
 }
+
+// In-memory session storage (use Redis or database in production)
+global.uploadSessions = global.uploadSessions || new Map();
 
 // In-memory session storage (use Redis or database in production)
 global.uploadSessions = global.uploadSessions || new Map();
@@ -68,15 +72,10 @@ export default async function handler(req, res) {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     };
 
-    // Store session
-    global.uploadSessions.set(sessionId, sessionData);
-
-    // Clean up old sessions (older than 24 hours)
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    for (const [id, sess] of global.uploadSessions.entries()) {
-      if (new Date(sess.createdAt).getTime() < oneDayAgo) {
-        global.uploadSessions.delete(id);
-      }
+    // Store session using file-based storage
+    const saved = await saveSession(sessionId, sessionData);
+    if (!saved) {
+      return res.status(500).json({ error: 'Failed to create upload session' });
     }
 
     res.status(200).json({

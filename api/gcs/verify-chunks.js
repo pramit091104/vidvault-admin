@@ -1,3 +1,5 @@
+import { getSession } from './lib/sessionStorage.js';
+
 // Access global sessions
 global.uploadSessions = global.uploadSessions || new Map();
 
@@ -15,16 +17,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Session ID is required' });
     }
 
-    // Get upload session
-    const session = global.uploadSessions.get(sessionId);
+    // Get upload session from file storage
+    const session = await getSession(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
-    }
-
-    // Check if session is expired
-    if (new Date() > session.expiresAt) {
-      global.uploadSessions.delete(sessionId);
-      return res.status(410).json({ error: 'Upload session expired' });
     }
 
     // Return list of uploaded chunk IDs

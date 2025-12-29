@@ -1,4 +1,5 @@
 import { Storage } from '@google-cloud/storage';
+import { getSession, updateSession } from './lib/sessionStorage.js';
 
 // Initialize Google Cloud Storage
 let bucket = null;
@@ -42,16 +43,10 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Session ID is required' });
     }
 
-    // Get upload session
-    const session = global.uploadSessions.get(sessionId);
+    // Get upload session from file storage
+    const session = await getSession(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
-    }
-
-    // Check if session is expired
-    if (new Date() > session.expiresAt) {
-      global.uploadSessions.delete(sessionId);
-      return res.status(410).json({ error: 'Upload session expired' });
     }
 
     // Generate signed URL if completed and not already available
