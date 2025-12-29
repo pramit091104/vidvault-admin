@@ -11,7 +11,8 @@
     "test:watch": "jest --watch",
     "check-env": "node check-env.js",
     "debug:deployment": "node scripts/debug-deployment.js",
-    "fix:common": "node scripts/fix-common-issues.js"
+    "fix:common": "node scripts/fix-common-issues.js",
+    "setup:project": "node scripts/setup-new-project.js"
   },
   "name": "vite_react_shadcn_ts",
   "private": true,

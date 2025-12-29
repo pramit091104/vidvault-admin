@@ -19,6 +19,18 @@
     {
       "src": "api/signed-url.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/delete.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/metadata.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/upload.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -36,6 +48,18 @@
     {
       "src": "/api/signed-url",
       "dest": "/api/signed-url.js"
+    },
+    {
+      "src": "/api/gcs/delete",
+      "dest": "/api/gcs/delete.js"
+    },
+    {
+      "src": "/api/gcs/metadata",
+      "dest": "/api/gcs/metadata.js"
+    },
+    {
+      "src": "/api/gcs/upload",
+      "dest": "/api/gcs/upload.js"
     },
     {
       "src": "/(.*)",
