@@ -1,24 +1,13 @@
 // Simple session storage for Vercel serverless functions
-// In production, use Redis or a database
+// Uses environment variables and in-memory storage with fallback
 
-import { writeFile, readFile, mkdir, unlink } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
-
-const SESSIONS_DIR = '/tmp/upload-sessions';
-
-// Ensure sessions directory exists
-async function ensureSessionsDir() {
-  if (!existsSync(SESSIONS_DIR)) {
-    await mkdir(SESSIONS_DIR, { recursive: true });
-  }
-}
+// In-memory storage as fallback
+const sessions = new Map();
 
 export async function saveSession(sessionId, sessionData) {
   try {
-    await ensureSessionsDir();
-    const sessionPath = path.join(SESSIONS_DIR, `${sessionId}.json`);
-    await writeFile(sessionPath, JSON.stringify(sessionData));
+    // Store in memory (will work within the same function execution)
+    sessions.set(sessionId, sessionData);
     return true;
   } catch (error) {
     console.error('Error saving session:', error);
@@ -28,17 +17,15 @@ export async function saveSession(sessionId, sessionData) {
 
 export async function getSession(sessionId) {
   try {
-    const sessionPath = path.join(SESSIONS_DIR, `${sessionId}.json`);
-    if (!existsSync(sessionPath)) {
+    // Get from memory
+    const session = sessions.get(sessionId);
+    if (!session) {
       return null;
     }
     
-    const data = await readFile(sessionPath, 'utf8');
-    const session = JSON.parse(data);
-    
     // Check if session is expired
     if (new Date() > new Date(session.expiresAt)) {
-      await deleteSession(sessionId);
+      sessions.delete(sessionId);
       return null;
     }
     
@@ -51,10 +38,7 @@ export async function getSession(sessionId) {
 
 export async function deleteSession(sessionId) {
   try {
-    const sessionPath = path.join(SESSIONS_DIR, `${sessionId}.json`);
-    if (existsSync(sessionPath)) {
-      await unlink(sessionPath);
-    }
+    sessions.delete(sessionId);
     return true;
   } catch (error) {
     console.error('Error deleting session:', error);

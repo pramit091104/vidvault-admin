@@ -47,6 +47,10 @@
     {
       "src": "api/gcs/verify-chunks.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/test.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -92,6 +96,10 @@
     {
       "src": "/api/gcs/verify-chunks/(.*)",
       "dest": "/api/gcs/verify-chunks.js?sessionId=$1"
+    },
+    {
+      "src": "/api/test",
+      "dest": "/api/test.js"
     },
     {
       "src": "/(.*)",
