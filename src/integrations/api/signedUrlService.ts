@@ -1,5 +1,7 @@
-// Use relative `/api` by default so Vite's proxy can forward requests in dev.
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+import { getApiBaseUrl } from '../../config/environment';
+
+// Get the API base URL using the environment utility
+const API_BASE_URL = getApiBaseUrl();
 
 /**
  * Request a signed URL from the backend.
@@ -18,7 +20,7 @@ export const requestSignedUrl = async (
   const safeVideoId = videoId || '';
 
   try {
-    const response = await fetch(`${API_BASE_URL}/signed-url`, {
+    const response = await fetch(`${API_BASE_URL}/api/signed-url`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
