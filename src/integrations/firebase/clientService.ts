@@ -9,6 +9,7 @@ import {
   updateDoc, 
   deleteDoc,
   orderBy,
+  limit,
   Timestamp,
   addDoc
 } from 'firebase/firestore';
@@ -123,18 +124,24 @@ export const deleteClient = async (clientId: string): Promise<void> => {
 // Get client by name (for payment integration)
 export const getClientByName = async (clientName: string, userId?: string): Promise<ClientRecord | null> => {
   try {
+    // Validate input
+    if (!clientName || clientName.trim().length === 0) {
+      console.warn('getClientByName called with empty clientName');
+      return null;
+    }
+
     let q;
     if (userId) {
       q = query(
         collection(db, CLIENTS_COLLECTION), 
-        where('clientName', '==', clientName),
+        where('clientName', '==', clientName.trim()),
         where('userId', '==', userId),
         limit(1)
       );
     } else {
       q = query(
         collection(db, CLIENTS_COLLECTION), 
-        where('clientName', '==', clientName),
+        where('clientName', '==', clientName.trim()),
         limit(1)
       );
     }
@@ -153,9 +160,11 @@ export const getClientByName = async (clientName: string, userId?: string): Prom
         updatedAt: data.updatedAt?.toDate(),
       } as ClientRecord;
     }
+    
+    console.log(`No client found with name: "${clientName}"`);
     return null;
   } catch (error) {
     console.error('Error fetching client by name:', error);
-    throw new Error('Failed to fetch client by name');
+    throw new Error(`Failed to fetch client by name: ${error instanceof Error ? error.message : 'Unknown error'}`);
   }
 };

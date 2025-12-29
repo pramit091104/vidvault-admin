@@ -70,14 +70,18 @@ export default async function handler(req, res) {
     // Clean up the input ID
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
 
-    // Search paths
+    // Search paths - expanded to cover more possibilities
     const potentialPaths = [
       `videos/${cleanId}`,
       `uploads/${cleanId}`,
       cleanId,
       `${cleanId}.mp4`,
       `uploads/${cleanId}.mp4`,
-      `videos/${cleanId}.mp4`
+      `videos/${cleanId}.mp4`,
+      // Additional paths for different naming conventions
+      `${cleanId.replace('.mp4', '')}.mp4`,
+      `uploads/${cleanId.replace('.mp4', '')}.mp4`,
+      `videos/${cleanId.replace('.mp4', '')}.mp4`,
     ];
 
     let foundFile = null;

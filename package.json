@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "test": "jest",
     "test:watch": "jest --watch",
-    "check-env": "node check-env.js"
+    "check-env": "node check-env.js",
+    "debug:deployment": "node scripts/debug-deployment.js",
+    "fix:common": "node scripts/fix-common-issues.js"
   },
   "name": "vite_react_shadcn_ts",
   "private": true,

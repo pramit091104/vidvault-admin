@@ -37,11 +37,16 @@ export const requestSignedUrl = async (
       try {
         const errorData = await response.json();
         if (errorData.error) errorMessage = errorData.error;
+        
+        // If it's a 404, provide more helpful error message
+        if (response.status === 404) {
+          errorMessage = 'Video not found in storage. The video may have been moved or deleted.';
+        }
       } catch (e) {
         // If we can't parse JSON, it might be HTML (like a 404 page)
         const text = await response.text();
         if (text.includes('<!DOCTYPE html>') || text.includes('<html>')) {
-          errorMessage = 'Server returned HTML instead of JSON - check if API server is running correctly';
+          errorMessage = 'API endpoint not found - check if the server is running correctly';
         }
       }
       
@@ -52,6 +57,12 @@ export const requestSignedUrl = async (
     return data.signedUrl;
   } catch (error) {
     console.error('Error requesting signed URL:', error);
+    
+    // If it's a network error, provide fallback behavior
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Network error: Unable to connect to the server. Please check your internet connection.');
+    }
+    
     throw error;
   }
 };

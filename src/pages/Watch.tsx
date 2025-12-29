@@ -268,18 +268,58 @@ const Watch = () => {
           try {
             // Use the stored fileName for signing; fall back to the document id
             const targetId = (videoData as any).fileName || mappedVideo.id;
+            console.log('Requesting signed URL for:', targetId);
+            
             const url = await requestSignedUrl(
               targetId,
               'gcs'
             );
             setSignedVideoUrl(url);
+            console.log('Successfully obtained signed URL');
           } catch (err: any) {
             console.error("Signing failed details:", err.message);
-            setVideoError("Could not authorize playback.");
-            // Fallback to public URL just in case the bucket is actually public
-            if (mappedVideo.publicUrl) {
-              console.warn("Falling back to public URL");
-              setSignedVideoUrl(mappedVideo.publicUrl);
+            
+            // Try alternative approaches based on the error
+            if (err.message.includes('not found')) {
+              // Try with different filename formats
+              const alternativeIds = [
+                mappedVideo.id,
+                `${mappedVideo.id}.mp4`,
+                (videoData as any).fileName,
+                `uploads/${mappedVideo.id}`,
+                `videos/${mappedVideo.id}`,
+              ].filter(Boolean);
+              
+              let foundUrl = null;
+              for (const altId of alternativeIds) {
+                try {
+                  console.log('Trying alternative ID:', altId);
+                  foundUrl = await requestSignedUrl(altId, 'gcs');
+                  if (foundUrl) {
+                    setSignedVideoUrl(foundUrl);
+                    console.log('Successfully found video with alternative ID:', altId);
+                    break;
+                  }
+                } catch (altErr) {
+                  console.log('Alternative ID failed:', altId, altErr.message);
+                }
+              }
+              
+              if (!foundUrl) {
+                setVideoError("Video file not found in storage. Please contact support.");
+                // Still try fallback to public URL
+                if (mappedVideo.publicUrl) {
+                  console.warn("Falling back to public URL");
+                  setSignedVideoUrl(mappedVideo.publicUrl);
+                }
+              }
+            } else {
+              setVideoError("Could not authorize video playback.");
+              // Fallback to public URL just in case the bucket is actually public
+              if (mappedVideo.publicUrl) {
+                console.warn("Falling back to public URL");
+                setSignedVideoUrl(mappedVideo.publicUrl);
+              }
             }
           }
         } else {
@@ -325,11 +365,15 @@ const Watch = () => {
       if (!video) return;
       
       try {
+        console.log('Loading payment amount for client:', video.clientName);
         const client = await getClientByName(video.clientName);
         if (client) {
           // Use final payment amount as the default payment for video completion
-          setPaymentAmount(client.finalPayment || 100); // Default to ₹100 if not set
+          const amount = client.finalPayment || 100;
+          setPaymentAmount(amount);
+          console.log('Payment amount loaded:', amount);
         } else {
+          console.log('Client not found, using default payment amount');
           setPaymentAmount(100); // Default amount if client not found
         }
       } catch (error) {
@@ -453,12 +497,34 @@ const Watch = () => {
   const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
     const error = e.currentTarget.error;
     console.error("Video Player Error Object:", error);
+    
+    let errorMessage = "Playback failed.";
+    
     if (error?.code === 4) {
-      setVideoError("Format not supported or file not found (404).");
+      errorMessage = "Video format not supported or file not found.";
     } else if (error?.code === 2) {
-      setVideoError("Network error. Check your connection.");
-    } else {
-      setVideoError("Playback failed.");
+      errorMessage = "Network error. Please check your connection and try again.";
+    } else if (error?.code === 3) {
+      errorMessage = "Video decoding failed. The file may be corrupted.";
+    } else if (error?.code === 1) {
+      errorMessage = "Video loading was aborted.";
+    }
+    
+    // Add additional context based on the video source
+    if (signedVideoUrl?.includes('googleapis.com')) {
+      errorMessage += " If this persists, the video may have been moved or access permissions changed.";
+    }
+    
+    setVideoError(errorMessage);
+    
+    // Try to reload the video once after a short delay
+    if (!videoError) { // Only try once to avoid infinite loops
+      setTimeout(() => {
+        if (videoRef.current) {
+          console.log('Attempting to reload video...');
+          videoRef.current.load();
+        }
+      }, 2000);
     }
   };
 
