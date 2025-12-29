@@ -27,7 +27,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 // --- Middleware ---
 app.use(helmet());
 app.use(cors({ 
-  origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000', 'https://previu.online', 'https://www.previu.online'],
+  origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000', 'https://previu.online'],
   credentials: true 
 }));
 app.use(express.json());
@@ -54,7 +54,7 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
       if (process.env.AUTO_CONFIGURE_GCS_CORS === 'true') {
         (async () => {
           try {
-            const origins = (process.env.GCS_CORS_ORIGINS || 'https://www.previu.online,http://localhost:5173,http://localhost:8080')
+            const origins = (process.env.GCS_CORS_ORIGINS || 'https://previu.online,http://localhost:5173,http://localhost:8080')
               .split(',')
               .map(s => s.trim());
             const corsConfig = [

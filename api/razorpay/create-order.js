@@ -60,7 +60,6 @@ export default async function handler(req, res) {
   // Enable CORS for your domain
   const allowedOrigins = [
     'https://previu.online',
-    'https://www.previu.online',
     'http://localhost:8080',
     'http://localhost:5173',
     'http://localhost:3000'
