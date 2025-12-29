@@ -31,6 +31,22 @@
     {
       "src": "api/gcs/upload.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/init-chunked-upload.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/upload-chunk.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/upload-status.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/verify-chunks.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -60,6 +76,22 @@
     {
       "src": "/api/gcs/upload",
       "dest": "/api/gcs/upload.js"
+    },
+    {
+      "src": "/api/gcs/init-chunked-upload",
+      "dest": "/api/gcs/init-chunked-upload.js"
+    },
+    {
+      "src": "/api/gcs/upload-chunk",
+      "dest": "/api/gcs/upload-chunk.js"
+    },
+    {
+      "src": "/api/gcs/upload-status/(.*)",
+      "dest": "/api/gcs/upload-status.js?sessionId=$1"
+    },
+    {
+      "src": "/api/gcs/verify-chunks/(.*)",
+      "dest": "/api/gcs/verify-chunks.js?sessionId=$1"
     },
     {
       "src": "/(.*)",

@@ -38,7 +38,9 @@ let bucket = null;
 if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   try {
     let credentials;
-    if (process.env.GCS_CREDENTIALS_BASE64) {
+    if (process.env.GCS_CREDENTIALS) {
+      credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+    } else if (process.env.GCS_CREDENTIALS_BASE64) {
       const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
       credentials = JSON.parse(decoded);
     } else if (process.env.GCS_KEY_FILE && fs.existsSync(process.env.GCS_KEY_FILE)) {
