@@ -156,8 +156,19 @@ export const handleApiError = (response: { status?: number; message?: string; co
  * @returns true if in development mode
  */
 export const isDevelopment = (): boolean => {
-  return process.env.NODE_ENV === 'development' || 
-         (typeof window !== 'undefined' && window.location.hostname === 'localhost');
+  // Check for Node.js environment
+  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
+    return true;
+  }
+  
+  // Check for browser environment
+  if (typeof window !== 'undefined') {
+    return window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1' ||
+           window.location.hostname.includes('localhost');
+  }
+  
+  return false;
 };
 
 /**
@@ -178,11 +189,11 @@ export const getApiBaseUrl = (): string => {
     return '';
   }
   
-  // In development, use localhost
+  // In development, use localhost with correct port
   if (isDevelopment()) {
-    return 'http://localhost:3000';
+    return 'http://localhost:3001';
   }
   
-  // In production, use relative URLs to work with the deployed backend
+  // In production, use relative URLs (handled by Vercel serverless functions)
   return '';
 };

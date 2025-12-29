@@ -1,4 +1,5 @@
 import { GCS_CONFIG, validateGCSConfig, getPublicUrl } from './config';
+import { getApiBaseUrl } from '../../config/environment';
 
 export interface GCSVideoMetadata {
   title: string;
@@ -127,8 +128,11 @@ export class GCSService {
       xhr.onerror = () => reject(new Error("Network error during upload"));
       xhr.onabort = () => reject(new Error("Upload was cancelled"));
 
-      // Use backend endpoint for GCS upload
-      xhr.open("POST", "/api/gcs/upload", true);
+      // Use backend endpoint for GCS upload with proper API base URL
+      const apiBaseUrl = getApiBaseUrl();
+      const uploadUrl = apiBaseUrl ? `${apiBaseUrl}/api/gcs/upload` : '/api/gcs/upload';
+      
+      xhr.open("POST", uploadUrl, true);
       xhr.send(formData);
     });
   }
@@ -142,7 +146,10 @@ export class GCSService {
     }
 
     try {
-      const response = await fetch(`/api/gcs/delete`, {
+      const apiBaseUrl = getApiBaseUrl();
+      const deleteUrl = apiBaseUrl ? `${apiBaseUrl}/api/gcs/delete` : '/api/gcs/delete';
+      
+      const response = await fetch(deleteUrl, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -169,7 +176,12 @@ export class GCSService {
     }
 
     try {
-      const response = await fetch(`/api/gcs/metadata?fileName=${encodeURIComponent(fileName)}`);
+      const apiBaseUrl = getApiBaseUrl();
+      const metadataUrl = apiBaseUrl 
+        ? `${apiBaseUrl}/api/gcs/metadata?fileName=${encodeURIComponent(fileName)}`
+        : `/api/gcs/metadata?fileName=${encodeURIComponent(fileName)}`;
+        
+      const response = await fetch(metadataUrl);
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
