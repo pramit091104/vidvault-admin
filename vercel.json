@@ -19,10 +19,6 @@
     {
       "src": "api/signed-url.js",
       "use": "@vercel/node"
-    },
-    {
-      "src": "api/test.js",
-      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -40,10 +36,6 @@
     {
       "src": "/api/signed-url",
       "dest": "/api/signed-url.js"
-    },
-    {
-      "src": "/api/test",
-      "dest": "/api/test.js"
     },
     {
       "src": "/(.*)",

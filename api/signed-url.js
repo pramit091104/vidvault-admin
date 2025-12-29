@@ -6,13 +6,27 @@ let bucket = null;
 
 if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   try {
+    let credentials = null;
+    
+    if (process.env.GCS_CREDENTIALS) {
+      // Parse credentials and fix escaped newlines in private key
+      credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+      if (credentials.private_key) {
+        // Replace escaped newlines with actual newlines
+        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+      }
+    }
+    
     const storage = new Storage({ 
       projectId: process.env.GCS_PROJECT_ID,
-      credentials: process.env.GCS_CREDENTIALS ? JSON.parse(process.env.GCS_CREDENTIALS) : undefined
+      credentials: credentials
     });
     bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+    
+    console.log('GCS initialized successfully');
   } catch (error) {
-    console.warn('Failed to initialize GCS:', error.message);
+    console.error('Failed to initialize GCS:', error.message);
+    console.error('Error details:', error);
   }
 }
 
@@ -41,10 +55,17 @@ export default async function handler(req, res) {
 
   try {
     if (!bucket) {
+      console.error('Storage unavailable - bucket not initialized');
       return res.status(503).json({ error: 'Storage unavailable' });
     }
 
     const { videoId, service } = req.body;
+    
+    if (!videoId) {
+      return res.status(400).json({ error: 'videoId is required' });
+    }
+    
+    console.log('Processing signed URL request for videoId:', videoId);
     
     // Clean up the input ID
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
@@ -63,30 +84,40 @@ export default async function handler(req, res) {
 
     // Try to find the file
     for (const path of potentialPaths) {
+      console.log('Checking path:', path);
       const file = bucket.file(path);
       const [exists] = await file.exists();
       if (exists) {
         foundFile = file;
+        console.log('Found file at path:', path);
         break;
       }
     }
 
     if (!foundFile) {
+      console.error('Video not found in any of the searched paths:', potentialPaths);
       return res.status(404).json({ error: 'Video not found in storage' });
     }
 
     // Generate signed URL
     const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+    console.log('Generating signed URL...');
+    
     const [signedUrl] = await foundFile.getSignedUrl({
       version: 'v4',
       action: 'read',
       expires: expiresAt,
     });
 
+    console.log('Signed URL generated successfully');
     res.json({ signedUrl, expiresAt: new Date(expiresAt).toISOString() });
 
   } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: error.message });
+    console.error('Error in signed-url handler:', error);
+    console.error('Error stack:', error.stack);
+    res.status(500).json({ 
+      error: error.message,
+      details: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 }
