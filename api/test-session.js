@@ -10,7 +10,7 @@ export default async function handler(req, res) {
   try {
     if (req.method === 'GET') {
       // Return session statistics
-      const stats = getSessionStats();
+      const stats = await getSessionStats();
       return res.status(200).json({ 
         success: true, 
         stats,
@@ -38,7 +38,7 @@ export default async function handler(req, res) {
         return res.status(200).json({ success: deleted, action: 'delete' });
 
       case 'stats':
-        const sessionStats = getSessionStats();
+        const sessionStats = await getSessionStats();
         return res.status(200).json({ success: true, stats: sessionStats, action: 'stats' });
 
       default:
