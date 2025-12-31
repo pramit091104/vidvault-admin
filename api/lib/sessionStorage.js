@@ -1,189 +1,204 @@
-// Enhanced session storage for Vercel serverless functions
-// Uses multiple strategies for better persistence
+// Session storage for Vercel serverless functions using GCS as persistent storage
+// This ensures sessions persist across different function instances
 
-// Global storage that persists across function calls within the same instance
-if (!global.uploadSessions) {
-  global.uploadSessions = new Map();
-  global.sessionTimestamps = new Map();
-  global.lastCleanup = Date.now();
-}
+import { Storage } from '@google-cloud/storage';
 
-// Enhanced cleanup with better logging
-function cleanupExpiredSessions() {
-  const now = Date.now();
-  if (now - global.lastCleanup > 2 * 60 * 1000) { // Clean every 2 minutes
-    const sessions = global.uploadSessions;
-    const timestamps = global.sessionTimestamps;
-    let cleanedCount = 0;
-    
-    for (const [sessionId, session] of sessions.entries()) {
-      const expiresAt = session.expiresAt instanceof Date ? session.expiresAt : new Date(session.expiresAt);
-      if (now > expiresAt.getTime()) {
-        sessions.delete(sessionId);
-        timestamps.delete(sessionId);
-        cleanedCount++;
-      }
-    }
-    
-    if (cleanedCount > 0) {
-      console.log(`🧹 Cleaned up ${cleanedCount} expired sessions. Active sessions: ${sessions.size}`);
-    }
-    global.lastCleanup = now;
+// Initialize GCS client for session storage
+let storage = null;
+let sessionBucket = null;
+
+try {
+  let credentials;
+  if (process.env.GCS_CREDENTIALS) {
+    credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+  } else if (process.env.GCS_CREDENTIALS_BASE64) {
+    const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+    credentials = JSON.parse(decoded);
   }
+
+  if (credentials && process.env.GCS_PROJECT_ID && process.env.GCS_BUCKET_NAME) {
+    storage = new Storage({ 
+      projectId: process.env.GCS_PROJECT_ID, 
+      credentials 
+    });
+    sessionBucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+    console.log('✅ GCS session storage initialized');
+  } else {
+    console.warn('⚠️ GCS credentials not found for session storage');
+  }
+} catch (error) {
+  console.error('❌ Failed to initialize GCS for session storage:', error.message);
 }
 
-// Enhanced session saving with better persistence
+// Session file path in GCS
+function getSessionPath(sessionId) {
+  return `upload_sessions/${sessionId}.json`;
+}
+
+// Save session to GCS
 export async function saveSession(sessionId, sessionData) {
   try {
-    cleanupExpiredSessions();
-    
-    // Ensure dates are properly formatted
-    const sessionToStore = {
-      ...sessionData,
-      createdAt: sessionData.createdAt || new Date(),
-      expiresAt: sessionData.expiresAt || new Date(Date.now() + 24 * 60 * 60 * 1000),
-      completedAt: sessionData.completedAt || null,
-      lastUpdated: new Date()
-    };
-    
-    // Store in global memory
-    global.uploadSessions.set(sessionId, sessionToStore);
-    global.sessionTimestamps.set(sessionId, Date.now());
-    
-    // Also try to store in process.env as a backup (for very short-term persistence)
-    try {
-      const envKey = `UPLOAD_SESSION_${sessionId}`;
-      process.env[envKey] = JSON.stringify({
-        ...sessionToStore,
-        createdAt: sessionToStore.createdAt.toISOString(),
-        expiresAt: sessionToStore.expiresAt.toISOString(),
-        completedAt: sessionToStore.completedAt?.toISOString() || null,
-        lastUpdated: sessionToStore.lastUpdated.toISOString()
-      });
-    } catch (envError) {
-      // Environment storage failed, but that's okay
+    if (!sessionBucket) {
+      console.error('❌ Session bucket not available');
+      return false;
     }
-    
-    console.log(`✅ Session ${sessionId} saved. Total sessions: ${global.uploadSessions.size}`);
+
+    // Prepare session data for storage
+    const dataToStore = {
+      ...sessionData,
+      createdAt: sessionData.createdAt?.toISOString() || new Date().toISOString(),
+      expiresAt: sessionData.expiresAt?.toISOString() || new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+      completedAt: sessionData.completedAt?.toISOString() || null,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Store in GCS
+    const file = sessionBucket.file(getSessionPath(sessionId));
+    await file.save(JSON.stringify(dataToStore), {
+      contentType: 'application/json',
+      metadata: {
+        cacheControl: 'no-cache',
+      }
+    });
+
+    console.log(`✅ Session ${sessionId} saved to GCS`);
     return true;
   } catch (error) {
-    console.error('❌ Error saving session:', error);
+    console.error(`❌ Error saving session ${sessionId} to GCS:`, error.message);
     return false;
   }
 }
 
-// Enhanced session retrieval with fallback mechanisms
+// Get session from GCS
 export async function getSession(sessionId) {
   try {
-    cleanupExpiredSessions();
-    
-    // First try global memory
-    let session = global.uploadSessions.get(sessionId);
-    
-    // If not in memory, try environment variables as backup
-    if (!session) {
-      try {
-        const envKey = `UPLOAD_SESSION_${sessionId}`;
-        const envData = process.env[envKey];
-        if (envData) {
-          const sessionData = JSON.parse(envData);
-          session = {
-            ...sessionData,
-            createdAt: new Date(sessionData.createdAt),
-            expiresAt: new Date(sessionData.expiresAt),
-            completedAt: sessionData.completedAt ? new Date(sessionData.completedAt) : null,
-            lastUpdated: new Date(sessionData.lastUpdated)
-          };
-          
-          // Restore to memory for faster access
-          global.uploadSessions.set(sessionId, session);
-          global.sessionTimestamps.set(sessionId, Date.now());
-          console.log(`🔄 Session ${sessionId} restored from environment backup`);
-        }
-      } catch (envError) {
-        console.warn('Environment backup read failed:', envError.message);
-      }
-    }
-    
-    if (!session) {
-      console.log(`❌ Session ${sessionId} not found. Available sessions: ${Array.from(global.uploadSessions.keys()).join(', ')}`);
+    if (!sessionBucket) {
+      console.error('❌ Session bucket not available');
       return null;
     }
+
+    const file = sessionBucket.file(getSessionPath(sessionId));
     
+    // Check if file exists
+    const [exists] = await file.exists();
+    if (!exists) {
+      console.log(`❌ Session ${sessionId} not found in GCS`);
+      return null;
+    }
+
+    // Download and parse session data
+    const [contents] = await file.download();
+    const sessionData = JSON.parse(contents.toString('utf-8'));
+
+    // Convert ISO strings back to Date objects
+    const session = {
+      ...sessionData,
+      createdAt: new Date(sessionData.createdAt),
+      expiresAt: new Date(sessionData.expiresAt),
+      completedAt: sessionData.completedAt ? new Date(sessionData.completedAt) : null,
+      lastUpdated: sessionData.lastUpdated ? new Date(sessionData.lastUpdated) : null
+    };
+
     // Check if session is expired
-    const expiresAt = session.expiresAt instanceof Date ? session.expiresAt : new Date(session.expiresAt);
-    if (new Date() > expiresAt) {
+    if (new Date() > session.expiresAt) {
       await deleteSession(sessionId);
       console.log(`⏰ Session ${sessionId} expired and removed`);
       return null;
     }
-    
-    // Update last access time
-    global.sessionTimestamps.set(sessionId, Date.now());
-    console.log(`✅ Session ${sessionId} found and valid`);
+
+    console.log(`✅ Session ${sessionId} retrieved from GCS`);
     return session;
   } catch (error) {
-    console.error('❌ Error getting session:', error);
+    console.error(`❌ Error getting session ${sessionId} from GCS:`, error.message);
     return null;
   }
 }
 
-// Enhanced session deletion
+// Delete session from GCS
 export async function deleteSession(sessionId) {
   try {
-    // Remove from global memory
-    const deleted = global.uploadSessions.delete(sessionId);
-    global.sessionTimestamps.delete(sessionId);
-    
-    // Remove from environment backup
-    try {
-      const envKey = `UPLOAD_SESSION_${sessionId}`;
-      delete process.env[envKey];
-    } catch (envError) {
-      // Environment cleanup failed, but that's okay
+    if (!sessionBucket) {
+      console.error('❌ Session bucket not available');
+      return true; // Return true to avoid blocking
     }
+
+    const file = sessionBucket.file(getSessionPath(sessionId));
     
-    console.log(`🗑️ Session ${sessionId} deletion: ${deleted ? 'success' : 'not found'}`);
+    // Check if file exists before deleting
+    const [exists] = await file.exists();
+    if (exists) {
+      await file.delete();
+      console.log(`🗑️ Session ${sessionId} deleted from GCS`);
+    } else {
+      console.log(`ℹ️ Session ${sessionId} not found for deletion`);
+    }
+
     return true;
   } catch (error) {
-    console.error('❌ Error deleting session:', error);
-    return true; // Return true even on error to avoid blocking
+    console.error(`❌ Error deleting session ${sessionId} from GCS:`, error.message);
+    return true; // Return true to avoid blocking
   }
 }
 
-// Enhanced session update
+// Update session in GCS
 export async function updateSession(sessionId, updates) {
   try {
-    const session = global.uploadSessions.get(sessionId);
+    // Get existing session
+    const session = await getSession(sessionId);
     if (!session) {
-      // Try to restore from environment backup
-      const restored = await getSession(sessionId);
-      if (!restored) {
-        console.log(`❌ Cannot update session ${sessionId}: not found`);
-        return false;
-      }
+      console.log(`❌ Cannot update session ${sessionId}: not found`);
+      return false;
     }
-    
-    const currentSession = global.uploadSessions.get(sessionId);
-    const updatedSession = { 
-      ...currentSession, 
+
+    // Merge updates
+    const updatedSession = {
+      ...session,
       ...updates,
       lastUpdated: new Date()
     };
-    
-    // Save the updated session
-    return await saveSession(sessionId, updatedSession);
+
+    // Save updated session
+    const saved = await saveSession(sessionId, updatedSession);
+    if (saved) {
+      console.log(`✅ Session ${sessionId} updated in GCS`);
+    }
+    return saved;
   } catch (error) {
-    console.error('❌ Error updating session:', error);
+    console.error(`❌ Error updating session ${sessionId}:`, error.message);
     return false;
   }
 }
 
-// Utility function to get session statistics
-export function getSessionStats() {
-  return {
-    totalSessions: global.uploadSessions?.size || 0,
-    sessionIds: Array.from(global.uploadSessions?.keys() || []),
-    lastCleanup: new Date(global.lastCleanup || 0).toISOString()
-  };
+// Get session statistics (list all sessions)
+export async function getSessionStats() {
+  try {
+    if (!sessionBucket) {
+      return {
+        totalSessions: 0,
+        sessionIds: [],
+        error: 'Session bucket not available'
+      };
+    }
+
+    const [files] = await sessionBucket.getFiles({
+      prefix: 'upload_sessions/',
+    });
+
+    const sessionIds = files
+      .filter(file => file.name.endsWith('.json'))
+      .map(file => file.name.replace('upload_sessions/', '').replace('.json', ''));
+
+    return {
+      totalSessions: sessionIds.length,
+      sessionIds,
+      storage: 'GCS'
+    };
+  } catch (error) {
+    console.error('❌ Error getting session stats:', error.message);
+    return {
+      totalSessions: 0,
+      sessionIds: [],
+      error: error.message
+    };
+  }
 }
