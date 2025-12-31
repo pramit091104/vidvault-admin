@@ -59,13 +59,38 @@ export default async function handler(req, res) {
       return res.status(503).json({ error: 'Storage unavailable' });
     }
 
-    const { videoId, service } = req.body;
+    const { videoId, gcsPath, service } = req.body;
     
-    if (!videoId) {
-      return res.status(400).json({ error: 'videoId is required' });
+    if (!videoId && !gcsPath) {
+      return res.status(400).json({ error: 'videoId or gcsPath is required' });
     }
     
-    console.log('Processing signed URL request for videoId:', videoId);
+    console.log('Processing signed URL request for:', { videoId, gcsPath });
+    
+    // If gcsPath is provided, use it directly
+    if (gcsPath) {
+      console.log('Using provided gcsPath:', gcsPath);
+      const file = bucket.file(gcsPath);
+      const [exists] = await file.exists();
+      
+      if (exists) {
+        // Generate signed URL
+        const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
+        console.log('Generating signed URL for gcsPath...');
+        
+        const [signedUrl] = await file.getSignedUrl({
+          version: 'v4',
+          action: 'read',
+          expires: expiresAt,
+        });
+
+        console.log('Signed URL generated successfully');
+        return res.json({ signedUrl, expiresAt: new Date(expiresAt).toISOString() });
+      } else {
+        console.error('File not found at gcsPath:', gcsPath);
+        // Fall through to try videoId-based search
+      }
+    }
     
     // Clean up the input ID
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');

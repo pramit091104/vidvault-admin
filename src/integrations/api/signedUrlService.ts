@@ -9,7 +9,8 @@ const API_BASE_URL = getApiBaseUrl();
  */
 export const requestSignedUrl = async (
   videoId: string,
-  service: 'youtube' | 'gcs'
+  service: 'youtube' | 'gcs',
+  gcsPath?: string
 ): Promise<string> => {
   // If it's YouTube, we don't need a backend signature
   if (service === 'youtube') {
@@ -20,15 +21,22 @@ export const requestSignedUrl = async (
   const safeVideoId = videoId || '';
 
   try {
+    const requestBody: any = {
+      videoId: safeVideoId,
+      service,
+    };
+    
+    // Include gcsPath if provided
+    if (gcsPath) {
+      requestBody.gcsPath = gcsPath;
+    }
+
     const response = await fetch(`${API_BASE_URL}/api/signed-url`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        videoId: safeVideoId,
-        service,
-      }),
+      body: JSON.stringify(requestBody),
     });
 
     if (!response.ok) {

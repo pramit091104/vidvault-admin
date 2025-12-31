@@ -266,13 +266,15 @@ const Watch = () => {
         // --- SECURE URL LOGIC ---
         if (mappedVideo.service === 'gcs') {
           try {
-            // Use the stored fileName for signing; fall back to the document id
+            // Use the stored gcsPath if available, otherwise fall back to fileName
+            const gcsPath = (videoData as any).gcsPath;
             const targetId = (videoData as any).fileName || mappedVideo.id;
-            console.log('Requesting signed URL for:', targetId);
+            console.log('Requesting signed URL for:', { targetId, gcsPath });
             
             const url = await requestSignedUrl(
               targetId,
-              'gcs'
+              'gcs',
+              gcsPath // Pass the gcsPath if available
             );
             setSignedVideoUrl(url);
             console.log('Successfully obtained signed URL');

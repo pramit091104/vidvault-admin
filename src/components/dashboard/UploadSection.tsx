@@ -191,6 +191,9 @@ const UploadSection = () => {
         // Save to Firebase GCS collection
         const videoId = uuidv4();
         try {
+          // Extract the GCS path from the result
+          const gcsPath = result.gcsPath || `uploads/${result.uploadId}/${result.fileName}`;
+          
           await saveGCSVideo({
             id: videoId,
             title: title.trim(),
@@ -198,6 +201,7 @@ const UploadSection = () => {
             clientName: clientName.trim(),
             userId: currentUser?.uid,
             fileName: result.fileName || file.name,
+            gcsPath: gcsPath, // Save the full GCS path
             publicUrl: result.signedUrl || '',
             size: result.size || file.size,
             contentType: file.type,
@@ -214,7 +218,7 @@ const UploadSection = () => {
           });
           
           toast.success('Video uploaded and saved successfully!');
-          console.log('✅ Video saved to Firebase:', videoId);
+          console.log('✅ Video saved to Firebase:', videoId, 'GCS Path:', gcsPath);
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
           toast.error('Video uploaded but failed to save to database');
