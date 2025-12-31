@@ -1,4 +1,4 @@
-import { getSession } from './lib/sessionStorage.js';
+import { getSession } from '../lib/sessionStorage.js';
 
 // Access global sessions
 global.uploadSessions = global.uploadSessions || new Map();

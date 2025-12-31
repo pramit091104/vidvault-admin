@@ -1,6 +1,6 @@
 import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
-import { getSession, updateSession } from './lib/sessionStorage.js';
+import { getSession, updateSession } from '../lib/sessionStorage.js';
 
 // Initialize Google Cloud Storage
 let bucket = null;
