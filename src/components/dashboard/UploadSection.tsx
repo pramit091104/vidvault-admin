@@ -14,9 +14,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { generateVideoSlug, createPublicUrl } from '@/lib/slugGenerator';
 import { useUploadResumption } from '@/hooks/useUploadResumption';
 import { useIntegratedUpload } from '@/hooks/useIntegratedUpload';
+import { useSimpleUpload } from '@/hooks/useSimpleUpload';
 import { UploadResumptionDialog } from './UploadResumptionDialog';
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Switch } from "@/components/ui/switch";
 
 const UploadSection = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -30,8 +32,12 @@ const UploadSection = () => {
   const [publicUrl, setPublicUrl] = useState<string>("");
   const [showResumptionDialog, setShowResumptionDialog] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [useSimpleUploadMode, setUseSimpleUploadMode] = useState(true); // Default to simple upload
 
-  // Integrated upload hook
+  // Simple upload hook (recommended for files < 50MB)
+  const simpleUpload = useSimpleUpload();
+
+  // Integrated upload hook (for large files with chunking)
   const {
     isUploading,
     uploadProgress,
@@ -118,31 +124,53 @@ const UploadSection = () => {
     setUploadSuccess(false);
     setPublicSlug("");
     setPublicUrl("");
-    resetUpload();
     
     try {
-      // Start integrated upload with chunking and optional compression
-      const result = await uploadFile({
-        file,
-        metadata: {
-          title: title.trim(),
-          description: description?.trim() || '',
-          clientName: clientName.trim(),
-        },
-        enableCompression,
-        onProgress: (progress) => {
-          // Progress is handled by the hook
-        },
-        onChunkUploaded: (chunkId, chunkIndex) => {
-          // Chunk progress is handled by the hook
-        },
-        onCompressionProgress: (progress) => {
-          // Compression progress is handled by the hook
-        },
-        onError: (error) => {
-          console.error('Upload error:', error);
-        }
-      });
+      let result;
+      
+      // Use simple upload for files < 50MB or if explicitly selected
+      if (useSimpleUploadMode || file.size < 50 * 1024 * 1024) {
+        toast.info("Starting direct upload...");
+        simpleUpload.reset();
+        
+        result = await simpleUpload.uploadFile({
+          file,
+          metadata: {
+            title: title.trim(),
+            description: description?.trim() || '',
+            clientName: clientName.trim(),
+          },
+          onProgress: (progress) => {
+            // Progress is handled by the hook
+          }
+        });
+      } else {
+        // Use chunked upload for large files
+        toast.info("Starting chunked upload...");
+        resetUpload();
+        
+        result = await uploadFile({
+          file,
+          metadata: {
+            title: title.trim(),
+            description: description?.trim() || '',
+            clientName: clientName.trim(),
+          },
+          enableCompression,
+          onProgress: (progress) => {
+            // Progress is handled by the hook
+          },
+          onChunkUploaded: (chunkId, chunkIndex) => {
+            // Chunk progress is handled by the hook
+          },
+          onCompressionProgress: (progress) => {
+            // Compression progress is handled by the hook
+          },
+          onError: (error) => {
+            console.error('Upload error:', error);
+          }
+        });
+      }
 
       if (result.success) {
         // Generate public slug if enabled
@@ -303,6 +331,28 @@ const UploadSection = () => {
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="uploadMode">Upload Mode</Label>
+          <div className="flex items-center space-x-3 p-4 border border-border/50 rounded-lg bg-background/50">
+            <input
+              type="checkbox"
+              id="uploadMode"
+              checked={useSimpleUploadMode}
+              onChange={(e) => setUseSimpleUploadMode(e.target.checked)}
+              className="h-4 w-4 text-primary rounded border-border"
+            />
+            <div className="flex-1">
+              <Label htmlFor="uploadMode" className="text-sm font-medium text-foreground cursor-pointer">
+                Use simple upload (Recommended)
+              </Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Direct upload for files up to 50MB. Faster and more reliable. Uncheck for large files that need chunked upload.
+              </p>
+            </div>
+            <Zap className="h-5 w-5 text-muted-foreground" />
+          </div>
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="enableCompression">Video Optimization</Label>
           <div className="flex items-center space-x-3 p-4 border border-border/50 rounded-lg bg-background/50">
             <input
@@ -311,13 +361,17 @@ const UploadSection = () => {
               checked={enableCompression}
               onChange={(e) => setEnableCompression(e.target.checked)}
               className="h-4 w-4 text-primary rounded border-border"
+              disabled={useSimpleUploadMode}
             />
             <div className="flex-1">
               <Label htmlFor="enableCompression" className="text-sm font-medium text-foreground cursor-pointer">
                 Enable video compression
               </Label>
               <p className="text-xs text-muted-foreground mt-1">
-                Automatically compress large videos to reduce file size and improve upload speed. Recommended for files over 50MB.
+                {useSimpleUploadMode 
+                  ? "Compression is not available in simple upload mode. Please compress your video before uploading."
+                  : "Automatically compress large videos to reduce file size and improve upload speed. Recommended for files over 50MB."
+                }
               </p>
             </div>
             <Zap className="h-5 w-5 text-muted-foreground" />
@@ -370,22 +424,35 @@ const UploadSection = () => {
         </div>
 
         {/* Enhanced Progress Display */}
-        {isUploading && (
+        {(isUploading || simpleUpload.isUploading) && (
           <div className="space-y-4 p-4 border border-border/50 rounded-lg bg-background/50">
             <div className="flex items-center gap-2">
               <FileVideo className="h-4 w-4 text-primary" />
               <span className="text-sm font-medium">
-                {stage === 'compressing' && 'Compressing video...'}
-                {stage === 'uploading' && 'Uploading chunks...'}
-                {stage === 'assembling' && 'Assembling file...'}
+                {useSimpleUploadMode || simpleUpload.isUploading 
+                  ? 'Uploading file...' 
+                  : stage === 'compressing' ? 'Compressing video...'
+                  : stage === 'uploading' ? 'Uploading chunks...'
+                  : 'Assembling file...'}
               </span>
               <Badge variant="secondary" className="ml-auto">
-                {stage}
+                {useSimpleUploadMode || simpleUpload.isUploading ? 'uploading' : stage}
               </Badge>
             </div>
 
+            {/* Simple Upload Progress */}
+            {(useSimpleUploadMode || simpleUpload.isUploading) && (
+              <div className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-muted-foreground">Upload Progress</span>
+                  <span className="text-muted-foreground">{Math.round(simpleUpload.uploadProgress)}%</span>
+                </div>
+                <Progress value={simpleUpload.uploadProgress} className="h-2" />
+              </div>
+            )}
+
             {/* Compression Progress */}
-            {stage === 'compressing' && (
+            {!useSimpleUploadMode && stage === 'compressing' && (
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground">Compression Progress</span>
