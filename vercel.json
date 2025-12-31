@@ -51,6 +51,10 @@
     {
       "src": "api/test.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/test-session.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -100,6 +104,10 @@
     {
       "src": "/api/test",
       "dest": "/api/test.js"
+    },
+    {
+      "src": "/api/test-session",
+      "dest": "/api/test-session.js"
     },
     {
       "src": "/(.*)",

@@ -26,8 +26,7 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   }
 }
 
-// Access global sessions
-global.uploadSessions = global.uploadSessions || new Map();
+// Session storage now handled by Firestore via sessionStorage.js
 
 export default async function handler(req, res) {
   // Only allow GET requests

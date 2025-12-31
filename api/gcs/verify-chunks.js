@@ -1,7 +1,6 @@
 import { getSession } from '../lib/sessionStorage.js';
 
-// Access global sessions
-global.uploadSessions = global.uploadSessions || new Map();
+// Session storage now handled by Firestore via sessionStorage.js
 
 export default async function handler(req, res) {
   // Only allow GET requests

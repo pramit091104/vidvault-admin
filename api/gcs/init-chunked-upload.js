@@ -41,8 +41,7 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   console.error('❌ Missing GCS configuration');
 }
 
-// In-memory session storage (use Redis or database in production)
-global.uploadSessions = global.uploadSessions || new Map();
+// Session storage now handled by Firestore via sessionStorage.js
 
 export default async function handler(req, res) {
   // Only allow POST requests

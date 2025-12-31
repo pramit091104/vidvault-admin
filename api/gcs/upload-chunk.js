@@ -43,10 +43,7 @@ export const config = {
   },
 };
 
-// Access global sessions
-global.uploadSessions = global.uploadSessions || new Map();
-
-// Access global sessions
+// Access global sessions (fallback - not used with Firestore)
 global.uploadSessions = global.uploadSessions || new Map();
 
 export default async function handler(req, res) {
