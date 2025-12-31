@@ -278,14 +278,17 @@ export class IntegratedUploadService {
   /**
    * Wait for file assembly to complete
    */
-  private async waitForAssembly(sessionId: string, maxWaitTime: number = 60000): Promise<{ gcsPath?: string; signedUrl?: string }> {
+  private async waitForAssembly(sessionId: string, maxWaitTime: number = 120000): Promise<{ gcsPath?: string; signedUrl?: string }> {
     const startTime = Date.now();
-    const pollInterval = 2000; // 2 seconds
+    const pollInterval = 1000; // 1 second (faster polling)
+
+    console.log(`⏳ Waiting for assembly of session ${sessionId}...`);
 
     while (Date.now() - startTime < maxWaitTime) {
       const status = await this.getUploadStatus(sessionId);
       
       if (status?.status === 'completed') {
+        console.log(`✅ Assembly completed for session ${sessionId}`);
         return {
           gcsPath: status.gcsPath,
           signedUrl: status.signedUrl
@@ -293,13 +296,18 @@ export class IntegratedUploadService {
       }
       
       if (status?.status === 'failed') {
+        console.error(`❌ Assembly failed for session ${sessionId}:`, status.error);
         throw new Error(status.error || 'File assembly failed');
       }
+
+      // Log current status
+      console.log(`📊 Assembly status: ${status?.status || 'unknown'}`);
 
       // Wait before next poll
       await new Promise(resolve => setTimeout(resolve, pollInterval));
     }
 
+    console.error(`⏰ Assembly timeout for session ${sessionId} after ${maxWaitTime}ms`);
     throw new Error('Assembly timeout - file may still be processing');
   }
 

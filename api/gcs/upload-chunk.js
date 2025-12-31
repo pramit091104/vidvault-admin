@@ -112,15 +112,28 @@ export default async function handler(req, res) {
 
       console.log(`📦 Processing chunk ${chunkIndex} for session ${sessionId}`);
 
-      // Store chunk data in session
+      // Store chunk metadata in session (not the actual data)
       const chunkInfo = {
         chunkId,
         index: parseInt(chunkIndex),
         size: chunkData.length,
-        data: chunkData.toString('base64'), // Store as base64 for JSON serialization
         checksum,
         uploadedAt: new Date()
       };
+
+      // Upload chunk directly to GCS with a temporary path
+      const tempChunkPath = `upload_chunks/${sessionId}/${chunkIndex}.chunk`;
+      const chunkFile = bucket.file(tempChunkPath);
+      await chunkFile.save(chunkData, {
+        metadata: {
+          contentType: 'application/octet-stream',
+          metadata: {
+            sessionId,
+            chunkId,
+            chunkIndex: chunkIndex.toString()
+          }
+        }
+      });
 
       // Initialize chunks object if it doesn't exist
       if (!session.chunks) {
@@ -151,19 +164,27 @@ export default async function handler(req, res) {
 
       console.log(`✅ Chunk ${chunkIndex} uploaded successfully. Complete: ${isComplete}`);
 
+      // If all chunks uploaded, trigger assembly in background
+      if (isComplete) {
+        console.log('🔧 All chunks uploaded, triggering background assembly...');
+        
+        // Update status to assembling immediately
+        await updateSession(sessionId, { status: 'assembling' });
+        
+        // Start assembly in background (don't await)
+        assembleFile(sessionId).catch(err => {
+          console.error('❌ Background assembly failed:', err);
+        });
+      }
+
       res.status(200).json({
         success: true,
         chunkId,
         uploadedChunks: session.uploadedChunks.length,
         totalChunks: session.totalChunks,
-        isComplete
+        isComplete,
+        status: isComplete ? 'assembling' : 'uploading'
       });
-
-      // If all chunks uploaded, trigger assembly
-      if (isComplete) {
-        console.log('🔧 All chunks uploaded, triggering assembly...');
-        setImmediate(() => assembleFile(sessionId));
-      }
     });
 
   } catch (error) {
@@ -172,41 +193,56 @@ export default async function handler(req, res) {
   }
 }
 
-// Assemble file from chunks
+// Assemble file from chunks stored in GCS
 async function assembleFile(sessionId) {
   try {
+    console.log(`🔧 Starting assembly for session ${sessionId}`);
     const session = await getSession(sessionId);
-    if (!session) return;
+    if (!session) {
+      console.error(`❌ Session ${sessionId} not found for assembly`);
+      return;
+    }
 
     await updateSession(sessionId, { status: 'assembling' });
 
-    // Sort chunks by index and convert back from base64
-    const sortedChunks = Object.values(session.chunks)
-      .sort((a, b) => a.index - b.index)
-      .map(chunk => ({
-        ...chunk,
-        data: Buffer.from(chunk.data, 'base64')
-      }));
+    // Get all chunk files from GCS
+    const chunkPrefix = `upload_chunks/${sessionId}/`;
+    const [chunkFiles] = await bucket.getFiles({ prefix: chunkPrefix });
 
-    // Combine chunk data
-    const buffers = sortedChunks.map(chunk => chunk.data);
+    if (chunkFiles.length === 0) {
+      throw new Error('No chunk files found');
+    }
+
+    console.log(`📦 Found ${chunkFiles.length} chunk files to assemble`);
+
+    // Sort chunks by index
+    const sortedChunkFiles = chunkFiles.sort((a, b) => {
+      const indexA = parseInt(a.name.split('/').pop().replace('.chunk', ''));
+      const indexB = parseInt(b.name.split('/').pop().replace('.chunk', ''));
+      return indexA - indexB;
+    });
+
+    // Download and combine chunks
+    const buffers = [];
+    for (const chunkFile of sortedChunkFiles) {
+      console.log(`📥 Downloading chunk: ${chunkFile.name}`);
+      const [chunkData] = await chunkFile.download();
+      buffers.push(chunkData);
+    }
+
     const assembledBuffer = Buffer.concat(buffers);
+    console.log(`✅ Assembled ${buffers.length} chunks into ${assembledBuffer.length} bytes`);
 
-    // Upload to GCS
+    // Upload assembled file to GCS
     const fileName = `uploads/${sessionId}/${session.fileName}`;
     const file = bucket.file(fileName);
 
-    const stream = file.createWriteStream({
+    console.log(`📤 Uploading assembled file to: ${fileName}`);
+    await file.save(assembledBuffer, {
       metadata: {
         contentType: session.metadata.contentType || 'application/octet-stream',
         metadata: session.metadata
       }
-    });
-
-    await new Promise((resolve, reject) => {
-      stream.on('error', reject);
-      stream.on('finish', resolve);
-      stream.end(assembledBuffer);
     });
 
     // Generate signed URL
@@ -217,20 +253,30 @@ async function assembleFile(sessionId) {
       expires: expiresAt,
     });
 
+    console.log(`🔗 Generated signed URL for assembled file`);
+
     // Update session with completion info
     await updateSession(sessionId, {
       status: 'completed',
       gcsPath: fileName,
       signedUrl,
       completedAt: new Date(),
-      chunks: {} // Clear chunks to save space
+      chunks: {} // Clear chunks metadata to save space
     });
 
+    // Clean up temporary chunk files
+    console.log(`🧹 Cleaning up ${chunkFiles.length} temporary chunk files`);
+    await Promise.all(chunkFiles.map(chunkFile => chunkFile.delete().catch(err => {
+      console.warn(`⚠️ Failed to delete chunk ${chunkFile.name}:`, err.message);
+    })));
+
+    console.log(`✅ Assembly completed successfully for session ${sessionId}`);
   } catch (error) {
-    console.error('Error assembling file:', error);
+    console.error(`❌ Error assembling file for session ${sessionId}:`, error);
     await updateSession(sessionId, {
       status: 'failed',
       error: error.message
     });
+    throw error;
   }
 }
