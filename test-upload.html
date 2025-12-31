@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Chunked Upload</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .log {
+            background: #f5f5f5;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .error { color: red; }
+        .success { color: green; }
+        .info { color: blue; }
+        button {
+            padding: 10px 20px;
+            margin: 10px 5px;
+            cursor: pointer;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+        .progress {
+            width: 100%;
+            height: 30px;
+            background: #f0f0f0;
+            border-radius: 5px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        .progress-bar {
+            height: 100%;
+            background: #4CAF50;
+            transition: width 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+    <h1>Chunked Upload Test</h1>
+    
+    <div>
+        <input type="file" id="fileInput" />
+        <button onclick="testUpload()">Upload File</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+
+    <div class="progress">
+        <div class="progress-bar" id="progressBar" style="width: 0%">0%</div>
+    </div>
+
+    <div class="log" id="log"></div>
+
+    <script>
+        const API_BASE = 'https://previu.online';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function updateProgress(percent) {
+            const bar = document.getElementById('progressBar');
+            bar.style.width = percent + '%';
+            bar.textContent = Math.round(percent) + '%';
+        }
+
+        async function testUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                log('Please select a file first', 'error');
+                return;
+            }
+
+            log(`Starting upload for: ${file.name} (${file.size} bytes)`, 'info');
+            updateProgress(0);
+
+            try {
+                // Step 1: Initialize upload session
+                log('Step 1: Initializing upload session...', 'info');
+                const chunkSize = 1 * 1024 * 1024; // 1MB chunks for testing
+                
+                const initResponse = await fetch(`${API_BASE}/api/gcs/init-chunked-upload`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        fileName: file.name,
+                        totalSize: file.size,
+                        chunkSize: chunkSize,
+                        metadata: {
+                            contentType: file.type,
+                            originalName: file.name
+                        }
+                    })
+                });
+
+                if (!initResponse.ok) {
+                    const error = await initResponse.json();
+                    throw new Error(`Init failed: ${error.error || initResponse.statusText}`);
+                }
+
+                const { sessionId, totalChunks } = await initResponse.json();
+                log(`✅ Session created: ${sessionId} (${totalChunks} chunks)`, 'success');
+
+                // Step 2: Upload chunks
+                log(`Step 2: Uploading ${totalChunks} chunks...`, 'info');
+                const chunks = Math.ceil(file.size / chunkSize);
+                
+                for (let i = 0; i < chunks; i++) {
+                    const start = i * chunkSize;
+                    const end = Math.min(start + chunkSize, file.size);
+                    const chunk = file.slice(start, end);
+                    
+                    log(`Uploading chunk ${i + 1}/${chunks} (${chunk.size} bytes)...`, 'info');
+                    
+                    const formData = new FormData();
+                    formData.append('chunk', chunk);
+                    formData.append('sessionId', sessionId);
+                    formData.append('chunkId', `chunk-${i}`);
+                    formData.append('chunkIndex', i.toString());
+                    formData.append('chunkSize', chunk.size.toString());
+                    formData.append('checksum', 'test-checksum');
+
+                    const uploadResponse = await fetch(`${API_BASE}/api/gcs/upload-chunk`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!uploadResponse.ok) {
+                        const error = await uploadResponse.json();
+                        throw new Error(`Chunk ${i} upload failed: ${error.error || uploadResponse.statusText}`);
+                    }
+
+                    const result = await uploadResponse.json();
+                    log(`✅ Chunk ${i + 1}/${chunks} uploaded`, 'success');
+                    updateProgress((i + 1) / chunks * 80); // 80% for upload
+                }
+
+                // Step 3: Wait for assembly
+                log('Step 3: Waiting for file assembly...', 'info');
+                updateProgress(85);
+                
+                let assembled = false;
+                let attempts = 0;
+                const maxAttempts = 60; // 60 seconds
+
+                while (!assembled && attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    attempts++;
+
+                    const statusResponse = await fetch(`${API_BASE}/api/gcs/upload-status/${sessionId}`);
+                    if (!statusResponse.ok) {
+                        throw new Error('Failed to get upload status');
+                    }
+
+                    const status = await statusResponse.json();
+                    log(`Status: ${status.status} (${status.uploadedChunks}/${status.totalChunks} chunks)`, 'info');
+
+                    if (status.status === 'completed') {
+                        assembled = true;
+                        log(`✅ Upload completed! File URL: ${status.signedUrl}`, 'success');
+                        updateProgress(100);
+                        
+                        if (status.signedUrl) {
+                            log(`You can access the file at: ${status.signedUrl}`, 'success');
+                        }
+                    } else if (status.status === 'failed') {
+                        throw new Error(`Assembly failed: ${status.error}`);
+                    } else {
+                        updateProgress(85 + (attempts / maxAttempts) * 15);
+                    }
+                }
+
+                if (!assembled) {
+                    log('⚠️ Assembly timeout - file may still be processing', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                console.error('Upload error:', error);
+            }
+        }
+    </script>
+</body>
+</html>

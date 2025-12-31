@@ -29,6 +29,20 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 // Session storage now handled by Firestore via sessionStorage.js
 
 export default async function handler(req, res) {
+  // Set CORS headers
+  const origin = req.headers.origin || req.headers.referer;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Only allow GET requests
   if (req.method !== 'GET') {
     res.setHeader('Allow', ['GET']);
