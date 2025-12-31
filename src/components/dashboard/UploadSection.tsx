@@ -197,9 +197,9 @@ const UploadSection = () => {
             description: description?.trim() || '',
             clientName: clientName.trim(),
             userId: currentUser?.uid,
-            fileName: result.fileName,
+            fileName: result.fileName || file.name,
             publicUrl: result.signedUrl || '',
-            size: result.finalSize,
+            size: result.size || file.size,
             contentType: file.type,
             privacyStatus: 'private',
             securityCode: '',
@@ -212,22 +212,15 @@ const UploadSection = () => {
             publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
             viewCount: 0,
           });
+          
+          toast.success('Video uploaded and saved successfully!');
+          console.log('✅ Video saved to Firebase:', videoId);
         } catch (firebaseError: any) {
           console.error('Firebase save error:', firebaseError);
           toast.error('Video uploaded but failed to save to database');
         }
         
         setUploadSuccess(true);
-        
-        // Show compression info if applied
-        if (result.compressionApplied) {
-          const savedMB = ((result.originalSize - result.finalSize) / (1024 * 1024)).toFixed(1);
-          const savedPercent = Math.round((1 - result.compressionRatio) * 100);
-          toast.success(`Video uploaded and compressed! Saved ${savedMB}MB (${savedPercent}%)`);
-        } else {
-          toast.success('Video uploaded successfully!');
-        }
-        
         window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
       } else {
         toast.error(result.error || "Failed to upload video");
