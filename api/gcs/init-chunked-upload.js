@@ -44,37 +44,41 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 // Session storage now handled by Firestore via sessionStorage.js
 
 export default async function handler(req, res) {
+  console.log(`🚀 Init chunked upload handler called - Method: ${req.method}`);
+  
   // Only allow POST requests
   if (req.method !== 'POST') {
+    console.log(`❌ Method not allowed: ${req.method}`);
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
-    console.log('Init chunked upload - checking bucket availability');
+    console.log('🔍 Checking bucket availability...');
     
     if (!bucket) {
-      console.error('Bucket not available - GCS not initialized');
+      console.error('❌ Bucket not available - GCS not initialized');
       return res.status(503).json({ error: 'Storage unavailable' });
     }
+    console.log('✅ Bucket is available');
 
-    console.log('Parsing request body:', req.body);
+    console.log('📝 Request body:', req.body);
     const { fileName, totalSize, chunkSize, metadata } = req.body;
 
     // Validate required fields
     if (!fileName || !totalSize || !chunkSize) {
-      console.error('Missing required fields:', { fileName, totalSize, chunkSize });
+      console.error('❌ Missing required fields:', { fileName, totalSize, chunkSize });
       return res.status(400).json({ 
         error: 'Missing required fields: fileName, totalSize, chunkSize' 
       });
     }
 
-    console.log('Generating session ID');
+    console.log('🆔 Generating session ID...');
     // Generate unique session ID
     const sessionId = uuidv4();
     const totalChunks = Math.ceil(totalSize / chunkSize);
 
-    console.log('Creating session data for:', sessionId);
+    console.log(`📦 Creating session data for: ${sessionId}`);
     // Create upload session
     const sessionData = {
       sessionId,
@@ -89,15 +93,15 @@ export default async function handler(req, res) {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     };
 
-    console.log('Saving session to storage');
+    console.log('💾 Saving session to storage...');
     // Store session using file-based storage
     const saved = await saveSession(sessionId, sessionData);
     if (!saved) {
-      console.error('Failed to save session');
+      console.error('❌ Failed to save session');
       return res.status(500).json({ error: 'Failed to create upload session' });
     }
 
-    console.log('Session created successfully:', sessionId);
+    console.log(`✅ Session created successfully: ${sessionId}`);
     res.status(200).json({
       sessionId,
       uploadUrl: '/api/gcs/upload-chunk',
@@ -106,7 +110,7 @@ export default async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('Error initializing chunked upload:', error);
+    console.error('❌ Error initializing chunked upload:', error);
     res.status(500).json({ 
       error: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined

@@ -47,44 +47,70 @@ export const config = {
 global.uploadSessions = global.uploadSessions || new Map();
 
 export default async function handler(req, res) {
+  console.log(`🚀 Upload chunk handler called - Method: ${req.method}, URL: ${req.url}`);
+  
   // Only allow POST requests
   if (req.method !== 'POST') {
+    console.log(`❌ Method not allowed: ${req.method}`);
     res.setHeader('Allow', ['POST']);
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
   try {
+    console.log('🔍 Checking bucket availability...');
     if (!bucket) {
+      console.error('❌ Bucket not available - GCS not initialized');
       return res.status(503).json({ error: 'Storage unavailable' });
     }
+    console.log('✅ Bucket is available');
 
     // Handle multipart form data
     upload.single('chunk')(req, res, async (err) => {
       if (err) {
-        console.error('Multer error:', err);
+        console.error('❌ Multer error:', err);
         return res.status(400).json({ error: err.message });
       }
+
+      console.log('📝 Request body:', {
+        sessionId: req.body?.sessionId,
+        chunkId: req.body?.chunkId,
+        chunkIndex: req.body?.chunkIndex,
+        chunkSize: req.body?.chunkSize,
+        hasFile: !!req.file
+      });
 
       const { sessionId, chunkId, chunkIndex, chunkSize, checksum } = req.body;
       const chunkData = req.file?.buffer;
 
       // Validate required fields
       if (!sessionId || !chunkId || chunkIndex === undefined || !chunkData) {
+        console.error('❌ Missing required fields:', {
+          sessionId: !!sessionId,
+          chunkId: !!chunkId,
+          chunkIndex: chunkIndex !== undefined,
+          chunkData: !!chunkData
+        });
         return res.status(400).json({ 
           error: 'Missing required fields: sessionId, chunkId, chunkIndex, chunk data' 
         });
       }
 
+      console.log(`🔍 Looking for session: ${sessionId}`);
       // Get upload session from file storage
       const session = await getSession(sessionId);
       if (!session) {
+        console.error(`❌ Upload session not found: ${sessionId}`);
         return res.status(404).json({ error: 'Upload session not found' });
       }
+      console.log(`✅ Session found: ${sessionId}`);
 
       // Validate chunk size
       if (chunkData.length !== parseInt(chunkSize)) {
+        console.error(`❌ Chunk size mismatch: expected ${chunkSize}, got ${chunkData.length}`);
         return res.status(400).json({ error: 'Chunk size mismatch' });
       }
+
+      console.log(`📦 Processing chunk ${chunkIndex} for session ${sessionId}`);
 
       // Store chunk data in session
       const chunkInfo = {
@@ -109,13 +135,21 @@ export default async function handler(req, res) {
       }
 
       const isComplete = session.uploadedChunks.length === session.totalChunks;
+      console.log(`📊 Upload progress: ${session.uploadedChunks.length}/${session.totalChunks} chunks`);
 
       // Update session in storage
-      await updateSession(sessionId, {
+      const updateResult = await updateSession(sessionId, {
         chunks: session.chunks,
         uploadedChunks: session.uploadedChunks,
         status: isComplete ? 'chunks_complete' : 'uploading'
       });
+
+      if (!updateResult) {
+        console.error('❌ Failed to update session');
+        return res.status(500).json({ error: 'Failed to update session' });
+      }
+
+      console.log(`✅ Chunk ${chunkIndex} uploaded successfully. Complete: ${isComplete}`);
 
       res.status(200).json({
         success: true,
@@ -127,12 +161,13 @@ export default async function handler(req, res) {
 
       // If all chunks uploaded, trigger assembly
       if (isComplete) {
+        console.log('🔧 All chunks uploaded, triggering assembly...');
         setImmediate(() => assembleFile(sessionId));
       }
     });
 
   } catch (error) {
-    console.error('Error uploading chunk:', error);
+    console.error('❌ Error uploading chunk:', error);
     res.status(500).json({ error: error.message });
   }
 }
