@@ -9,39 +9,23 @@
       }
     },
     {
-      "src": "api/razorpay/create-order.js",
+      "src": "api/subscription.js",
       "use": "@vercel/node"
     },
     {
-      "src": "api/razorpay/verify-payment.js",
+      "src": "api/clients.js",
       "use": "@vercel/node"
     },
     {
-      "src": "api/signed-url.js",
+      "src": "api/upload.js",
       "use": "@vercel/node"
     },
     {
-      "src": "api/gcs/delete.js",
+      "src": "api/storage.js",
       "use": "@vercel/node"
     },
     {
-      "src": "api/gcs/metadata.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/upload.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/simple-upload.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/upload-handler.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/configure-lifecycle.js",
+      "src": "api/payment.js",
       "use": "@vercel/node"
     },
     {
@@ -54,52 +38,24 @@
       "handle": "filesystem"
     },
     {
-      "src": "/api/razorpay/create-order",
-      "dest": "/api/razorpay/create-order.js"
+      "src": "/api/subscription/(.*)",
+      "dest": "/api/subscription.js"
     },
     {
-      "src": "/api/razorpay/verify-payment",
-      "dest": "/api/razorpay/verify-payment.js"
+      "src": "/api/clients/(.*)",
+      "dest": "/api/clients.js"
     },
     {
-      "src": "/api/signed-url",
-      "dest": "/api/signed-url.js"
+      "src": "/api/upload/(.*)",
+      "dest": "/api/upload.js"
     },
     {
-      "src": "/api/gcs/delete",
-      "dest": "/api/gcs/delete.js"
+      "src": "/api/storage/(.*)",
+      "dest": "/api/storage.js"
     },
     {
-      "src": "/api/gcs/metadata",
-      "dest": "/api/gcs/metadata.js"
-    },
-    {
-      "src": "/api/gcs/upload",
-      "dest": "/api/gcs/upload.js"
-    },
-    {
-      "src": "/api/gcs/simple-upload",
-      "dest": "/api/gcs/simple-upload.js"
-    },
-    {
-      "src": "/api/gcs/resumable-upload-url",
-      "dest": "/api/gcs/upload-handler.js?action=resumable-upload-url"
-    },
-    {
-      "src": "/api/gcs/finalize-upload",
-      "dest": "/api/gcs/upload-handler.js?action=finalize-upload"
-    },
-    {
-      "src": "/api/gcs/upload-status/(.*)",
-      "dest": "/api/gcs/upload-handler.js?action=upload-status&sessionId=$1"
-    },
-    {
-      "src": "/api/gcs/verify-chunks/(.*)",
-      "dest": "/api/gcs/upload-handler.js?action=verify-chunks&sessionId=$1"
-    },
-    {
-      "src": "/api/gcs/configure-lifecycle",
-      "dest": "/api/gcs/configure-lifecycle.js"
+      "src": "/api/payment/(.*)",
+      "dest": "/api/payment.js"
     },
     {
       "src": "/api/test",

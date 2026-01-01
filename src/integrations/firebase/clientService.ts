@@ -14,6 +14,7 @@ import {
   addDoc
 } from 'firebase/firestore';
 import { db } from './config';
+import { auth } from './config';
 
 export const CLIENTS_COLLECTION = 'clients';
 
@@ -31,18 +32,25 @@ export interface ClientRecord {
   updatedAt?: Date;
 }
 
-// Create a new client
+// Create a new client (frontend only - validation should be done separately)
 export const createClient = async (clientData: Omit<ClientRecord, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> => {
   try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Create directly in Firestore (validation should be done before calling this function)
     const docRef = await addDoc(collection(db, CLIENTS_COLLECTION), {
       ...clientData,
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
+    
     return docRef.id;
   } catch (error) {
     console.error('Error creating client:', error);
-    throw new Error('Failed to create client');
+    throw new Error(error instanceof Error ? error.message : 'Failed to create client');
   }
 };
 

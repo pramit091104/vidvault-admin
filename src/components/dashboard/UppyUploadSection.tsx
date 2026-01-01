@@ -4,16 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Upload, Loader2, CheckCircle2, Pause, Play, X, Zap, Cloud } from "lucide-react";
+import { Upload, CheckCircle2, Pause, Play, X, Zap, Cloud, Crown, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { useUppyUpload } from "@/hooks/useUppyUpload";
 import { saveGCSVideo } from "@/integrations/firebase/videoService";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/integrations/firebase/config";
+import { useAuth } from "@/contexts/AuthContext";
 import { v4 as uuidv4 } from 'uuid';
+import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
 
 interface UppyUploadSectionProps {
   preSelectedFile?: File | null;
@@ -24,8 +24,9 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
-  const [currentUser, setCurrentUser] = useState<any>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  
+  const { currentUser, subscription, incrementVideoUpload, canUploadVideo } = useAuth();
 
   const {
     isUploading,
@@ -43,14 +44,6 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
     isPaused
   } = useUppyUpload();
 
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Handle pre-selected file
   useEffect(() => {
     if (preSelectedFile) {
       setFile(preSelectedFile);
@@ -91,10 +84,10 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
         return;
       }
       
-      // Validate file size (2GB limit)
-      const maxSize = 2 * 1024 * 1024 * 1024;
+      // Basic size check for UI feedback (backend will do the real validation)
+      const maxSize = subscription.maxFileSize * 1024 * 1024; // Convert MB to bytes
       if (selectedFile.size > maxSize) {
-        toast.error("File size exceeds the 2GB upload limit.");
+        toast.error(`File size exceeds the ${subscription.maxFileSize}MB limit for ${subscription.tier} users. ${subscription.tier === 'free' ? 'Upgrade to Premium for larger file uploads.' : 'Please compress your video first.'}`);
         return;
       }
       
@@ -126,6 +119,7 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
       return;
     }
 
+    // Backend will handle all validation including upload limits
     try {
       await startUpload({
         file,
@@ -145,6 +139,12 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
     if (!uploadResult || !currentUser) return;
 
     try {
+      // Backend already incremented upload count, just update local state
+      setSubscription(prev => ({
+        ...prev,
+        videoUploadsUsed: prev.videoUploadsUsed + 1
+      }));
+
       // Save metadata to Firestore
       const videoId = uuidv4();
       const securityCode = Math.random().toString(36).substring(2, 8).toUpperCase();
@@ -228,13 +228,55 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
               Upload Video (Uppy - Resumable)
             </CardTitle>
             <CardDescription>
-              Upload large videos (up to 2GB) with resumable upload support
+              Upload videos (up to {subscription.maxFileSize}MB for {subscription.tier} users) with resumable upload support
             </CardDescription>
           </div>
-          <Badge variant="outline" className="flex items-center gap-1">
-            <Zap className="h-3 w-3" />
-            Resumable
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="flex items-center gap-1">
+              <Zap className="h-3 w-3" />
+              Resumable
+            </Badge>
+            <Badge 
+              variant={subscription.tier === 'premium' ? 'default' : 'secondary'} 
+              className={`flex items-center gap-1 ${subscription.tier === 'premium' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
+            >
+              {subscription.tier === 'premium' && <Crown className="h-3 w-3" />}
+              {subscription.tier.toUpperCase()}
+            </Badge>
+          </div>
+        </div>
+        
+        {/* Subscription Status */}
+        <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium">Upload Usage</span>
+            {subscription.tier === 'free' && (
+              <PremiumPaymentModal>
+                <Button 
+                  size="sm" 
+                  className="bg-purple-500 hover:bg-purple-600 text-white"
+                >
+                  <Crown className="h-3 w-3 mr-1" />
+                  Upgrade
+                </Button>
+              </PremiumPaymentModal>
+            )}
+          </div>
+          <div className="flex items-center gap-2 mb-2">
+            <Progress 
+              value={(subscription.videoUploadsUsed / subscription.maxVideoUploads) * 100} 
+              className="flex-1 h-2" 
+            />
+            <span className="text-sm text-muted-foreground">
+              {subscription.videoUploadsUsed}/{subscription.maxVideoUploads}
+            </span>
+          </div>
+          {subscription.videoUploadsUsed >= subscription.maxVideoUploads && (
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm">Upload limit reached. {subscription.tier === 'free' ? 'Upgrade to continue uploading.' : 'Limit resets monthly.'}</span>
+            </div>
+          )}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">

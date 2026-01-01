@@ -1,5 +1,5 @@
-import { ReactNode, useState, useEffect } from "react";
-import { Upload, Film, MessageSquare, Settings, LogOut, Users, Menu, X, BarChart3, Zap } from "lucide-react";
+import { ReactNode, useState } from "react";
+import { Upload, Film, Settings, LogOut, Users, Menu, X, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";

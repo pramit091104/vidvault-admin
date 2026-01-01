@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { toast } from "sonner";
 
 const Auth = () => {
   const [isLoading, setIsLoading] = useState(false);
@@ -25,13 +26,23 @@ const Auth = () => {
 
   const handleGoogleSignIn = async () => {
     setIsLoading(true);
+    setError("");
+    
     try {
+      // Use redirect method (no immediate navigation as it redirects the page)
       await signInWithGoogle();
-      navigate("/dashboard");
-    } catch (error) {
-      // Error is handled in the context
-    } finally {
-      setIsLoading(false);
+      // The page will redirect to Google, so no need to navigate here
+    } catch (error: any) {
+      console.error("Google sign-in error:", error);
+      
+      if (error.code === 'auth/network-request-failed') {
+        setError("Network error. Please check your internet connection.");
+      } else if (error.code === 'auth/internal-error') {
+        setError("Authentication service error. Please try again later.");
+      } else {
+        setError(error.message || "Failed to sign in with Google. Please try again.");
+      }
+      setIsLoading(false); // Only reset loading on error, as success will redirect
     }
   };
 
@@ -129,8 +140,9 @@ const Auth = () => {
             </div>
 
             {error && (
-              <div className="p-3 text-sm text-red-500 bg-red-50 border border-red-200 rounded-md">
-                {error}
+              <div className="p-3 text-sm text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                <span>{error}</span>
               </div>
             )}
 
@@ -169,8 +181,14 @@ const Auth = () => {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
               </svg>
             )}
-            Google
+            Continue with Google
           </Button>
+
+          {isLoading && (
+            <div className="text-xs text-muted-foreground text-center">
+              Redirecting to Google sign-in...
+            </div>
+          )}
 
           <div className="text-center text-sm text-muted-foreground pt-4">
             {isLogin ? "Don't have an account? " : "Already have an account? "}

@@ -1,6 +1,7 @@
 import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
+import { validateFileUpload, incrementVideoUploadCount, getUserIdFromToken } from '../lib/subscriptionValidator.js';
 
 // Initialize Google Cloud Storage
 let bucket = null;
@@ -28,11 +29,11 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   }
 }
 
-// Multer for handling file uploads (50MB limit)
+// Multer for handling file uploads (dynamic limit based on subscription)
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 50 * 1024 * 1024, // 50MB limit
+    fileSize: 500 * 1024 * 1024, // 500MB max (will be validated per user)
   }
 });
 
@@ -73,7 +74,7 @@ export default async function handler(req, res) {
       if (err) {
         console.error('❌ Multer error:', err);
         if (err.code === 'LIMIT_FILE_SIZE') {
-          return res.status(400).json({ error: 'File too large. Maximum size is 50MB.' });
+          return res.status(400).json({ error: 'File too large. Maximum size is 500MB.' });
         }
         return res.status(400).json({ error: err.message });
       }
@@ -88,7 +89,25 @@ export default async function handler(req, res) {
         });
       }
 
-      console.log(`📤 Uploading file: ${fileName} (${fileData.length} bytes)`);
+      // Get user ID from Authorization header
+      const userId = await getUserIdFromToken(req.headers.authorization);
+      if (!userId) {
+        return res.status(401).json({ 
+          error: 'Authentication required. Please sign in to upload files.',
+          code: 'AUTH_REQUIRED'
+        });
+      }
+
+      // Validate upload permissions and limits
+      const validation = await validateFileUpload(userId, fileData.length);
+      if (!validation.allowed) {
+        return res.status(403).json({ 
+          error: validation.error,
+          code: validation.code
+        });
+      }
+
+      console.log(`📤 Uploading file: ${fileName} (${fileData.length} bytes) for user: ${userId}`);
 
       // Generate unique file path
       const uploadId = uuidv4();
@@ -99,11 +118,25 @@ export default async function handler(req, res) {
       await file.save(fileData, {
         metadata: {
           contentType: req.file?.mimetype || metadata.contentType || 'application/octet-stream',
-          metadata: metadata
+          metadata: {
+            ...metadata,
+            userId,
+            uploadId,
+            uploadedAt: new Date().toISOString()
+          }
         }
       });
 
       console.log(`✅ File uploaded to: ${filePath}`);
+
+      // Increment user's upload count
+      try {
+        await incrementVideoUploadCount(userId);
+        console.log(`📊 Incremented upload count for user: ${userId}`);
+      } catch (error) {
+        console.error('❌ Failed to increment upload count:', error);
+        // Don't fail the upload, but log the error
+      }
 
       // Generate signed URL (valid for 7 days)
       const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
@@ -122,7 +155,12 @@ export default async function handler(req, res) {
         gcsPath: filePath,
         signedUrl,
         size: fileData.length,
-        uploadedAt: new Date().toISOString()
+        uploadedAt: new Date().toISOString(),
+        subscription: {
+          tier: validation.subscription.tier,
+          uploadsUsed: validation.subscription.videoUploadsUsed + 1,
+          maxUploads: validation.subscription.maxVideoUploads
+        }
       });
 
     });

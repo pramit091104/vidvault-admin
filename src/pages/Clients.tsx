@@ -14,15 +14,14 @@ import {
   Search, 
   Plus, 
   Filter, 
-  MoreHorizontal,
   Edit,
   Trash2,
   Share2,
-  Download,
-  Eye,
   Save,
   X,
-  Check
+  Crown,
+  AlertCircle,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -33,17 +32,20 @@ import {
   ClientRecord 
 } from "@/integrations/firebase/clientService";
 import { useAuth } from "@/contexts/AuthContext";
-import { PaymentModal } from "@/components/payment/PaymentModal";
-import { PaymentSummary } from "@/components/payment/PaymentSummary";
+import { validateClientCreation } from "@/services/backendApiService";
+import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
+import { Progress } from "@/components/ui/progress";
 
 interface Client extends ClientRecord {
   isEditing?: boolean;
 }
 
 const Clients = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, subscription, setSubscription } = useAuth();
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isCreatingClient, setIsCreatingClient] = useState(false);
+  const [lastClickTime, setLastClickTime] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [editingClient, setEditingClient] = useState<Client | null>(null);
@@ -88,7 +90,6 @@ const Clients = () => {
     if (!client || !editingClient) return;
 
     try {
-      setLoading(true);
       await updateClient(clientId, editingClient);
       
       // Update local state
@@ -103,8 +104,6 @@ const Clients = () => {
     } catch (error) {
       console.error('Error updating client:', error);
       toast.error('Failed to update client');
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -120,20 +119,27 @@ const Clients = () => {
   const handleDeleteClient = async (clientId: string, clientName: string) => {
     if (window.confirm(`Are you sure you want to delete ${clientName}?`)) {
       try {
-        setLoading(true);
         await deleteClient(clientId);
         setClients(prev => prev.filter(client => client.id !== clientId));
         toast.success(`${clientName} deleted successfully`);
       } catch (error) {
         console.error('Error deleting client:', error);
         toast.error('Failed to delete client');
-      } finally {
-        setLoading(false);
       }
     }
   };
 
   const handleAddNewClient = async () => {
+    const now = Date.now();
+    
+    // Prevent multiple rapid clicks (debounce with 1 second)
+    if (isCreatingClient || (now - lastClickTime < 1000)) {
+      return;
+    }
+
+    setLastClickTime(now);
+    setIsCreatingClient(true);
+
     const newClientData = {
       clientName: 'New Client',
       work: 'New Project',
@@ -146,17 +152,56 @@ const Clients = () => {
     };
 
     try {
-      setLoading(true);
+      // First validate and increment count via backend API
+      const user = currentUser;
+      if (!user) {
+        throw new Error('User not authenticated');
+      }
+
+      const token = await user.getIdToken();
+      
+      const response = await fetch('/api/clients/create', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          clientName: newClientData.clientName,
+          work: newClientData.work,
+          status: newClientData.status,
+          duration: newClientData.duration
+        })
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: 'Failed to create client' }));
+        throw new Error(error.error || `HTTP ${response.status}`);
+      }
+
+      const backendResult = await response.json();
+
+      // If backend validation and count increment succeed, create in Firestore
       const newClientId = await createClient(newClientData);
       const newClient = { ...newClientData, id: newClientId, isEditing: true };
       setClients(prev => [newClient, ...prev]);
       setEditingClient(newClient);
+      
+      // Update local subscription state with backend result
+      if (backendResult.subscription) {
+        setSubscription(prev => ({
+          ...prev,
+          clientsUsed: backendResult.subscription.clientsUsed
+        }));
+      }
+      
       toast.success('New client added');
     } catch (error) {
       console.error('Error adding client:', error);
-      toast.error('Failed to add client');
+      toast.error(error instanceof Error ? error.message : 'Failed to add client');
     } finally {
-      setLoading(false);
+      setIsCreatingClient(false);
     }
   };
 
@@ -165,13 +210,13 @@ const Clients = () => {
       name: client.clientName,
       work: client.work,
       status: client.status,
-      amount: client.finalPayment
+      duration: client.duration
     };
     
     if (navigator.share) {
       navigator.share({
         title: `Client: ${client.clientName}`,
-        text: `Work: ${client.work}, Status: ${client.status}, Amount: ₹${client.finalPayment.toLocaleString('en-IN')}`,
+        text: `Work: ${client.work}, Status: ${client.status}, Duration: ${client.duration}`,
       });
     } else {
       navigator.clipboard.writeText(JSON.stringify(shareData, null, 2));
@@ -183,10 +228,8 @@ const Clients = () => {
     const allClientsData = {
       totalClients: clients.length,
       completedClients: clients.filter(c => c.status === 'Done').length,
-      totalRevenue: clients.reduce((sum, client) => sum + client.finalPayment, 0),
-      paidAmount: clients.reduce((sum, client) => sum + client.paidPayment, 0),
-      clients: clients.map(({ id, clientName, work, status, finalPayment }) => ({
-        id, clientName, work, status, finalPayment
+      clients: clients.map(({ id, clientName, work, status, duration }) => ({
+        id, clientName, work, status, duration
       }))
     };
     
@@ -197,45 +240,8 @@ const Clients = () => {
   const handleCellEdit = (field: string, value: string | number) => {
     setEditingClient(prev => {
       if (!prev) return null;
-      
-      // Convert string values to numbers for payment fields
-      if (field === 'prePayment' || field === 'paidPayment' || field === 'finalPayment') {
-        const numValue = typeof value === 'string' ? parseFloat(value) || 0 : value;
-        return { ...prev, [field]: numValue };
-      }
-      
       return { ...prev, [field]: value };
     });
-  };
-
-  const handlePaymentComplete = async (clientId: string, paymentType: 'pre' | 'post' | 'final', amount: number) => {
-    try {
-      const client = clients.find(c => c.id === clientId);
-      if (!client) return;
-
-      const updatedClient = { ...client };
-      
-      // Update the appropriate payment field
-      if (paymentType === 'pre') {
-        updatedClient.prePayment = amount;
-      } else if (paymentType === 'post') {
-        updatedClient.paidPayment = amount;
-      } else if (paymentType === 'final') {
-        updatedClient.finalPayment = amount;
-      }
-
-      await updateClient(clientId, updatedClient);
-      
-      // Update local state
-      setClients(prev => prev.map(c => 
-        c.id === clientId ? updatedClient : c
-      ));
-      
-      toast.success(`${paymentType.charAt(0).toUpperCase() + paymentType.slice(1)} payment processed successfully`);
-    } catch (error) {
-      console.error('Error updating payment:', error);
-      toast.error('Failed to update payment record');
-    }
   };
 
   const filteredClients = clients.filter(client => {
@@ -245,9 +251,6 @@ const Clients = () => {
     return matchesSearch && matchesStatus;
   });
 
-  const totalPrePayment = clients.reduce((sum, client) => sum + client.prePayment, 0);
-  const totalPaidPayment = clients.reduce((sum, client) => sum + client.paidPayment, 0);
-  const totalFinalPayment = clients.reduce((sum, client) => sum + client.finalPayment, 0);
   const completedClients = clients.filter(client => client.status === "Done").length;
 
   if (loading && clients.length === 0) {
@@ -265,19 +268,84 @@ const Clients = () => {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <h2 className="text-lg font-semibold text-white">Personal Client Management</h2>
           
-          <Button
-            onClick={handleAddNewClient}
-            size="sm"
-            className="bg-gray-700 hover:bg-gray-600 text-white font-medium shadow-lg transition-all duration-300"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            New
-          </Button>
+          <div className="flex items-center gap-3">
+            {subscription.tier === 'free' && clients.length >= subscription.maxClients && (
+              <PremiumPaymentModal>
+                <Button
+                  size="sm"
+                  className="bg-purple-500 hover:bg-purple-600 text-white font-medium shadow-lg transition-all duration-300"
+                >
+                  <Crown className="h-4 w-4 mr-2" />
+                  Upgrade
+                </Button>
+              </PremiumPaymentModal>
+            )}
+            
+            <Button
+              onClick={handleAddNewClient}
+              size="sm"
+              disabled={clients.length >= subscription.maxClients || isCreatingClient}
+              className="bg-gray-700 hover:bg-gray-600 text-white font-medium shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isCreatingClient ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {clients.length >= subscription.maxClients ? 'Limit Reached' : 'New'}
+                </>
+              )}
+            </Button>
+          </div>
         </div>
       </nav>
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Client Usage Status */}
+        <div className="mb-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-white">Client Usage</span>
+            <div className="flex items-center gap-2">
+              <Badge 
+                variant={subscription.tier === 'premium' ? 'default' : 'secondary'} 
+                className={`${subscription.tier === 'premium' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
+              >
+                {subscription.tier === 'premium' && <Crown className="h-3 w-3 mr-1" />}
+                {subscription.tier.toUpperCase()}
+              </Badge>
+              {subscription.tier === 'free' && (
+                <PremiumPaymentModal>
+                  <Button 
+                    size="sm" 
+                    className="bg-purple-500 hover:bg-purple-600 text-white"
+                  >
+                    <Crown className="h-3 w-3 mr-1" />
+                    Upgrade
+                  </Button>
+                </PremiumPaymentModal>
+              )}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 mb-2">
+            <Progress 
+              value={(clients.length / subscription.maxClients) * 100} 
+              className="flex-1 h-2" 
+            />
+            <span className="text-sm text-muted-foreground">
+              {clients.length}/{subscription.maxClients}
+            </span>
+          </div>
+          {clients.length >= subscription.maxClients && (
+            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+              <AlertCircle className="h-4 w-4" />
+              <span className="text-sm">Client limit reached. {subscription.tier === 'free' ? 'Upgrade to add more clients.' : 'Limit resets monthly.'}</span>
+            </div>
+          )}
+        </div>
         {/* Search and Filter Bar */}
         <div className="bg-[#14181f] rounded-xl border border-slate-700 p-4 mb-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -316,9 +384,6 @@ const Clients = () => {
                 <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Client Name</TableHead>
                 <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Work</TableHead>
                 <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Status</TableHead>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700 text-right"># pre pay</TableHead>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700 text-right">Post pay</TableHead>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700 text-right"># Final payment</TableHead>
                 <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Duration</TableHead>
                 <TableHead className="text-gray-300 font-semibold border-b border-slate-700 text-center">Actions</TableHead>
               </TableRow>
@@ -364,42 +429,6 @@ const Clients = () => {
                       <Badge className={`${getStatusColor(client.status)} font-medium`}>
                         {client.status}
                       </Badge>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {client.isEditing ? (
-                      <Input
-                        type="number"
-                        value={editingClient?.prePayment || 0}
-                        onChange={(e) => handleCellEdit('prePayment', e.target.value)}
-                        className="bg-slate-900/50 border-slate-600 text-white h-8 w-24 text-right"
-                      />
-                    ) : (
-                      <span className="text-gray-300 font-mono">₹{client.prePayment.toLocaleString('en-IN')}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {client.isEditing ? (
-                      <Input
-                        type="number"
-                        value={editingClient?.paidPayment || 0}
-                        onChange={(e) => handleCellEdit('paidPayment', e.target.value)}
-                        className="bg-slate-900/50 border-slate-600 text-white h-8 w-24 text-right"
-                      />
-                    ) : (
-                      <span className="text-gray-300 font-mono">₹{client.paidPayment.toLocaleString('en-IN')}</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {client.isEditing ? (
-                      <Input
-                        type="number"
-                        value={editingClient?.finalPayment || 0}
-                        onChange={(e) => handleCellEdit('finalPayment', e.target.value)}
-                        className="bg-slate-900/50 border-slate-600 text-white h-8 w-24 text-right"
-                      />
-                    ) : (
-                      <span className="text-gray-300 font-mono">₹{client.finalPayment.toLocaleString('en-IN')}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -465,20 +494,6 @@ const Clients = () => {
                           >
                             <Share2 className="h-4 w-4" />
                           </Button>
-                          {client.id && (
-                            <PaymentModal
-                              client={{
-                                id: client.id,
-                                clientName: client.clientName,
-                                prePayment: client.prePayment,
-                                paidPayment: client.paidPayment,
-                                finalPayment: client.finalPayment
-                              }}
-                              onPaymentComplete={(paymentType, amount) => 
-                                handlePaymentComplete(client.id!, paymentType, amount)
-                              }
-                            />
-                          )}
                         </>
                       )}
                     </div>
@@ -493,12 +508,12 @@ const Clients = () => {
         <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700 p-6">
           <div className="grid grid-cols-2 gap-6">
             <div className="text-center">
-              <p className="text-gray-400 text-sm mb-1">COUNT</p>
+              <p className="text-gray-400 text-sm mb-1">TOTAL CLIENTS</p>
               <p className="text-2xl font-bold text-white">{clients.length}</p>
             </div>
             <div className="text-center">
-              <p className="text-gray-400 text-sm mb-1">SUM</p>
-              <p className="text-2xl font-bold text-white">₹{totalFinalPayment.toLocaleString('en-IN')}</p>
+              <p className="text-gray-400 text-sm mb-1">COMPLETED</p>
+              <p className="text-2xl font-bold text-white">{completedClients}</p>
             </div>
           </div>
         </div>

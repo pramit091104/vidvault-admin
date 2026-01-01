@@ -1,6 +1,7 @@
 {
   "scripts": {
-    "server": "node server.js",
+    "server": "node scripts/start-server.js",
+    "server:direct": "node --disable-warning=DEP0169 server.js",
     "dev": "vite",
     "dev:all": "concurrently \"npm run server\" \"npm run dev\"",
     "build": "vite build",
@@ -9,8 +10,9 @@
     "preview": "vite preview",
     "test": "jest",
     "test:watch": "jest --watch",
-    "check-env": "node check-env.js",
-    "setup:gcs-lifecycle": "node scripts/setup-gcs-lifecycle.js"
+    "check-env": "node --disable-warning=DEP0169 check-env.js",
+    "setup:gcs-lifecycle": "node --disable-warning=DEP0169 scripts/setup-gcs-lifecycle.js",
+    "debug:deprecation": "node scripts/debug-deprecation.js"
   },
   "name": "vite_react_shadcn_ts",
   "private": true,
@@ -48,7 +50,7 @@
     "cors": "^2.8.5",
     "date-fns": "^3.6.0",
     "dotenv": "^17.2.3",
-    "express": "^5.2.1",
+    "express": "^4.21.2",
     "firebase": "^10.13.2",
     "firebase-admin": "^13.6.0",
     "fluent-ffmpeg": "^2.1.3",

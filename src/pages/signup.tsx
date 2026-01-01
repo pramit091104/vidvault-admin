@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import Head from 'next/head';
-import Link from 'next/link';
+import { Link } from 'react-router-dom';
 import { EmailSignUp } from '@/components/auth/EmailSignUp';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -14,28 +13,22 @@ const SignUpPage = () => {
     try {
       setIsLoading(true);
       await signInWithGoogle();
+      // Page will redirect to Google, so no need to handle success here
     } catch (error) {
       console.error('Google sign in error:', error);
-    } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Only reset on error, success will redirect
     }
   };
 
   return (
-    <>
-      <Head>
-        <title>Create Account - VidVault Admin</title>
-        <meta name="description" content="Create a new VidVault Admin account" />
-      </Head>
-
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md space-y-8">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-gray-900">Create an account</h1>
-            <p className="mt-2 text-sm text-gray-600">
-              Start managing your video content with VidVault Admin
-            </p>
-          </div>
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md space-y-8">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900">Create an account</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            Start managing your video content with VidVault Admin
+          </p>
+        </div>
 
           <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
             <EmailSignUp />
@@ -51,7 +44,7 @@ const SignUpPage = () => {
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing up...
+                    Redirecting to Google...
                   </>
                 ) : (
                   <>
@@ -92,7 +85,7 @@ const SignUpPage = () => {
               <p className="text-gray-600">
                 Already have an account?{' '}
                 <Link
-                  href="/login"
+                  to="/login"
                   className="font-medium text-indigo-600 hover:text-indigo-500"
                 >
                   Sign in
@@ -102,7 +95,7 @@ const SignUpPage = () => {
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 };
 
