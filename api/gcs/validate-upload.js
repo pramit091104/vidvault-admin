@@ -1,4 +1,8 @@
 import { validateFileUpload, getUserIdFromToken } from '../lib/subscriptionValidator.js';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 export default async function handler(req, res) {
   // Set CORS headers

@@ -1,6 +1,7 @@
 import { Storage } from '@google-cloud/storage';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import { getUserSubscription, getUserIdFromToken } from '../lib/subscriptionValidator.js';
 import dotenv from 'dotenv';
 
 // Load environment variables
@@ -90,6 +91,17 @@ export default async function handler(req, res) {
     const userId = decodedToken.uid;
     const userEmail = decodedToken.email;
 
+    // Get user subscription to check file size limits
+    let userSubscription;
+    try {
+      userSubscription = await getUserSubscription(userId);
+    } catch (error) {
+      console.error('❌ Error getting user subscription:', error);
+      return res.status(500).json({ 
+        error: 'Failed to validate subscription status' 
+      });
+    }
+
     // Extract request data
     const { 
       fileName, 
@@ -122,11 +134,40 @@ export default async function handler(req, res) {
       });
     }
 
-    // Enforce file size limit (2GB)
-    const MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
-    if (fileSize > MAX_FILE_SIZE) {
-      return res.status(400).json({ 
-        error: 'File size exceeds 2GB limit' 
+    // Enforce subscription-based file size limits
+    const maxFileSizeBytes = userSubscription.maxFileSize * 1024 * 1024; // Convert MB to bytes
+    
+    if (fileSize > maxFileSizeBytes) {
+      const maxFileSizeMB = userSubscription.maxFileSize;
+      const fileSizeMB = Math.round(fileSize / (1024 * 1024));
+      
+      if (userSubscription.tier === 'free') {
+        return res.status(413).json({ 
+          error: `File size (${fileSizeMB}MB) exceeds the ${maxFileSizeMB}MB limit for free users. Upgrade to Premium for larger file uploads.`,
+          code: 'FILE_SIZE_EXCEEDED',
+          maxFileSize: maxFileSizeMB,
+          currentFileSize: fileSizeMB,
+          tier: userSubscription.tier,
+          upgradeRequired: true
+        });
+      } else {
+        return res.status(413).json({ 
+          error: `File size (${fileSizeMB}MB) exceeds the ${maxFileSizeMB}MB limit for ${userSubscription.tier} users. Please compress your video first.`,
+          code: 'FILE_SIZE_EXCEEDED',
+          maxFileSize: maxFileSizeMB,
+          currentFileSize: fileSizeMB,
+          tier: userSubscription.tier,
+          upgradeRequired: false
+        });
+      }
+    }
+
+    // Additional absolute maximum file size check (2GB for all users)
+    const ABSOLUTE_MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
+    if (fileSize > ABSOLUTE_MAX_FILE_SIZE) {
+      return res.status(413).json({ 
+        error: 'File size exceeds the absolute maximum limit of 2GB',
+        code: 'FILE_TOO_LARGE'
       });
     }
 

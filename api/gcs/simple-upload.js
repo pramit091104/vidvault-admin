@@ -2,6 +2,10 @@ import { Storage } from '@google-cloud/storage';
 import multer from 'multer';
 import { v4 as uuidv4 } from 'uuid';
 import { validateFileUpload, incrementVideoUploadCount, getUserIdFromToken } from '../lib/subscriptionValidator.js';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Initialize Google Cloud Storage
 let bucket = null;
