@@ -634,6 +634,7 @@ import clientsValidateHandler from './api/clients/validate.js';
 import clientsCreateHandler from './api/clients/create.js';
 import gcsValidateUploadHandler from './api/gcs/validate-upload.js';
 import gcsSimpleUploadHandler from './api/gcs/simple-upload.js';
+import gcsResumableUploadUrlHandler from './api/gcs/resumable-upload-url.js';
 
 // Add the new API routes
 app.get('/api/subscription/status', subscriptionStatusHandler);
@@ -641,6 +642,7 @@ app.get('/api/clients/validate', clientsValidateHandler);
 app.post('/api/clients/create', clientsCreateHandler);
 app.post('/api/gcs/validate-upload', gcsValidateUploadHandler);
 app.post('/api/gcs/simple-upload', gcsSimpleUploadHandler);
+app.post('/api/gcs/resumable-upload-url', gcsResumableUploadUrlHandler);
 
 app.post('/api/gcs/upload', upload.single('file'), async (req, res) => {
   try {

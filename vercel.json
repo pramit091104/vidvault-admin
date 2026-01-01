@@ -31,6 +31,10 @@
     {
       "src": "api/test.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/**/*.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -56,6 +60,10 @@
     {
       "src": "/api/payment/(.*)",
       "dest": "/api/payment.js"
+    },
+    {
+      "src": "/api/gcs/(.*)",
+      "dest": "/api/gcs/$1.js"
     },
     {
       "src": "/api/test",

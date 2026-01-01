@@ -1,6 +1,10 @@
 import { Storage } from '@google-cloud/storage';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
