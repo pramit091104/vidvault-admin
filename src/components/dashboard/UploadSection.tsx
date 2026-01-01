@@ -20,8 +20,12 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 
-const UploadSection = () => {
-  const [file, setFile] = useState<File | null>(null);
+interface UploadSectionProps {
+  preSelectedFile?: File | null;
+}
+
+const UploadSection = ({ preSelectedFile }: UploadSectionProps = {}) => {
+  const [file, setFile] = useState<File | null>(preSelectedFile || null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
@@ -70,6 +74,16 @@ const UploadSection = () => {
 
     return () => unsubscribe();
   }, [cleanup]);
+
+  // Handle pre-selected file
+  useEffect(() => {
+    if (preSelectedFile) {
+      setFile(preSelectedFile);
+      if (!title) {
+        setTitle(preSelectedFile.name.replace(/\.[^/.]+$/, ""));
+      }
+    }
+  }, [preSelectedFile, title]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {

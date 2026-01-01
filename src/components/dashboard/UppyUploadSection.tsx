@@ -15,8 +15,12 @@ import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 import { v4 as uuidv4 } from 'uuid';
 
-const UppyUploadSection = () => {
-  const [file, setFile] = useState<File | null>(null);
+interface UppyUploadSectionProps {
+  preSelectedFile?: File | null;
+}
+
+const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => {
+  const [file, setFile] = useState<File | null>(preSelectedFile || null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
@@ -45,6 +49,16 @@ const UppyUploadSection = () => {
     });
     return () => unsubscribe();
   }, []);
+
+  // Handle pre-selected file
+  useEffect(() => {
+    if (preSelectedFile) {
+      setFile(preSelectedFile);
+      if (!title) {
+        setTitle(preSelectedFile.name.replace(/\.[^/.]+$/, ""));
+      }
+    }
+  }, [preSelectedFile, title]);
 
   // Handle upload success
   useEffect(() => {
