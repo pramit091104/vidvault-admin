@@ -148,33 +148,3 @@ export const getVideoPayments = async (videoSlug: string): Promise<PaymentRecord
     throw new Error('Failed to get video payments');
   }
 };
-
-// Check if user has already paid for a video
-export const hasUserPaidForVideo = async (videoSlug: string, userId?: string, anonymousId?: string): Promise<boolean> => {
-  try {
-    let q;
-    if (userId) {
-      q = query(
-        collection(db, PAYMENTS_COLLECTION),
-        where('videoSlug', '==', videoSlug),
-        where('userId', '==', userId),
-        where('status', '==', 'completed')
-      );
-    } else if (anonymousId) {
-      q = query(
-        collection(db, PAYMENTS_COLLECTION),
-        where('videoSlug', '==', videoSlug),
-        where('anonymousId', '==', anonymousId),
-        where('status', '==', 'completed')
-      );
-    } else {
-      return false;
-    }
-    
-    const querySnapshot = await getDocs(q);
-    return !querySnapshot.empty;
-  } catch (error) {
-    console.error('Error checking payment status:', error);
-    return false;
-  }
-};

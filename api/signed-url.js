@@ -47,6 +47,19 @@ export const config = {
 };
 
 export default async function handler(req, res) {
+  // CORS headers
+  const origin = req.headers.origin || req.headers.referer;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Only allow POST requests
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -65,7 +78,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'videoId or gcsPath is required' });
     }
     
-    console.log('Processing signed URL request for:', { videoId, gcsPath });
+    console.log('Processing signed URL request for:', { videoId, gcsPath, service });
     
     // If gcsPath is provided, use it directly
     if (gcsPath) {
@@ -84,7 +97,7 @@ export default async function handler(req, res) {
           expires: expiresAt,
         });
 
-        console.log('Signed URL generated successfully');
+        console.log('Signed URL generated successfully for gcsPath');
         return res.json({ signedUrl, expiresAt: new Date(expiresAt).toISOString() });
       } else {
         console.error('File not found at gcsPath:', gcsPath);
@@ -95,8 +108,12 @@ export default async function handler(req, res) {
     // Clean up the input ID
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
 
-    // Search paths - expanded to cover more possibilities
+    // Search paths - expanded to cover more possibilities including new Uppy paths
     const potentialPaths = [
+      // New Uppy upload paths (drafts folder structure)
+      `drafts/${cleanId}`,
+      `drafts/*/${cleanId}`, // Will need special handling
+      // Legacy paths
       `videos/${cleanId}`,
       `uploads/${cleanId}`,
       cleanId,
@@ -107,12 +124,15 @@ export default async function handler(req, res) {
       `${cleanId.replace('.mp4', '')}.mp4`,
       `uploads/${cleanId.replace('.mp4', '')}.mp4`,
       `videos/${cleanId.replace('.mp4', '')}.mp4`,
+      // Handle cases where cleanId might be a filename without extension
+      `drafts/*/${cleanId.replace(/\.[^/.]+$/, '')}-*`,
     ];
 
     let foundFile = null;
 
-    // Try to find the file
+    // First, try direct path matching
     for (const path of potentialPaths) {
+      if (path.includes('*')) continue; // Skip wildcard paths for now
       console.log('Checking path:', path);
       const file = bucket.file(path);
       const [exists] = await file.exists();
@@ -123,9 +143,59 @@ export default async function handler(req, res) {
       }
     }
 
+    // If not found, try searching in drafts folder with wildcard patterns
     if (!foundFile) {
-      console.error('Video not found in any of the searched paths:', potentialPaths);
-      return res.status(404).json({ error: 'Video not found in storage' });
+      console.log('Direct path search failed, trying drafts folder search...');
+      
+      try {
+        // List files in drafts folder
+        const [files] = await bucket.getFiles({
+          prefix: 'drafts/',
+          maxResults: 1000
+        });
+
+        // Search for files that match the videoId pattern
+        const searchTerms = [
+          cleanId,
+          cleanId.replace('.mp4', ''),
+          cleanId.replace(/\.[^/.]+$/, ''),
+          videoId,
+          videoId.replace('.mp4', ''),
+          videoId.replace(/\.[^/.]+$/, '')
+        ];
+
+        for (const file of files) {
+          const fileName = file.name;
+          console.log('Checking drafts file:', fileName);
+          
+          // Check if any search term matches the file name
+          for (const term of searchTerms) {
+            if (fileName.includes(term) || fileName.endsWith(term) || fileName.includes(term.replace(/[^a-zA-Z0-9]/g, '_'))) {
+              foundFile = file;
+              console.log('Found matching file in drafts:', fileName);
+              break;
+            }
+          }
+          
+          if (foundFile) break;
+        }
+      } catch (listError) {
+        console.error('Error listing drafts folder:', listError);
+      }
+    }
+
+    if (!foundFile) {
+      console.error('Video not found in any of the searched paths');
+      console.error('Searched paths:', potentialPaths);
+      console.error('Original videoId:', videoId);
+      console.error('Cleaned ID:', cleanId);
+      
+      return res.status(404).json({ 
+        error: 'Video not found in storage. The video may have been moved or deleted.',
+        searchedPaths: potentialPaths.filter(p => !p.includes('*')),
+        videoId: videoId,
+        cleanId: cleanId
+      });
     }
 
     // Generate signed URL

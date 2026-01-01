@@ -134,12 +134,6 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
           description: description.trim(),
           clientName: clientName.trim()
         },
-        onProgress: (progress) => {
-          console.log(`Upload progress: ${progress}%`);
-        },
-        onUploadSpeed: (speed) => {
-          console.log(`Upload speed: ${formatSpeed(speed)}`);
-        }
       });
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -161,7 +155,7 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
         description: description.trim(),
         clientName: clientName.trim(),
         fileName: uploadResult.fileName,
-        publicUrl: uploadResult.gcsPath, // Will be replaced with signed URL
+        publicUrl: uploadResult.gcsPath, // Store the GCS path for now - will be used to generate signed URLs
         size: uploadResult.fileSize,
         contentType: file?.type || 'video/mp4',
         userId: currentUser.uid,
@@ -170,8 +164,10 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
         accessCount: 0,
         privacyStatus: 'private',
         isPubliclyAccessible: false,
-        uploadedAt: new Date()
-      });
+        uploadedAt: new Date(),
+        // Store the actual GCS path for signed URL generation
+        gcsPath: uploadResult.gcsPath
+      } as any);
 
       setUploadSuccess(true);
       toast.success("Video uploaded successfully!");

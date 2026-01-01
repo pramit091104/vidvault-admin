@@ -5,7 +5,6 @@ import VideosTable from "@/components/dashboard/VideosTable";
 import Clients from "@/pages/Clients";
 import SettingsSection from "@/components/dashboard/SettingsSection";
 import OverviewSection from "@/components/dashboard/OverviewSection";
-import MigrationStatus from "@/components/dashboard/MigrationStatus";
 
 const Dashboard = () => {
   const [activeSection, setActiveSection] = useState<string>("overview");
@@ -22,8 +21,6 @@ const Dashboard = () => {
         return <Clients />;
       case "settings":
         return <SettingsSection />;
-      case "migration":
-        return <MigrationStatus />;
       default:
         return <OverviewSection onSectionChange={setActiveSection} />;
     }

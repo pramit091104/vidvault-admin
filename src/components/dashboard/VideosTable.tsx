@@ -194,7 +194,9 @@ const VideosTable = () => {
     try {
       // Delete file from GCS
       if (record.fileName) {
-        await gcsService.deleteFile(record.fileName);
+        // Pass both fileName and gcsPath (if available) for better file resolution
+        const gcsPath = record.gcsPath || record.publicUrl;
+        await gcsService.deleteFile(record.fileName, gcsPath);
       }
 
       // Delete video record in Firestore

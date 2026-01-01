@@ -29,6 +29,19 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 }
 
 export default async function handler(req, res) {
+  // CORS headers
+  const origin = req.headers.origin || req.headers.referer;
+  if (origin) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Access-Control-Allow-Methods', 'DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   // Only allow DELETE requests
   if (req.method !== 'DELETE') {
     res.setHeader('Allow', ['DELETE']);
@@ -41,25 +54,52 @@ export default async function handler(req, res) {
       return res.status(503).json({ error: 'Storage unavailable' });
     }
 
-    const { fileName } = req.body;
+    const { fileName, gcsPath } = req.body;
     
-    if (!fileName) {
-      return res.status(400).json({ error: 'fileName required' });
+    if (!fileName && !gcsPath) {
+      return res.status(400).json({ error: 'fileName or gcsPath required' });
     }
 
-    console.log('Attempting to delete file:', fileName);
+    console.log('Attempting to delete file:', { fileName, gcsPath });
+
+    // If gcsPath is provided, try it first
+    if (gcsPath) {
+      try {
+        const file = bucket.file(gcsPath);
+        const [exists] = await file.exists();
+        
+        if (exists) {
+          await file.delete();
+          console.log('Successfully deleted file at gcsPath:', gcsPath);
+          return res.json({ 
+            success: true, 
+            deletedPath: gcsPath,
+            message: `File deleted successfully from ${gcsPath}`
+          });
+        }
+      } catch (deleteError) {
+        console.log('Failed to delete at gcsPath:', gcsPath, deleteError.message);
+      }
+    }
 
     // Clean up the input filename
     const cleanFileName = fileName.replace(/\.mp4\.mp4$/, '.mp4');
 
-    // Try different path patterns like in signed-url
+    // Try different path patterns including new Uppy paths
     const potentialPaths = [
       cleanFileName,
+      // New Uppy upload paths (drafts folder structure)
+      `drafts/${cleanFileName}`,
+      // Legacy paths
       `videos/${cleanFileName}`,
       `uploads/${cleanFileName}`,
       `${cleanFileName}.mp4`,
       `uploads/${cleanFileName}.mp4`,
       `videos/${cleanFileName}.mp4`,
+      // Additional patterns
+      `${cleanFileName.replace('.mp4', '')}.mp4`,
+      `uploads/${cleanFileName.replace('.mp4', '')}.mp4`,
+      `videos/${cleanFileName.replace('.mp4', '')}.mp4`,
     ];
 
     let fileDeleted = false;
@@ -83,11 +123,56 @@ export default async function handler(req, res) {
       }
     }
 
+    // If not found in direct paths, search in drafts folder
+    if (!fileDeleted) {
+      console.log('Direct path search failed, trying drafts folder search...');
+      
+      try {
+        // List files in drafts folder
+        const [files] = await bucket.getFiles({
+          prefix: 'drafts/',
+          maxResults: 1000
+        });
+
+        // Search for files that match the fileName pattern
+        const searchTerms = [
+          cleanFileName,
+          cleanFileName.replace('.mp4', ''),
+          cleanFileName.replace(/\.[^/.]+$/, ''),
+          fileName,
+          fileName.replace('.mp4', ''),
+          fileName.replace(/\.[^/.]+$/, '')
+        ];
+
+        for (const file of files) {
+          const filePath = file.name;
+          console.log('Checking drafts file for deletion:', filePath);
+          
+          // Check if any search term matches the file name
+          for (const term of searchTerms) {
+            if (filePath.includes(term) || filePath.endsWith(term) || filePath.includes(term.replace(/[^a-zA-Z0-9]/g, '_'))) {
+              await file.delete();
+              fileDeleted = true;
+              deletedPath = filePath;
+              console.log('Successfully deleted matching file in drafts:', filePath);
+              break;
+            }
+          }
+          
+          if (fileDeleted) break;
+        }
+      } catch (listError) {
+        console.error('Error searching drafts folder:', listError);
+      }
+    }
+
     if (!fileDeleted) {
       console.error('File not found in any of the searched paths:', potentialPaths);
       return res.status(404).json({ 
         error: 'File not found',
-        searchedPaths: potentialPaths
+        searchedPaths: potentialPaths,
+        fileName: fileName,
+        gcsPath: gcsPath
       });
     }
     

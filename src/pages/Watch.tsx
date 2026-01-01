@@ -9,9 +9,6 @@ import 'plyr/dist/plyr.css';
 import { requestSignedUrl } from '@/integrations/api/signedUrlService';
 import { getPublicVideoBySlug, updateVideoViewCount, YouTubeVideoRecord, GCSVideoRecord } from "@/integrations/firebase/videoService";
 import { addTimestampedComment, getVideoTimestampedComments, clearVideoCommentsCache, TimestampedComment } from "@/integrations/firebase/commentService";
-import { getClientByName } from "@/integrations/firebase/clientService";
-import { hasUserPaidForVideo } from "@/integrations/firebase/paymentService";
-import { VideoPaymentModal } from "@/components/payment/VideoPaymentModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
 
@@ -51,47 +48,18 @@ const Watch = () => {
   const [videoDimensions, setVideoDimensions] = useState<{ width: number; height: number } | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isMuted, setIsMuted] = useState(false);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [commentsRefreshInterval, setCommentsRefreshInterval] = useState<NodeJS.Timeout | null>(null);
   const [isRefreshingComments, setIsRefreshingComments] = useState(false);
-
-  // Payment-related state
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentAmount, setPaymentAmount] = useState(0);
-  const [hasVideoEnded, setHasVideoEnded] = useState(false);
-  const [hasPaid, setHasPaid] = useState(false);
-  const [anonymousId] = useState(() => {
-    const stored = localStorage.getItem('anonymous_user_id');
-    if (stored) return stored;
-    const newId = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('anonymous_user_id', newId);
-    return newId;
-  });
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
 
-  // Update current time from video element and detect video completion
+  // Update current time from video element
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
 
     const handleTimeUpdate = () => {
       setCurrentTime(video.currentTime);
-      
-      // Check if video is near completion (within 5 seconds of end)
-      const duration = video.duration;
-      if (duration && video.currentTime >= duration - 5 && !hasVideoEnded && !hasPaid) {
-        setHasVideoEnded(true);
-        handleVideoCompletion();
-      }
-    };
-
-    const handleVideoEnded = () => {
-      if (!hasVideoEnded && !hasPaid) {
-        setHasVideoEnded(true);
-        handleVideoCompletion();
-      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -104,15 +72,13 @@ const Watch = () => {
     };
 
     video.addEventListener('timeupdate', handleTimeUpdate);
-    video.addEventListener('ended', handleVideoEnded);
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
-      video.removeEventListener('ended', handleVideoEnded);
       document.removeEventListener('keydown', handleKeyDown);
     };
-  }, [hasVideoEnded, hasPaid]);
+  }, []);
 
   // Initialize Plyr player when video element and signed URL are ready
   useEffect(() => {
@@ -206,16 +172,10 @@ const Watch = () => {
       }
     };
 
-    // Initial fetch
+    // Only fetch comments once when video loads
     fetchComments();
 
-    // Set up auto-refresh every 10 seconds
-    const interval = setInterval(fetchComments, 10000);
-    setCommentsRefreshInterval(interval);
-
-    return () => {
-      if (interval) clearInterval(interval);
-    };
+    // No cleanup needed since we're not using intervals anymore
   }, [video?.id]);
 
   useEffect(() => {
@@ -228,7 +188,6 @@ const Watch = () => {
 
       try {
         setIsLoading(true);
-        console.log("Fetching metadata for slug:", slug);
         const videoData = await getPublicVideoBySlug(slug);
 
         if (!videoData || !videoData.isPublic) {
@@ -269,7 +228,6 @@ const Watch = () => {
             // Use the stored gcsPath if available, otherwise fall back to fileName
             const gcsPath = (videoData as any).gcsPath;
             const targetId = (videoData as any).fileName || mappedVideo.id;
-            console.log('Requesting signed URL for:', { targetId, gcsPath });
             
             const url = await requestSignedUrl(
               targetId,
@@ -277,7 +235,6 @@ const Watch = () => {
               gcsPath // Pass the gcsPath if available
             );
             setSignedVideoUrl(url);
-            console.log('Successfully obtained signed URL');
           } catch (err: any) {
             console.error("Signing failed details:", err.message);
             
@@ -340,65 +297,6 @@ const Watch = () => {
 
     fetchVideo();
   }, [slug]);
-
-  // Check if user has already paid for this video
-  useEffect(() => {
-    const checkPaymentStatus = async () => {
-      if (!video) return;
-      
-      try {
-        const paid = await hasUserPaidForVideo(
-          video.slug, 
-          currentUser?.uid, 
-          currentUser ? undefined : anonymousId
-        );
-        setHasPaid(paid);
-      } catch (error) {
-        console.error('Error checking payment status:', error);
-      }
-    };
-
-    checkPaymentStatus();
-  }, [video, currentUser, anonymousId]);
-
-  // Load client payment amount when video is loaded
-  useEffect(() => {
-    const loadPaymentAmount = async () => {
-      if (!video) return;
-      
-      try {
-        console.log('Loading payment amount for client:', video.clientName);
-        const client = await getClientByName(video.clientName);
-        if (client) {
-          // Use final payment amount as the default payment for video completion
-          const amount = client.finalPayment || 100;
-          setPaymentAmount(amount);
-          console.log('Payment amount loaded:', amount);
-        } else {
-          console.log('Client not found, using default payment amount');
-          setPaymentAmount(100); // Default amount if client not found
-        }
-      } catch (error) {
-        console.error('Error loading payment amount:', error);
-        setPaymentAmount(100); // Default amount on error
-      }
-    };
-
-    loadPaymentAmount();
-  }, [video]);
-
-  const handleVideoCompletion = async () => {
-    if (!video || hasPaid) return;
-    
-    // Show payment modal when video completes
-    setShowPaymentModal(true);
-  };
-
-  const handlePaymentComplete = () => {
-    setHasPaid(true);
-    setShowPaymentModal(false);
-    toast.success('Thank you for your payment!');
-  };
 
   const handleShare = async () => {
     const shareUrl = window.location.href;
@@ -861,22 +759,6 @@ const Watch = () => {
         </div>
         </div>
       </main>
-
-      {/* Payment Modal */}
-      {video && (
-        <VideoPaymentModal
-          isOpen={showPaymentModal}
-          onClose={() => setShowPaymentModal(false)}
-          video={{
-            id: video.id,
-            slug: video.slug,
-            title: video.title,
-            clientName: video.clientName,
-          }}
-          paymentAmount={paymentAmount}
-          onPaymentComplete={handlePaymentComplete}
-        />
-      )}
     </div>
   );
 };

@@ -41,7 +41,6 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
     { id: "upload", label: "Upload Video", icon: Upload },
     { id: "videos", label: "Manage Videos", icon: Film },
     { id: "clients", label: "Clients", icon: Users },
-    { id: "migration", label: "Migration Status", icon: Zap },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

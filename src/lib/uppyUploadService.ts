@@ -49,6 +49,7 @@ export class UppyUploadService {
       const idToken = await currentUser.getIdToken();
 
       // Request resumable upload URL from backend
+      console.log('🔄 Requesting resumable upload URL...');
       const urlResponse = await fetch(`${API_BASE_URL}/api/gcs/resumable-upload-url`, {
         method: 'POST',
         headers: {
@@ -64,11 +65,27 @@ export class UppyUploadService {
       });
 
       if (!urlResponse.ok) {
-        const errorData = await urlResponse.json();
-        throw new Error(errorData.error || 'Failed to get upload URL');
+        let errorMessage = 'Failed to get upload URL';
+        try {
+          const errorData = await urlResponse.json();
+          errorMessage = errorData.error || errorMessage;
+        } catch (e) {
+          // If JSON parsing fails, use status text
+          errorMessage = `${urlResponse.status}: ${urlResponse.statusText}`;
+        }
+        
+        // Log detailed error for debugging
+        console.error('❌ Upload URL request failed:', {
+          status: urlResponse.status,
+          statusText: urlResponse.statusText,
+          url: `${API_BASE_URL}/api/gcs/resumable-upload-url`
+        });
+        
+        throw new Error(errorMessage);
       }
 
       const { uploadUrl, gcsPath } = await urlResponse.json();
+      console.log('✅ Resumable upload URL received');
 
       // Initialize Uppy
       this.uppy = new Uppy({

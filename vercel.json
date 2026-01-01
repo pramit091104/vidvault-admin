@@ -37,27 +37,15 @@
       "use": "@vercel/node"
     },
     {
-      "src": "api/gcs/init-chunked-upload.js",
+      "src": "api/gcs/upload-handler.js",
       "use": "@vercel/node"
     },
     {
-      "src": "api/gcs/upload-chunk.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/upload-status.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/verify-chunks.js",
+      "src": "api/gcs/configure-lifecycle.js",
       "use": "@vercel/node"
     },
     {
       "src": "api/test.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/test-session.js",
       "use": "@vercel/node"
     }
   ],
@@ -94,28 +82,28 @@
       "dest": "/api/gcs/simple-upload.js"
     },
     {
-      "src": "/api/gcs/init-chunked-upload",
-      "dest": "/api/gcs/init-chunked-upload.js"
+      "src": "/api/gcs/resumable-upload-url",
+      "dest": "/api/gcs/upload-handler.js?action=resumable-upload-url"
     },
     {
-      "src": "/api/gcs/upload-chunk",
-      "dest": "/api/gcs/upload-chunk.js"
+      "src": "/api/gcs/finalize-upload",
+      "dest": "/api/gcs/upload-handler.js?action=finalize-upload"
     },
     {
       "src": "/api/gcs/upload-status/(.*)",
-      "dest": "/api/gcs/upload-status.js?sessionId=$1"
+      "dest": "/api/gcs/upload-handler.js?action=upload-status&sessionId=$1"
     },
     {
       "src": "/api/gcs/verify-chunks/(.*)",
-      "dest": "/api/gcs/verify-chunks.js?sessionId=$1"
+      "dest": "/api/gcs/upload-handler.js?action=verify-chunks&sessionId=$1"
+    },
+    {
+      "src": "/api/gcs/configure-lifecycle",
+      "dest": "/api/gcs/configure-lifecycle.js"
     },
     {
       "src": "/api/test",
       "dest": "/api/test.js"
-    },
-    {
-      "src": "/api/test-session",
-      "dest": "/api/test-session.js"
     },
     {
       "src": "/(.*)",

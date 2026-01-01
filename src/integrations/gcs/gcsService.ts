@@ -140,7 +140,7 @@ export class GCSService {
   /**
    * Delete a file from Google Cloud Storage
    */
-  async deleteFile(fileName: string): Promise<void> {
+  async deleteFile(fileName: string, gcsPath?: string): Promise<void> {
     if (!this.isInitialized) {
       await this.initialize();
     }
@@ -149,17 +149,22 @@ export class GCSService {
       const apiBaseUrl = getApiBaseUrl();
       const deleteUrl = apiBaseUrl ? `${apiBaseUrl}/api/gcs/delete` : '/api/gcs/delete';
       
+      const requestBody: any = { fileName };
+      if (gcsPath) {
+        requestBody.gcsPath = gcsPath;
+      }
+      
       const response = await fetch(deleteUrl, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ fileName }),
+        body: JSON.stringify(requestBody),
       });
 
       if (!response.ok) {
         const error = await response.json().catch(() => ({}));
-        throw new Error(error.error?.message || "Failed to delete file");
+        throw new Error(error.error || "Failed to delete file");
       }
     } catch (error: any) {
       console.error("GCS delete error:", error);

@@ -194,8 +194,6 @@ export const getVideoTimestampedComments = async (
         commentCache.delete(videoId);
       }
     }
-
-    console.log(`[commentService] Querying timestampedComments collection for videoId: "${videoId}"`);
     
     const commentsRef = collection(db, 'timestampedComments');
     const constraints: QueryConstraint[] = [
@@ -205,9 +203,7 @@ export const getVideoTimestampedComments = async (
     
     const q = query(commentsRef, ...constraints);
     const querySnapshot = await getDocs(q);
-    
-    console.log(`[commentService] Query returned ${querySnapshot.size} documents`);
-    
+        
     if (querySnapshot.empty) {
       console.warn(`[commentService] No comments found for videoId: "${videoId}"`);
     }
@@ -227,9 +223,6 @@ export const getVideoTimestampedComments = async (
     if (useCache) {
       commentCache.set(videoId, { data: comments, timestamp: Date.now() });
     }
-    
-    console.log(`[commentService] Returning ${comments.length} sorted comments`);
-    return comments;
   } catch (error) {
     console.error('[commentService] Error fetching timestamped comments:', error);
     throw new Error(`Failed to fetch comments: ${error instanceof Error ? error.message : 'Unknown error'}`);
