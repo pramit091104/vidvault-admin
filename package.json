@@ -12,7 +12,8 @@
     "check-env": "node check-env.js",
     "debug:deployment": "node scripts/debug-deployment.js",
     "fix:common": "node scripts/fix-common-issues.js",
-    "setup:project": "node scripts/setup-new-project.js"
+    "setup:project": "node scripts/setup-new-project.js",
+    "setup:gcs-lifecycle": "node scripts/setup-gcs-lifecycle.js"
   },
   "name": "vite_react_shadcn_ts",
   "private": true,
@@ -51,6 +52,8 @@
     "@tanstack/react-query": "^5.83.0",
     "@types/fluent-ffmpeg": "^2.1.28",
     "@types/uuid": "^10.0.0",
+    "@uppy/core": "^5.2.0",
+    "@uppy/xhr-upload": "^5.1.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -60,6 +63,7 @@
     "embla-carousel-react": "^8.6.0",
     "express": "^5.2.1",
     "firebase": "^10.13.2",
+    "firebase-admin": "^13.6.0",
     "fluent-ffmpeg": "^2.1.3",
     "helmet": "^8.1.0",
     "input-otp": "^1.4.2",
