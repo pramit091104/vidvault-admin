@@ -1,112 +1,137 @@
-import { useState, useCallback } from 'react';
-import { videoCompressionService, CompressionProgress } from '@/services/videoCompressionService';
-import { VideoAnalysis, CompressionOptions, CompressionResult } from '@/services/compressionService';
+import { useState, useCallback, useRef } from 'react';
+import { compressionWorkerService, CompressionOptions, CompressionProgress, CompressionResult } from '../lib/compressionWorkerService';
 
-export interface UseVideoCompressionResult {
-  // State
-  isAnalyzing: boolean;
+export interface UseVideoCompressionState {
   isCompressing: boolean;
-  analysis: VideoAnalysis | null;
-  recommendations: CompressionOptions | null;
-  progress: CompressionProgress | null;
+  progress: number;
   error: string | null;
-  
-  // Actions
-  analyzeVideo: (file: File) => Promise<void>;
-  compressVideo: (file: File, options?: Partial<CompressionOptions>) => Promise<CompressionResult & { compressedFile?: File }>;
-  checkServiceStatus: () => Promise<{ available: boolean; version?: string; error?: string }>;
-  shouldCompress: (file: File) => boolean;
-  getRecommendedSettings: (file: File) => Partial<CompressionOptions>;
-  reset: () => void;
+  result: CompressionResult | null;
+  estimatedTime: number | null;
+  estimatedSize: number | null;
 }
 
-export function useVideoCompression(): UseVideoCompressionResult {
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isCompressing, setIsCompressing] = useState(false);
-  const [analysis, setAnalysis] = useState<VideoAnalysis | null>(null);
-  const [recommendations, setRecommendations] = useState<CompressionOptions | null>(null);
-  const [progress, setProgress] = useState<CompressionProgress | null>(null);
-  const [error, setError] = useState<string | null>(null);
+export interface UseVideoCompressionActions {
+  compressVideo: (file: File, options?: CompressionOptions) => Promise<CompressionResult>;
+  cancelCompression: () => void;
+  reset: () => void;
+  shouldCompress: (file: File) => boolean;
+  getEstimate: (fileSize: number) => { estimatedSize: number; estimatedTime: number };
+}
 
-  const reset = useCallback(() => {
-    setIsAnalyzing(false);
-    setIsCompressing(false);
-    setAnalysis(null);
-    setRecommendations(null);
-    setProgress(null);
-    setError(null);
-  }, []);
+export function useVideoCompression(): UseVideoCompressionState & UseVideoCompressionActions {
+  const [state, setState] = useState<UseVideoCompressionState>({
+    isCompressing: false,
+    progress: 0,
+    error: null,
+    result: null,
+    estimatedTime: null,
+    estimatedSize: null
+  });
 
-  const analyzeVideo = useCallback(async (file: File) => {
-    setIsAnalyzing(true);
-    setError(null);
-
-    try {
-      const result = await videoCompressionService.analyzeVideo(file);
-      setAnalysis(result.analysis);
-      setRecommendations(result.recommendations);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Analysis failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, []);
+  const compressionRef = useRef<{ cancelled: boolean }>({ cancelled: false });
 
   const compressVideo = useCallback(async (
     file: File, 
-    options?: Partial<CompressionOptions>
-  ): Promise<CompressionResult & { compressedFile?: File }> => {
-    setIsCompressing(true);
-    setError(null);
-    setProgress(null);
+    options?: CompressionOptions
+  ): Promise<CompressionResult> => {
+    // Reset state
+    compressionRef.current.cancelled = false;
+    setState({
+      isCompressing: true,
+      progress: 0,
+      error: null,
+      result: null,
+      estimatedTime: null,
+      estimatedSize: null
+    });
 
     try {
-      const result = await videoCompressionService.compressVideo(
+      // Get estimates
+      const estimate = compressionWorkerService.getCompressionEstimate(file.size);
+      setState(prev => ({
+        ...prev,
+        estimatedTime: estimate.estimatedTime,
+        estimatedSize: estimate.estimatedSize
+      }));
+
+      // Get adaptive options if none provided
+      const compressionOptions = options || compressionWorkerService.getAdaptiveCompressionOptions(file.size);
+
+      // Start compression
+      const result = await compressionWorkerService.compressVideo(
         file,
-        options,
-        (progressData) => setProgress(progressData)
+        compressionOptions,
+        (progress: CompressionProgress) => {
+          if (compressionRef.current.cancelled) return;
+          
+          setState(prev => ({
+            ...prev,
+            progress: progress.progress
+          }));
+        }
       );
-      
+
+      if (compressionRef.current.cancelled) {
+        throw new Error('Compression cancelled');
+      }
+
+      setState(prev => ({
+        ...prev,
+        isCompressing: false,
+        progress: 100,
+        result
+      }));
+
       return result;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Compression failed';
-      setError(errorMessage);
-      throw new Error(errorMessage);
-    } finally {
-      setIsCompressing(false);
-      setProgress(null);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Compression failed';
+      
+      setState(prev => ({
+        ...prev,
+        isCompressing: false,
+        error: errorMessage
+      }));
+
+      throw error;
     }
   }, []);
 
-  const checkServiceStatus = useCallback(async () => {
-    return await videoCompressionService.checkServiceStatus();
+  const cancelCompression = useCallback(() => {
+    compressionRef.current.cancelled = true;
+    setState(prev => ({
+      ...prev,
+      isCompressing: false,
+      error: 'Compression cancelled'
+    }));
+  }, []);
+
+  const reset = useCallback(() => {
+    compressionRef.current.cancelled = false;
+    setState({
+      isCompressing: false,
+      progress: 0,
+      error: null,
+      result: null,
+      estimatedTime: null,
+      estimatedSize: null
+    });
   }, []);
 
   const shouldCompress = useCallback((file: File) => {
-    return videoCompressionService.shouldCompress(file);
+    return compressionWorkerService.shouldCompress(file);
   }, []);
 
-  const getRecommendedSettings = useCallback((file: File) => {
-    return videoCompressionService.getRecommendedSettings(file);
+  const getEstimate = useCallback((fileSize: number) => {
+    return compressionWorkerService.getCompressionEstimate(fileSize);
   }, []);
 
   return {
-    // State
-    isAnalyzing,
-    isCompressing,
-    analysis,
-    recommendations,
-    progress,
-    error,
-    
-    // Actions
-    analyzeVideo,
+    ...state,
     compressVideo,
-    checkServiceStatus,
+    cancelCompression,
+    reset,
     shouldCompress,
-    getRecommendedSettings,
-    reset
+    getEstimate
   };
 }

@@ -1,10 +1,11 @@
 import { useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
-import UploadSection from "@/components/dashboard/UploadSection";
+import SmartUploadSection from "@/components/dashboard/SmartUploadSection";
 import VideosTable from "@/components/dashboard/VideosTable";
 import Clients from "@/pages/Clients";
 import SettingsSection from "@/components/dashboard/SettingsSection";
 import OverviewSection from "@/components/dashboard/OverviewSection";
+import MigrationStatus from "@/components/dashboard/MigrationStatus";
 
 const Dashboard = () => {
   const [activeSection, setActiveSection] = useState<string>("overview");
@@ -14,13 +15,15 @@ const Dashboard = () => {
       case "overview":
         return <OverviewSection onSectionChange={setActiveSection} />;
       case "upload":
-        return <UploadSection />;
+        return <SmartUploadSection />;
       case "videos":
         return <VideosTable />;
       case "clients":
         return <Clients />;
       case "settings":
         return <SettingsSection />;
+      case "migration":
+        return <MigrationStatus />;
       default:
         return <OverviewSection onSectionChange={setActiveSection} />;
     }

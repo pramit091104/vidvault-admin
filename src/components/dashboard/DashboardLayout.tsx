@@ -1,5 +1,5 @@
 import { ReactNode, useState, useEffect } from "react";
-import { Upload, Film, MessageSquare, Settings, LogOut, Users, Menu, X, BarChart3 } from "lucide-react";
+import { Upload, Film, MessageSquare, Settings, LogOut, Users, Menu, X, BarChart3, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
@@ -41,6 +41,7 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
     { id: "upload", label: "Upload Video", icon: Upload },
     { id: "videos", label: "Manage Videos", icon: Film },
     { id: "clients", label: "Clients", icon: Users },
+    { id: "migration", label: "Migration Status", icon: Zap },
     { id: "settings", label: "Settings", icon: Settings },
   ];
 

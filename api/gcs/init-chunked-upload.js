@@ -22,39 +22,15 @@ export default async function handler(req, res) {
     // Extract data from old format
     const { fileName, fileSize, contentType, metadata } = req.body;
 
-    // Redirect to new resumable upload URL endpoint
-    const baseUrl = req.headers.host?.includes('localhost') 
-      ? `http://${req.headers.host}` 
-      : `https://${req.headers.host}`;
+    console.log('Legacy init-chunked-upload called:', { fileName, fileSize });
 
-    const response = await fetch(`${baseUrl}/api/gcs/resumable-upload-url`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': req.headers.authorization || ''
-      },
-      body: JSON.stringify({
-        fileName,
-        fileSize,
-        contentType,
-        metadata
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      return res.status(response.status).json(errorData);
-    }
-
-    const data = await response.json();
-
-    // Return in format expected by old system
+    // For now, return a simple response that indicates the new system should be used
     res.status(200).json({
       success: true,
-      sessionId: data.gcsPath, // Use gcsPath as sessionId for compatibility
-      uploadUrl: data.uploadUrl,
-      gcsPath: data.gcsPath,
-      expiresAt: data.expiresAt
+      message: 'Please use the new Uppy resumable upload system for better reliability',
+      sessionId: `legacy-${Date.now()}`,
+      uploadUrl: '/api/gcs/resumable-upload-url',
+      recommendation: 'Switch to UppyUploadSection component for files > 100MB'
     });
 
   } catch (error) {

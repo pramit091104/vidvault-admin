@@ -9,6 +9,7 @@ import UploadSection from "./UploadSection"; // Your existing upload component
 import UppyUploadSection from "./UppyUploadSection"; // New Uppy component
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
+import { FEATURES, getUploadMethod, formatFileSize, isFileSizeValid } from "@/config/features";
 
 const SmartUploadSection = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -43,23 +44,17 @@ const SmartUploadSection = () => {
       return;
     }
 
+    // Validate file size
+    if (!isFileSizeValid(file.size)) {
+      alert(`File size exceeds maximum limit of ${formatFileSize(FEATURES.RESUMABLE_UPLOAD_MAX_SIZE)}`);
+      return;
+    }
+
     setSelectedFile(file);
 
-    // Auto-select upload mode based on file size
-    const fileSizeMB = file.size / (1024 * 1024);
-    if (fileSizeMB < 100) { // Use simple upload for files < 100MB
-      setUploadMode('simple');
-    } else { // Use Uppy for files >= 100MB
-      setUploadMode('uppy');
-    }
-  };
-
-  const formatFileSize = (bytes: number): string => {
-    if (bytes === 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    const k = 1024;
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${units[i]}`;
+    // Auto-select upload mode based on file size using feature config
+    const uploadMethod = getUploadMethod(file.size);
+    setUploadMode(uploadMethod);
   };
 
   return (
@@ -117,7 +112,7 @@ const SmartUploadSection = () => {
         <div>
           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-800">
-              <strong>Simple Upload Mode</strong> - Optimized for files under 100MB
+              <strong>Simple Upload Mode</strong> - Optimized for files under {formatFileSize(FEATURES.SIMPLE_UPLOAD_MAX_SIZE)}
             </p>
           </div>
           <UploadSection preSelectedFile={selectedFile} />
@@ -142,7 +137,7 @@ const SmartUploadSection = () => {
               <UploadIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>Select a video file to begin upload</p>
               <p className="text-sm mt-2">
-                Files under 100MB will use simple upload, larger files will use resumable upload
+                Files under {formatFileSize(FEATURES.SIMPLE_UPLOAD_MAX_SIZE)} will use simple upload, larger files will use resumable upload
               </p>
             </div>
           </CardContent>
