@@ -1,0 +1,90 @@
+{
+  "bindings": [
+    {
+      "members": [
+        "serviceAccount:previu@veedo-401e0.iam.gserviceaccount.com"
+      ],
+      "role": "roles/datastore.user"
+    },
+    {
+      "members": [
+        "serviceAccount:previu@veedo-401e0.iam.gserviceaccount.com"
+      ],
+      "role": "roles/datastore.viewer"
+    },
+    {
+      "members": [
+        "serviceAccount:previu@veedo-401e0.iam.gserviceaccount.com"
+      ],
+      "role": "roles/datastore.editor"
+    },
+    {
+      "members": [
+        "serviceAccount:service-403109439314@gcp-sa-firebase.iam.gs
+erviceaccount.com"                                                       ],
+      "role": "roles/firebase.managementServiceAgent"
+    },
+    {
+      "members": [
+        "serviceAccount:firebase-adminsdk-fbsvc@veedo-401e0.iam.gse
+rviceaccount.com"                                                        ],
+      "role": "roles/firebase.sdkAdminServiceAgent"
+    },
+    {
+      "members": [
+        "serviceAccount:firebase-adminsdk-fbsvc@veedo-401e0.iam.gse
+rviceaccount.com"                                                        ],
+      "role": "roles/firebaseauth.admin"
+    },
+    {
+      "members": [
+        "serviceAccount:service-403109439314@firebase-rules.iam.gse
+rviceaccount.com"                                                        ],
+      "role": "roles/firebaserules.system"
+    },
+    {
+      "members": [
+        "serviceAccount:service-403109439314@gcp-sa-firestore.iam.g
+serviceaccount.com"                                                      ],
+      "role": "roles/firestore.serviceAgent"
+    },
+    {
+      "members": [
+        "serviceAccount:firebase-adminsdk-fbsvc@veedo-401e0.iam.gse
+rviceaccount.com"                                                        ],
+      "role": "roles/iam.serviceAccountTokenCreator"
+    },
+    {
+      "members": [
+        "user:pramit.0904@gmail.com"
+      ],
+      "role": "roles/owner"
+    },
+    {
+      "members": [
+        "serviceAccount:previu@veedo-401e0.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.admin"
+    },
+    {
+      "members": [
+        "serviceAccount:previu@veedo-401e0.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.objectAdmin"
+    },
+    {
+      "members": [
+        "serviceAccount:previu@veedo-401e0.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.objectCreator"
+    },
+    {
+      "members": [
+        "serviceAccount:previu@veedo-401e0.iam.gserviceaccount.com"
+      ],
+      "role": "roles/storage.objectViewer"
+    }
+  ],
+  "etag": "BwZHYUjcYd4=",
+  "version": 1
+}
