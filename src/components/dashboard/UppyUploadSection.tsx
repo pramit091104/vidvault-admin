@@ -26,7 +26,7 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
   const [clientName, setClientName] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState(false);
   
-  const { currentUser, subscription, incrementVideoUpload, canUploadVideo } = useAuth();
+  const { currentUser, subscription } = useAuth();
 
   const {
     isUploading,
@@ -140,11 +140,8 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
 
     try {
       // Backend already incremented upload count, just update local state
-      setSubscription(prev => ({
-        ...prev,
-        videoUploadsUsed: prev.videoUploadsUsed + 1
-      }));
-
+      // Note: In a real app, you'd want to refetch subscription data from the server
+      
       // Save metadata to Firestore
       const videoId = uuidv4();
       const securityCode = Math.random().toString(36).substring(2, 8).toUpperCase();

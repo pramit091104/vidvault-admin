@@ -69,6 +69,45 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
 }
 
 /**
+ * Update user subscription in backend
+ */
+export async function updateSubscription(subscriptionData: {
+  tier: 'free' | 'premium';
+  maxVideoUploads: number;
+  maxClients: number;
+  maxFileSize: number;
+  subscriptionDate?: Date;
+  expiryDate?: Date;
+  status?: string;
+}): Promise<BackendSubscription> {
+  try {
+    const headers = await getAuthHeaders();
+    
+    const response = await fetch('/api/subscription/update', {
+      method: 'POST',
+      headers,
+      credentials: 'include',
+      body: JSON.stringify({
+        ...subscriptionData,
+        subscriptionDate: subscriptionData.subscriptionDate?.toISOString(),
+        expiryDate: subscriptionData.expiryDate?.toISOString()
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Failed to update subscription' }));
+      throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.subscription;
+  } catch (error) {
+    console.error('Error updating subscription:', error);
+    throw error;
+  }
+}
+
+/**
  * Validate if user can upload a file
  */
 export async function validateFileUpload(fileSize: number): Promise<ValidationResponse> {

@@ -1,4 +1,59 @@
 import { getUserSubscription, getUserIdFromToken, validateClientCreation } from './lib/subscriptionValidator.js';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
+
+// Initialize Firebase Admin if not already initialized
+let db;
+
+function initializeFirebaseAdmin() {
+  try {
+    if (getApps().length === 0) {
+      let credentials;
+      
+      if (process.env.GCS_CREDENTIALS) {
+        credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+      } else if (process.env.GCS_CREDENTIALS_BASE64) {
+        const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+        credentials = JSON.parse(decoded);
+      } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
+        credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+      }
+
+      if (credentials) {
+        initializeApp({
+          credential: cert(credentials),
+          projectId: process.env.GCS_PROJECT_ID || process.env.FIREBASE_PROJECT_ID
+        });
+        console.log('✅ Firebase Admin initialized successfully');
+      } else {
+        console.warn('⚠️ No Firebase credentials found in environment variables');
+        throw new Error('Firebase credentials not found');
+      }
+    }
+    
+    if (!db) {
+      db = getFirestore();
+    }
+    
+    return db;
+  } catch (error) {
+    console.error('❌ Failed to initialize Firebase Admin:', error.message);
+    throw error;
+  }
+}
+
+// Initialize on module load, but handle errors gracefully
+try {
+  initializeFirebaseAdmin();
+} catch (error) {
+  console.warn('Firebase Admin initialization deferred due to:', error.message);
+}
+
+const SUBSCRIPTIONS_COLLECTION = 'subscriptions';
 
 export default async function handler(req, res) {
   // Set CORS headers
@@ -35,6 +90,13 @@ export default async function handler(req, res) {
           return res.status(405).json({ error: 'Method not allowed' });
         }
         return await handleSubscriptionStatus(userId, res);
+
+      case 'update':
+        if (req.method !== 'POST') {
+          res.setHeader('Allow', ['POST']);
+          return res.status(405).json({ error: 'Method not allowed' });
+        }
+        return await handleSubscriptionUpdate(userId, req, res);
 
       case 'validate-client':
         if (req.method !== 'GET') {
@@ -78,6 +140,115 @@ async function handleSubscriptionStatus(userId, res) {
     res.status(500).json({ 
       error: 'Failed to get subscription status',
       code: 'SUBSCRIPTION_ERROR'
+    });
+  }
+}
+
+async function handleSubscriptionUpdate(userId, req, res) {
+  try {
+    const { 
+      tier, 
+      maxVideoUploads, 
+      maxClients, 
+      maxFileSize,
+      subscriptionDate,
+      expiryDate,
+      status = 'active'
+    } = req.body;
+
+    // Validate required fields
+    if (!tier || !maxVideoUploads || !maxClients || !maxFileSize) {
+      return res.status(400).json({ 
+        error: 'Missing required fields: tier, maxVideoUploads, maxClients, maxFileSize' 
+      });
+    }
+
+    // Validate tier
+    if (!['free', 'premium'].includes(tier)) {
+      return res.status(400).json({ 
+        error: 'Invalid tier. Must be "free" or "premium"' 
+      });
+    }
+
+    // Ensure Firebase Admin is initialized
+    const database = db || initializeFirebaseAdmin();
+    
+    const docRef = database.collection(SUBSCRIPTIONS_COLLECTION).doc(userId);
+    const doc = await docRef.get();
+    
+    const subscriptionData = {
+      userId,
+      tier,
+      maxVideoUploads,
+      maxClients,
+      maxFileSize,
+      status,
+      updatedAt: new Date()
+    };
+
+    // Add subscription and expiry dates if provided
+    if (subscriptionDate) {
+      subscriptionData.subscriptionDate = new Date(subscriptionDate);
+    }
+    if (expiryDate) {
+      subscriptionData.expiryDate = new Date(expiryDate);
+    }
+
+    if (!doc.exists) {
+      // Create new subscription document
+      subscriptionData.videoUploadsUsed = 0;
+      subscriptionData.clientsUsed = 0;
+      subscriptionData.createdAt = new Date();
+      
+      await docRef.set(subscriptionData);
+      console.log(`✅ Created new subscription for user: ${userId} (${tier})`);
+    } else {
+      // Update existing subscription, preserve usage counts
+      const existingData = doc.data();
+      subscriptionData.videoUploadsUsed = existingData.videoUploadsUsed || 0;
+      subscriptionData.clientsUsed = existingData.clientsUsed || 0;
+      subscriptionData.createdAt = existingData.createdAt || new Date();
+      
+      await docRef.set(subscriptionData, { merge: true });
+      console.log(`✅ Updated subscription for user: ${userId} (${tier})`);
+    }
+
+    // Return the updated subscription
+    const updatedDoc = await docRef.get();
+    const updatedData = updatedDoc.data();
+    
+    res.status(200).json({
+      success: true,
+      subscription: {
+        tier: updatedData.tier,
+        videoUploadsUsed: updatedData.videoUploadsUsed,
+        maxVideoUploads: updatedData.maxVideoUploads,
+        clientsUsed: updatedData.clientsUsed,
+        maxClients: updatedData.maxClients,
+        maxFileSize: updatedData.maxFileSize,
+        status: updatedData.status,
+        subscriptionDate: updatedData.subscriptionDate?.toDate(),
+        expiryDate: updatedData.expiryDate?.toDate(),
+        createdAt: updatedData.createdAt?.toDate(),
+        updatedAt: updatedData.updatedAt?.toDate()
+      }
+    });
+
+  } catch (error) {
+    console.error('❌ Error updating subscription:', error);
+    
+    // Handle permission errors gracefully
+    if (error.code === 7 || error.message?.includes('PERMISSION_DENIED')) {
+      console.warn('⚠️ Firestore permission denied for subscription update');
+      return res.status(500).json({ 
+        error: 'Unable to update subscription due to database permissions',
+        code: 'PERMISSION_DENIED'
+      });
+    }
+    
+    res.status(500).json({ 
+      error: 'Failed to update subscription',
+      code: 'UPDATE_ERROR'
     });
   }
 }

@@ -577,72 +577,34 @@ app.post('/api/signed-url', async (req, res) => {
 });
 
 // --- Razorpay Payment Endpoints ---
+// Note: Razorpay endpoints are now handled by the payment handler
 
-// Initialize Razorpay instance
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_Rx5tnJCOUHefCi',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'gJfWtk2zshP9dKcZQocNPg6T',
-});
+// Import the new API handlers
+import subscriptionHandler from './api/subscription.js';
+import clientsValidateHandler from './api/clients/validate.js';
+import clientsCreateHandler from './api/clients/create.js';
+import gcsValidateUploadHandler from './api/gcs/validate-upload.js';
+import gcsSimpleUploadHandler from './api/gcs/simple-upload.js';
+import gcsResumableUploadUrlHandler from './api/gcs/resumable-upload-url.js';
+import paymentHandler from './api/payment.js';
 
-// Create order endpoint
-app.post('/api/razorpay/create-order', async (req, res) => {
-  try {
-    const { amount, currency = 'INR', receipt, notes } = req.body;
+// Add the new API routes
+app.use('/api/subscription', subscriptionHandler);
+app.get('/api/clients/validate', clientsValidateHandler);
+app.post('/api/clients/create', clientsCreateHandler);
+app.post('/api/gcs/validate-upload', gcsValidateUploadHandler);
+app.post('/api/gcs/simple-upload', gcsSimpleUploadHandler);
+app.post('/api/gcs/resumable-upload-url', gcsResumableUploadUrlHandler);
 
-    const options = {
-      amount: amount, // Amount in smallest currency unit (paise)
-      currency,
-      receipt,
-      notes,
-      payment_capture: 1, // Auto capture payment
-    };
-
-    const order = await razorpay.orders.create(options);
-    res.json(order);
-  } catch (error) {
-    console.error('Error creating Razorpay order:', error);
-    res.status(500).json({ error: 'Failed to create payment order' });
-  }
-});
-
-// Verify payment endpoint
-app.post('/api/razorpay/verify-payment', (req, res) => {
-  try {
-    const { orderId, paymentId, signature } = req.body;
-
-    const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'gJfWtk2zshP9dKcZQocNPg6T');
-    hmac.update(orderId + '|' + paymentId);
-    const generatedSignature = hmac.digest('hex');
-
-    const isValid = generatedSignature === signature;
-    res.json({ isValid });
-  } catch (error) {
-    console.error('Error verifying payment:', error);
-    res.status(500).json({ error: 'Payment verification failed' });
-  }
-});
+// Payment routes - use the payment handler for both /api/payment and /api/razorpay routes
+app.use('/api/payment', paymentHandler);
+app.use('/api/razorpay', paymentHandler);
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Debug Server running on http://localhost:${PORT}`);
 });
 
 // --- GCS Upload / Delete / Metadata Endpoints ---
-
-// Import the new API handlers
-import subscriptionStatusHandler from './api/subscription/status.js';
-import clientsValidateHandler from './api/clients/validate.js';
-import clientsCreateHandler from './api/clients/create.js';
-import gcsValidateUploadHandler from './api/gcs/validate-upload.js';
-import gcsSimpleUploadHandler from './api/gcs/simple-upload.js';
-import gcsResumableUploadUrlHandler from './api/gcs/resumable-upload-url.js';
-
-// Add the new API routes
-app.get('/api/subscription/status', subscriptionStatusHandler);
-app.get('/api/clients/validate', clientsValidateHandler);
-app.post('/api/clients/create', clientsCreateHandler);
-app.post('/api/gcs/validate-upload', gcsValidateUploadHandler);
-app.post('/api/gcs/simple-upload', gcsSimpleUploadHandler);
-app.post('/api/gcs/resumable-upload-url', gcsResumableUploadUrlHandler);
 
 app.post('/api/gcs/upload', upload.single('file'), async (req, res) => {
   try {

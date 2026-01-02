@@ -1,5 +1,5 @@
-import { doc, getDoc, updateDoc, arrayUnion, serverTimestamp, collection, addDoc, query, where, getDocs, orderBy, limit, QueryConstraint, deleteDoc } from 'firebase/firestore';
-import { db } from './config';
+import { doc, getDoc, updateDoc, arrayUnion, collection, addDoc, query, where, getDocs, orderBy, QueryConstraint, deleteDoc } from 'firebase/firestore';
+import { db, auth } from './config';
 
 // Simple cache for storing comment queries
 const commentCache = new Map<string, { data: TimestampedComment[], timestamp: number }>();
@@ -137,11 +137,23 @@ export const addTimestampedComment = async (
   commentData: Omit<TimestampedComment, 'id' | 'createdAt'>
 ): Promise<TimestampedComment> => {
   try {
+    // Verify user is authenticated
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User must be authenticated to add comments');
+    }
+
+    // Verify the comment belongs to the authenticated user
+    if (commentData.userId !== user.uid) {
+      throw new Error('Cannot add comment for another user');
+    }
+
     const commentsRef = collection(db, 'timestampedComments');
     const now = new Date().toISOString();
     
     const newComment = {
       ...commentData,
+      userId: user.uid, // Ensure userId is set to authenticated user
       createdAt: now,
     };
 

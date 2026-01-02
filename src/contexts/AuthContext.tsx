@@ -15,7 +15,7 @@ import {
 import { auth, googleProvider } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import { getSubscription, saveSubscription, incrementVideoUploadCount } from "@/integrations/firebase/subscriptionService";
-import { getSubscriptionStatus, validateClientCreation } from "@/services/backendApiService";
+import { getSubscriptionStatus, validateClientCreation, updateSubscription } from "@/services/backendApiService";
 
 export interface UserSubscription {
   tier: 'free' | 'premium';
@@ -172,12 +172,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
 
     try {
-      const premiumSubscription = {
-        userId: currentUser.uid,
+      const premiumSubscriptionData = {
         tier: 'premium' as const,
-        videoUploadsUsed: subscription.videoUploadsUsed,
         maxVideoUploads: 50,
-        clientsUsed: subscription.clientsUsed,
         maxClients: 50,
         maxFileSize: 500, // 500MB for premium
         subscriptionDate: new Date(),
@@ -185,17 +182,26 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         status: 'active' as const
       };
 
+      // Update backend subscription first
+      const updatedBackendSubscription = await updateSubscription(premiumSubscriptionData);
+      
+      // Also save to frontend Firestore for backward compatibility
+      const premiumSubscription = {
+        userId: currentUser.uid,
+        ...premiumSubscriptionData
+      };
       await saveSubscription(premiumSubscription);
       
+      // Update local state with backend response
       setSubscription({
-        tier: 'premium',
-        videoUploadsUsed: subscription.videoUploadsUsed,
-        maxVideoUploads: 50,
-        clientsUsed: subscription.clientsUsed,
-        maxClients: 50,
-        maxFileSize: 500,
-        subscriptionDate: premiumSubscription.subscriptionDate,
-        expiryDate: premiumSubscription.expiryDate
+        tier: updatedBackendSubscription.tier,
+        videoUploadsUsed: updatedBackendSubscription.videoUploadsUsed,
+        maxVideoUploads: updatedBackendSubscription.maxVideoUploads,
+        clientsUsed: updatedBackendSubscription.clientsUsed,
+        maxClients: updatedBackendSubscription.maxClients,
+        maxFileSize: updatedBackendSubscription.maxFileSize,
+        subscriptionDate: updatedBackendSubscription.subscriptionDate,
+        expiryDate: updatedBackendSubscription.expiryDate
       });
       
       toast.success("Welcome to Premium! You now have access to 50 video uploads and larger file sizes.");

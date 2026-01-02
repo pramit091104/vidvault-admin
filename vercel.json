@@ -54,6 +54,10 @@
       "dest": "/api/payment.js"
     },
     {
+      "src": "/api/razorpay/(.*)",
+      "dest": "/api/payment.js"
+    },
+    {
       "src": "/api/signed-url",
       "dest": "/api/signed-url.js"
     },

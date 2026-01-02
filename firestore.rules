@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow authenticated users to read/write their own subscription data
+    match /subscriptions/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // Allow authenticated users to read/write client documents
+    // More permissive rules to handle existing data without userId
+    match /clients/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read/write video documents (YouTube)
+    match /youtubeClientCodes/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read/write video documents (GCS)
+    match /gcsClientCodes/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read/write payment records
+    match /payments/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read/write comments
+    match /comments/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow authenticated users to read/write timestamped comments
+    match /timestampedComments/{document} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Service account rules for server-side operations
+    match /{document=**} {
+      allow read, write: if request.auth != null && 
+        request.auth.token.firebase.sign_in_provider == 'custom';
+    }
+  }
+}

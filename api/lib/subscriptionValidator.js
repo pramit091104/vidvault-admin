@@ -15,23 +15,48 @@ function initializeFirebaseAdmin() {
       
       // Try different credential sources
       if (process.env.GCS_CREDENTIALS) {
-        credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+        try {
+          credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+          console.log('✅ Using GCS_CREDENTIALS');
+        } catch (e) {
+          console.error('❌ Invalid JSON in GCS_CREDENTIALS:', e.message);
+          throw new Error('Invalid GCS_CREDENTIALS format');
+        }
       } else if (process.env.GCS_CREDENTIALS_BASE64) {
-        const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
-        credentials = JSON.parse(decoded);
+        try {
+          const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+          credentials = JSON.parse(decoded);
+          console.log('✅ Using GCS_CREDENTIALS_BASE64');
+        } catch (e) {
+          console.error('❌ Invalid base64 or JSON in GCS_CREDENTIALS_BASE64:', e.message);
+          throw new Error('Invalid GCS_CREDENTIALS_BASE64 format');
+        }
       } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
-        // Alternative environment variable name for Vercel
-        credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+        try {
+          credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+          console.log('✅ Using FIREBASE_SERVICE_ACCOUNT_KEY');
+        } catch (e) {
+          console.error('❌ Invalid JSON in FIREBASE_SERVICE_ACCOUNT_KEY:', e.message);
+          throw new Error('Invalid FIREBASE_SERVICE_ACCOUNT_KEY format');
+        }
       }
 
       if (credentials) {
+        // Validate required credential fields
+        if (!credentials.private_key || !credentials.client_email || !credentials.project_id) {
+          throw new Error('Firebase credentials missing required fields (private_key, client_email, project_id)');
+        }
+
+        const projectId = process.env.GCS_PROJECT_ID || process.env.FIREBASE_PROJECT_ID || credentials.project_id;
+        
         initializeApp({
           credential: cert(credentials),
-          projectId: process.env.GCS_PROJECT_ID || process.env.FIREBASE_PROJECT_ID
+          projectId: projectId
         });
-        console.log('✅ Firebase Admin initialized successfully');
+        console.log(`✅ Firebase Admin initialized successfully for project: ${projectId}`);
       } else {
-        console.warn('⚠️ No Firebase credentials found in environment variables');
+        console.error('❌ No Firebase credentials found in environment variables');
+        console.error('Required: GCS_CREDENTIALS, GCS_CREDENTIALS_BASE64, or FIREBASE_SERVICE_ACCOUNT_KEY');
         throw new Error('Firebase credentials not found');
       }
     }

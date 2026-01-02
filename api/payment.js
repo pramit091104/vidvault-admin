@@ -1,5 +1,9 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import dotenv from 'dotenv';
+
+// Load environment variables
+dotenv.config();
 
 // Initialize Razorpay instance
 const razorpay = new Razorpay({

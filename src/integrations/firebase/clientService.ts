@@ -40,9 +40,15 @@ export const createClient = async (clientData: Omit<ClientRecord, 'id' | 'create
       throw new Error('User not authenticated');
     }
 
+    // Validate that the client data belongs to the authenticated user
+    if (clientData.userId && clientData.userId !== user.uid) {
+      throw new Error('User ID mismatch - cannot create client for another user');
+    }
+
     // Create directly in Firestore (validation should be done before calling this function)
     const docRef = await addDoc(collection(db, CLIENTS_COLLECTION), {
       ...clientData,
+      userId: user.uid, // Ensure userId is set to authenticated user
       createdAt: Timestamp.now(),
       updatedAt: Timestamp.now(),
     });
