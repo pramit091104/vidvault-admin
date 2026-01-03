@@ -1,53 +1,110 @@
 {
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "headers": [
+  "version": 2,
+  "builds": [
     {
-      "source": "/assets/(.*)",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=31536000, immutable"
-        }
-      ]
+      "src": "package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    },
+    {
+      "src": "api/subscription.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/clients.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/payment.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/signed-url.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/resumable-upload-url.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/simple-upload.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "api/gcs/validate-upload.js",
+      "use": "@vercel/node"
     }
   ],
-  "rewrites": [
+  "routes": [
     {
-      "source": "/api/subscription/(.*)",
-      "destination": "/api/subscription.js"
+      "src": "/assets/(.*\\.(js|css|wasm|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot))",
+      "headers": {
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
     },
     {
-      "source": "/api/clients/(.*)",
-      "destination": "/api/clients.js"
+      "src": "/(.*\\.css)",
+      "headers": {
+        "Content-Type": "text/css",
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
     },
     {
-      "source": "/api/payment/(.*)",
-      "destination": "/api/payment.js"
+      "src": "/(.*\\.js)",
+      "headers": {
+        "Content-Type": "application/javascript",
+        "Cache-Control": "public, max-age=31536000, immutable"
+      }
     },
     {
-      "source": "/api/razorpay/(.*)",
-      "destination": "/api/payment.js"
+      "src": "/__/auth/(.*)",
+      "dest": "https://veedo-401e0.firebaseapp.com/__/auth/$1",
+      "headers": {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
+      }
     },
     {
-      "source": "/api/signed-url",
-      "destination": "/api/signed-url.js"
+      "src": "/api/subscription/(.*)",
+      "dest": "/api/subscription.js"
     },
     {
-      "source": "/api/gcs/resumable-upload-url",
-      "destination": "/api/gcs/resumable-upload-url.js"
+      "src": "/api/clients/(.*)",
+      "dest": "/api/clients.js"
     },
     {
-      "source": "/api/gcs/simple-upload",
-      "destination": "/api/gcs/simple-upload.js"
+      "src": "/api/payment/(.*)",
+      "dest": "/api/payment.js"
     },
     {
-      "source": "/api/gcs/validate-upload",
-      "destination": "/api/gcs/validate-upload.js"
+      "src": "/api/razorpay/(.*)",
+      "dest": "/api/payment.js"
     },
     {
-      "source": "/__/auth/(.*)",
-      "destination": "https://veedo-401e0.firebaseapp.com/__/auth/$1"
+      "src": "/api/signed-url",
+      "dest": "/api/signed-url.js"
+    },
+    {
+      "src": "/api/gcs/resumable-upload-url",
+      "dest": "/api/gcs/resumable-upload-url.js"
+    },
+    {
+      "src": "/api/gcs/simple-upload",
+      "dest": "/api/gcs/simple-upload.js"
+    },
+    {
+      "src": "/api/gcs/validate-upload",
+      "dest": "/api/gcs/validate-upload.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html",
+      "headers": {
+        "Content-Type": "text/html; charset=utf-8"
+      }
     }
   ],
   "env": {
