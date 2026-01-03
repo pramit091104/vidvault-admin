@@ -1,81 +1,53 @@
 {
-  "version": 2,
-  "builds": [
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "headers": [
     {
-      "src": "package.json",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
-    },
-    {
-      "src": "api/subscription.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/clients.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/payment.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/signed-url.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/resumable-upload-url.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/simple-upload.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "api/gcs/validate-upload.js",
-      "use": "@vercel/node"
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "handle": "filesystem"
+      "source": "/api/subscription/(.*)",
+      "destination": "/api/subscription.js"
     },
     {
-      "src": "/api/subscription/(.*)",
-      "dest": "/api/subscription.js"
+      "source": "/api/clients/(.*)",
+      "destination": "/api/clients.js"
     },
     {
-      "src": "/api/clients/(.*)",
-      "dest": "/api/clients.js"
+      "source": "/api/payment/(.*)",
+      "destination": "/api/payment.js"
     },
     {
-      "src": "/api/payment/(.*)",
-      "dest": "/api/payment.js"
+      "source": "/api/razorpay/(.*)",
+      "destination": "/api/payment.js"
     },
     {
-      "src": "/api/razorpay/(.*)",
-      "dest": "/api/payment.js"
+      "source": "/api/signed-url",
+      "destination": "/api/signed-url.js"
     },
     {
-      "src": "/api/signed-url",
-      "dest": "/api/signed-url.js"
+      "source": "/api/gcs/resumable-upload-url",
+      "destination": "/api/gcs/resumable-upload-url.js"
     },
     {
-      "src": "/api/gcs/resumable-upload-url",
-      "dest": "/api/gcs/resumable-upload-url.js"
+      "source": "/api/gcs/simple-upload",
+      "destination": "/api/gcs/simple-upload.js"
     },
     {
-      "src": "/api/gcs/simple-upload",
-      "dest": "/api/gcs/simple-upload.js"
+      "source": "/api/gcs/validate-upload",
+      "destination": "/api/gcs/validate-upload.js"
     },
     {
-      "src": "/api/gcs/validate-upload",
-      "dest": "/api/gcs/validate-upload.js"
-    },
-    {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/__/auth/(.*)",
+      "destination": "https://veedo-401e0.firebaseapp.com/__/auth/$1"
     }
   ],
   "env": {
