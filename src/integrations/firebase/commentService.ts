@@ -137,30 +137,39 @@ export const addTimestampedComment = async (
   commentData: Omit<TimestampedComment, 'id' | 'createdAt'>
 ): Promise<TimestampedComment> => {
   try {
-    // Verify user is authenticated
     const user = auth.currentUser;
-    if (!user) {
-      throw new Error('User must be authenticated to add comments');
-    }
-
-    // Verify the comment belongs to the authenticated user
-    if (commentData.userId !== user.uid) {
-      throw new Error('Cannot add comment for another user');
-    }
-
     const commentsRef = collection(db, 'timestampedComments');
     const now = new Date().toISOString();
     
-    const newComment = {
-      ...commentData,
-      userId: user.uid, // Ensure userId is set to authenticated user
-      createdAt: now,
-    };
+    let finalCommentData;
+    
+    if (user) {
+      // Authenticated user - verify the comment belongs to them
+      if (commentData.userId !== user.uid) {
+        throw new Error('Cannot add comment for another user');
+      }
+      
+      finalCommentData = {
+        ...commentData,
+        userId: user.uid, // Ensure userId is set to authenticated user
+        createdAt: now,
+      };
+    } else {
+      // Anonymous user - allow the comment with the provided anonymous userId
+      if (!commentData.userId.startsWith('anonymous_')) {
+        throw new Error('Invalid anonymous user ID format');
+      }
+      
+      finalCommentData = {
+        ...commentData,
+        createdAt: now,
+      };
+    }
 
-    const docRef = await addDoc(commentsRef, newComment);
+    const docRef = await addDoc(commentsRef, finalCommentData);
     
     return {
-      ...newComment,
+      ...finalCommentData,
       id: docRef.id,
     };
   } catch (error) {
@@ -235,6 +244,8 @@ export const getVideoTimestampedComments = async (
     if (useCache) {
       commentCache.set(videoId, { data: comments, timestamp: Date.now() });
     }
+    
+    return comments;
   } catch (error) {
     console.error('[commentService] Error fetching timestamped comments:', error);
     throw new Error(`Failed to fetch comments: ${error instanceof Error ? error.message : 'Unknown error'}`);

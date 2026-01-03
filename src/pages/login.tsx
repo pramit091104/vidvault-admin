@@ -13,10 +13,10 @@ const LoginPage = () => {
     try {
       setIsLoading(true);
       await signInWithGoogle();
-      // Page will redirect to Google, so no need to handle success here
+      // Success will be handled by AuthContext
     } catch (error) {
       console.error('Google sign in error:', error);
-      setIsLoading(false); // Only reset on error, success will redirect
+      setIsLoading(false); // Reset loading on error
     }
   };
 

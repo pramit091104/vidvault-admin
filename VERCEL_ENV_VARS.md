@@ -1,35 +1,60 @@
+# Required Environment Variables for Vercel
+
+⚠️ **CRITICAL**: Make sure `VITE_FIREBASE_AUTH_DOMAIN` is set to the Firebase auth domain, NOT your custom domain!
+
+Copy these environment variables to your Vercel project settings:
+
+## Firebase Configuration (Frontend)
+```
 VITE_FIREBASE_API_KEY=AIzaSyAycvL6OUa2gIHHABBdDr6eknJGxeddeqk
 VITE_FIREBASE_AUTH_DOMAIN=veedo-401e0.firebaseapp.com
 VITE_FIREBASE_PROJECT_ID=veedo-401e0
 VITE_FIREBASE_STORAGE_BUCKET=veedo-401e0.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=403109439314
 VITE_FIREBASE_APP_ID=1:403109439314:web:9fe6a35d401573cb453c8b
+```
 
-# Google Cloud Storage Configuration
-VITE_GCS_PROJECT_ID=veedo-401e0
-VITE_GCS_BUCKET_NAME=previu_videos
-VITE_GCS_API_KEY=./gcs-key.json
+⚠️ **IMPORTANT**: 
+- `VITE_FIREBASE_AUTH_DOMAIN` MUST be `veedo-401e0.firebaseapp.com` (Firebase domain)
+- DO NOT set it to `previu.online` (your custom domain)
+- This is causing the `/__/auth/handler` 404 errors
 
-# Server Configuration
-PORT=3001
-CORS_ORIGIN=http://localhost:5173
-UPLOAD_DIR=./uploads
-
-# Server Configuration (for backend)
+## Google Cloud Storage (Backend)
+```
 GCS_PROJECT_ID=veedo-401e0
 GCS_BUCKET_NAME=previu_videos
 GCS_CREDENTIALS={"type":"service_account","project_id":"veedo-401e0","private_key_id":"08da75fb6f4242ced9965c2aab9667fe763c18cc","private_key":"-----BEGIN PRIVATE KEY-----\nMIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQCWdjbGQewIm01E\nE02l31mCdFAdgZIBa5w6L0JPVWKC82JYARw3Z+MvYJQoKqNUxh4bu9dtVLrtvgqt\nvRTSS/NIwWvVE48l4ZB0C4g5susQuaTlCZ7Gn88eMSm58uWpv3ZKPFGA41jZoEU2\nIUtJJsiexH/nOu3kzHlkIAts8+XBy+JUOvAlq1A0Rc0JLzGOrRMy5Dds/izkNblF\nEIbsG+r+JO4yBzrqB5clfp7oT3WR6XWsmuGgG60lJuKuThZbgbOEj6o5uH4DmGYL\nVkTQoSiX7YzRk1HrYecPiuGRfol6TVZE4tAccmFLhQK6+WQhgT56yVyKJsBf3LIA\nzm5DRV0lAgMBAAECggEALv0eIA5oW0u89pycrEezWYVfm8diRKVJtfYaXFJLIKBH\nvzohiMAd+CbOPjkKpyf0MS8ZmSBT/HlUNmwNe5uSj88wEOw50Ve/WC5dzb8toByJ\n/alid59i/IfYAyVzSe7sT0TFI15c2iIuWzhMnbzJ/KNbWmhR8RlWc8l6J/2HbFz4\nbG0bw0M1BOHOKIxzGUOfzEhY6+jSc8vWamtQVpCqzuucGlYriO5zhzsZq929I1eI\n28TdvRnEGQklFsq0Rnh0qkWc4y3ZvAwy+O7hTqRT9D4TMYrhXO62E0CB2cskz8Mp\nqkUIPXOVocR3agbaJqvc04FPhLJUrxIOb+kHdL0uRQKBgQDFjLZrKRI76nzsLM4C\nN8x8MqEpb1r5R3IVYIlfzhAkbkUDH4RS75OaVGQ4wYL0S5TqfjZvx/37vxa3szP1\nQNNmUe7j5ad4KHwB3WjFmtzK4zGN7ehwgLLZISCDwJS1F1KStMVopM9aFLwTWAEp\ng+SATCIFuzM3XF3+INJO67fSswKBgQDC+tso3HDACJumLoL8XE8oxQwq0YAMvhG5\ngNFqXI+EYAoB1mHcnq64FvO8+2qK8T4qGnIVotae0HpIoB806iQTGg8XvsMzFfyS\nJPlQXHvTNgDosUjbY+dQpizDehIimZbrkghIzegCKAlsfB6p5GtnxdXeS1g7W/3q\nH06FKNccxwKBgDzbLTLz0w8sHFGxN8FNKSw1eJpIGJFkZguZ0pf15dkjMxVUNzJJ\nZYIMb1dgnZPeWMCoIuLqjB5qbngmt2HdF4KUyO/hxmZoqlL0vxroqw3BUXm0iX9m\n1jG3V8neoLDsv148W/fxlYLdklavLKR6YgD38x8q3Qs35CiuObtgOB+rAoGAM7RY\nF67VS2c890WQQKGt8C7IujYSEc75XkrVvbHL8RuSq8gQ7XM6++BCRFQbfbrZdErN\nBAXJihXYx5eGjv6kEFixtedFVi+3aX3aiz/rKihA93PD0UHd3loitreRRZGbHt77\nyWqo4qGBVj5X10+WV89zll4+iIctfz9MEC2zVZMCgYB7m1QedBAqQImkf3oxJds6\ns0vCp0oasFy8Z/3jzrtpgWeaQQ77XBl5Xd/dBtJG9Tz9EpgHkbzyDWd+i9GEPI6c\nsVP2/hvfF1BCkMYRXhfAPp1lm2v73fhSdhfy+JVVr3KFBxJzUY+fCvE1doB9e+Tf\nHhbpGvlE0KvWaIRKOEaarg==\n-----END PRIVATE KEY-----\n","client_email":"previu@veedo-401e0.iam.gserviceaccount.com","client_id":"106276358745416209993","auth_uri":"https://accounts.google.com/o/oauth2/auth","token_uri":"https://oauth2.googleapis.com/token","auth_provider_x509_cert_url":"https://www.googleapis.com/oauth2/v1/certs","client_x509_cert_url":"https://www.googleapis.com/robot/v1/metadata/x509/previu%40veedo-401e0.iam.gserviceaccount.com","universe_domain":"googleapis.com"}
-AUTO_CONFIGURE_GCS_CORS=true
-GCS_CORS_ORIGINS=https://previu.online,http://localhost:5173,http://localhost:8080
+```
 
-# Razorpay Configuration (Frontend only)
+## Upload Configuration
+```
+VITE_UPLOAD_SIMPLE_MAX_SIZE=104857600
+VITE_UPLOAD_RESUMABLE_MAX_SIZE=2147483648
+VITE_UPLOAD_CHUNK_SIZE=10485760
+```
+
+## Razorpay Configuration (LIVE KEYS)
+```
 VITE_RAZORPAY_KEY_ID=rzp_live_RxBgqXgrBXf3KE
-
-# Server-side Razorpay Configuration (Backend only)
 RAZORPAY_KEY_ID=rzp_live_RxBgqXgrBXf3KE
 RAZORPAY_KEY_SECRET=O53mL6H62Q0rH9hIncpXl9Z0
+```
 
-# Upload Configuration
-VITE_UPLOAD_SIMPLE_MAX_SIZE=104857600  # 100MB
-VITE_UPLOAD_RESUMABLE_MAX_SIZE=2147483648  # 2GB
-VITE_UPLOAD_CHUNK_SIZE=10485760  # 10MB
+## How to Add These to Vercel:
+
+1. Go to https://vercel.com/dashboard
+2. Select your `previu` project
+3. Go to **Settings** → **Environment Variables**
+4. Add each variable one by one:
+   - **Name**: Variable name (e.g., `VITE_FIREBASE_API_KEY`)
+   - **Value**: Variable value (e.g., `AIzaSyAycvL6OUa2gIHHABBdDr6eknJGxeddeqk`)
+   - **Environment**: Select `Production` (and optionally `Preview` and `Development`)
+5. Click **Save** for each variable
+
+## After Adding Variables:
+
+1. Go to your project's **Deployments** tab
+2. Click **Redeploy** on the latest deployment
+3. Or push a new commit to trigger automatic redeployment
+
+The Firebase Auth errors should be resolved once these environment variables are set.

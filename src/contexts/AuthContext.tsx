@@ -1,18 +1,15 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import {
   User,
-  signInWithRedirect,
-  getRedirectResult,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   sendPasswordResetEmail,
   signOut,
   onAuthStateChanged,
-  GoogleAuthProvider,
   UserCredential,
   updateProfile,
 } from "firebase/auth";
-import { auth, googleProvider } from "@/integrations/firebase/config";
+import { auth } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import { getSubscription, saveSubscription, incrementVideoUploadCount } from "@/integrations/firebase/subscriptionService";
 import { getSubscriptionStatus, validateClientCreation, updateSubscription } from "@/services/backendApiService";
@@ -32,8 +29,6 @@ export interface AuthContextType {
   currentUser: User | null;
   subscription: UserSubscription;
   loading: boolean;
-  // Google Auth
-  signInWithGoogle: () => Promise<void>;
   // Email/Password Auth
   loginWithEmail: (email: string, password: string) => Promise<UserCredential>;
   signUpWithEmail: (email: string, password: string, displayName: string) => Promise<UserCredential>;
@@ -76,32 +71,18 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     maxFileSize: 50
   });
 
-  // Sign in with Google (redirect method - primary)
-  const signInWithGoogle = async () => {
-    try {
-      // Configure the provider with additional settings
-      googleProvider.setCustomParameters({
-        prompt: 'select_account'
-      });
-
-      await signInWithRedirect(auth, googleProvider);
-      // The result will be handled by getRedirectResult in useEffect
-      // No need to return anything as redirect doesn't return immediately
-    } catch (error: any) {
-      console.error("Error signing in with Google:", error);
-      
-      // Handle specific error cases
-      if (error.code === 'auth/network-request-failed') {
-        toast.error("Network error. Please check your connection and try again.");
-      } else if (error.code === 'auth/internal-error') {
-        toast.error("Authentication service error. Please try again later.");
-      } else {
-        toast.error(error.message || "Failed to sign in with Google. Please try again.");
-      }
-      throw error;
-    }
+  // Validate Gmail address
+  const validateGmailAddress = (email: string): boolean => {
+    const gmailRegex = /^[a-zA-Z0-9._%+-]+@gmail\.com$/;
+    return gmailRegex.test(email);
   };
+
+  // Email/Password Authentication
   const loginWithEmail = async (email: string, password: string) => {
+    if (!validateGmailAddress(email)) {
+      throw new Error("Only Gmail addresses are allowed. Please use a @gmail.com email address.");
+    }
+
     try {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       setCurrentUser(userCredential.user);
@@ -116,6 +97,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // Sign up with email and password
   const signUpWithEmail = async (email: string, password: string, displayName: string) => {
+    if (!validateGmailAddress(email)) {
+      throw new Error("Only Gmail addresses are allowed. Please use a @gmail.com email address.");
+    }
+
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       
@@ -130,7 +115,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       return userCredential;
     } catch (error: any) {
       console.error("Error creating account:", error);
-      toast.error(error.message || "Failed to create account");
+      if (error.code === 'auth/email-already-in-use') {
+        toast.error("This email address is already registered. Please sign in instead.");
+      } else if (error.code === 'auth/weak-password') {
+        toast.error("Password is too weak. Please use at least 6 characters.");
+      } else {
+        toast.error(error.message || "Failed to create account");
+      }
       throw error;
     }
   };
@@ -380,24 +371,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       setLoading(false);
     });
 
-    // Handle redirect result
-    const handleRedirectResult = async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (result) {
-          const user = result.user;
-          setCurrentUser(user);
-          toast.success(`Welcome, ${user.displayName || user.email}!`);
-        }
-      } catch (error: any) {
-        console.error("Error handling redirect result:", error);
-        if (error.code !== 'auth/null-user') {
-          toast.error(error.message || "Authentication failed");
-        }
-      }
-    };
-
-    handleRedirectResult();
     return unsubscribe;
   }, []);
 
@@ -405,8 +378,6 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     currentUser,
     subscription,
     loading,
-    // Google Auth
-    signInWithGoogle,
     // Email/Password Auth
     loginWithEmail,
     signUpWithEmail,

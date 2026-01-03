@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider } from "firebase/auth";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Firebase configuration
@@ -26,6 +26,7 @@ const requiredEnvVars = [
 const missingVars = requiredEnvVars.filter(varName => !import.meta.env[varName]);
 if (missingVars.length > 0) {
   console.error('Missing required Firebase environment variables:', missingVars);
+  console.error('Available env vars:', Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')));
   throw new Error(`Missing Firebase configuration: ${missingVars.join(', ')}`);
 }
 
@@ -35,15 +36,9 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
 
-// Initialize Google Auth Provider with proper configuration
-export const googleProvider = new GoogleAuthProvider();
-
-// Configure Google Auth Provider
-googleProvider.addScope('email');
-googleProvider.addScope('profile');
-googleProvider.setCustomParameters({
-  prompt: 'select_account'
-});
+// Debug: Log auth configuration
+console.log('Firebase Auth initialized for email/password authentication');
+console.log('Auth domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 
 // Initialize Firestore
 export const db = getFirestore(app);
