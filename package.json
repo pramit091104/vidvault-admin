@@ -14,7 +14,9 @@
     "check-env": "node --disable-warning=DEP0169 check-env.js",
     "setup:gcs-lifecycle": "node --disable-warning=DEP0169 scripts/setup-gcs-lifecycle.js",
     "debug:deprecation": "node scripts/debug-deprecation.js",
-    "deploy:rules": "node --disable-warning=DEP0040 deploy-firestore-rules.js"
+    "deploy:rules": "node --disable-warning=DEP0040 deploy-firestore-rules.js",
+    "deploy:optimizations": "node --disable-warning=DEP0169 scripts/deploy-optimizations.js",
+    "optimize:cost": "node --disable-warning=DEP0169 scripts/deploy-optimizations.js"
   },
   "name": "vite_react_shadcn_ts",
   "private": true,

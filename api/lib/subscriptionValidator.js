@@ -8,6 +8,26 @@ dotenv.config();
 // Initialize Firebase Admin if not already initialized
 let db;
 
+// In-memory cache for subscription data (5 minute TTL)
+const subscriptionCache = new Map();
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+// Cache helper functions
+function getCachedSubscription(userId) {
+  const cached = subscriptionCache.get(userId);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+    return cached.data;
+  }
+  return null;
+}
+
+function setCachedSubscription(userId, data) {
+  subscriptionCache.set(userId, {
+    data,
+    timestamp: Date.now()
+  });
+}
+
 function initializeFirebaseAdmin() {
   try {
     if (getApps().length === 0) {
@@ -82,19 +102,26 @@ try {
 const SUBSCRIPTIONS_COLLECTION = 'subscriptions';
 
 /**
- * Get user subscription from Firestore
+ * Get user subscription from Firestore with caching
  */
 export async function getUserSubscription(userId) {
   try {
+    // Check cache first
+    const cached = getCachedSubscription(userId);
+    if (cached) {
+      return cached;
+    }
+
     // Ensure Firebase Admin is initialized
     const database = db || initializeFirebaseAdmin();
     
     const docRef = database.collection(SUBSCRIPTIONS_COLLECTION).doc(userId);
     const doc = await docRef.get();
     
+    let subscription;
     if (!doc.exists) {
       // Return default free subscription
-      return {
+      subscription = {
         userId,
         tier: 'free',
         videoUploadsUsed: 0,
@@ -104,23 +131,27 @@ export async function getUserSubscription(userId) {
         maxFileSize: 50, // 50MB
         status: 'active'
       };
+    } else {
+      const data = doc.data();
+      subscription = {
+        ...data,
+        subscriptionDate: data.subscriptionDate?.toDate(),
+        expiryDate: data.expiryDate?.toDate(),
+        createdAt: data.createdAt?.toDate(),
+        updatedAt: data.updatedAt?.toDate(),
+      };
     }
-    
-    const data = doc.data();
-    return {
-      ...data,
-      subscriptionDate: data.subscriptionDate?.toDate(),
-      expiryDate: data.expiryDate?.toDate(),
-      createdAt: data.createdAt?.toDate(),
-      updatedAt: data.updatedAt?.toDate(),
-    };
+
+    // Cache the result
+    setCachedSubscription(userId, subscription);
+    return subscription;
   } catch (error) {
     console.error('❌ Error getting user subscription:', error);
     
     // Handle permission errors gracefully by returning default subscription
     if (error.code === 7 || error.message?.includes('PERMISSION_DENIED')) {
       console.warn('⚠️ Firestore permission denied, returning default subscription');
-      return {
+      const defaultSubscription = {
         userId,
         tier: 'free',
         videoUploadsUsed: 0,
@@ -130,6 +161,8 @@ export async function getUserSubscription(userId) {
         maxFileSize: 50, // 50MB
         status: 'active'
       };
+      setCachedSubscription(userId, defaultSubscription);
+      return defaultSubscription;
     }
     
     throw error;
@@ -177,32 +210,31 @@ export async function validateFileUpload(userId, fileSize) {
 }
 
 /**
- * Validate if user can add a client
+ * Validate if user can add a client (optimized with cached counts)
  */
 export async function validateClientCreation(userId) {
   try {
     const subscription = await getUserSubscription(userId);
     
-    // Get current client count from Firestore
-    const database = db || initializeFirebaseAdmin();
-    const clientsRef = database.collection('clients');
-    const clientsQuery = clientsRef.where('userId', '==', userId);
-    const clientsSnapshot = await clientsQuery.get();
-    const currentClientCount = clientsSnapshot.size;
+    // Use cached client count from subscription document instead of querying all clients
+    const currentClientCount = subscription.clientsUsed || 0;
     
     // Check client limit
     if (currentClientCount >= subscription.maxClients) {
       return {
         allowed: false,
         error: `Client limit reached. ${subscription.tier === 'free' ? 'Upgrade to Premium for 50 clients.' : 'You have reached your client limit.'}`,
-        code: 'CLIENT_LIMIT_EXCEEDED'
+        code: 'CLIENT_LIMIT_EXCEEDED',
+        currentClientCount,
+        maxClients: subscription.maxClients
       };
     }
     
     return {
       allowed: true,
       subscription,
-      currentClientCount
+      currentClientCount,
+      maxClients: subscription.maxClients
     };
   } catch (error) {
     console.error('❌ Error validating client creation:', error);
@@ -214,7 +246,8 @@ export async function validateClientCreation(userId) {
       return {
         allowed: true,
         subscription,
-        currentClientCount: 0 // Default to 0 if we can't check
+        currentClientCount: 0, // Default to 0 if we can't check
+        maxClients: subscription.maxClients
       };
     }
     
@@ -227,7 +260,7 @@ export async function validateClientCreation(userId) {
 }
 
 /**
- * Increment video upload count
+ * Increment video upload count with cache invalidation
  */
 export async function incrementVideoUploadCount(userId) {
   try {
@@ -258,6 +291,9 @@ export async function incrementVideoUploadCount(userId) {
       });
     }
     
+    // Invalidate cache to ensure fresh data on next read
+    subscriptionCache.delete(userId);
+    
     return true;
   } catch (error) {
     console.error('❌ Error incrementing video upload count:', error);
@@ -273,7 +309,7 @@ export async function incrementVideoUploadCount(userId) {
 }
 
 /**
- * Increment client count
+ * Increment client count with cache invalidation
  */
 export async function incrementClientCount(userId) {
   try {
@@ -303,6 +339,9 @@ export async function incrementClientCount(userId) {
         updatedAt: new Date()
       });
     }
+    
+    // Invalidate cache to ensure fresh data on next read
+    subscriptionCache.delete(userId);
     
     return true;
   } catch (error) {

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import Index from "@/pages/Index";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -69,7 +70,7 @@ const DashboardLayout = ({ children, activeSection, onSectionChange }: Dashboard
         {/* Logo */}
         <div className="flex items-center gap-3">
           <div>
-            <h1 className="text-xl font-bold text-foreground">Previu</h1>
+            <button type="button" onClick={()=> window.location.href= '/'}><h1 className="text-xl font-bold text-foreground">Previu</h1></button>
             <p className="text-xs text-muted-foreground">Admin Dashboard</p>
           </div>
         </div>
