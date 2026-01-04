@@ -71,14 +71,69 @@ export default async function handler(req, res) {
       });
     }
 
-    // For anonymous users, skip email notification
-    if (isAnonymous || !isAuthenticated) {
+    // TEMPORARY: For testing, let's create a mock video with different owner if videoId starts with "mock-"
+    const isMockMode = videoId.startsWith('mock-');
+    
+    if (isMockMode) {
+      console.log('🎭 MOCK MODE: Creating fake video with different owner for testing');
+      
+      // Create mock video data with different owner
+      const mockOwnerEmail = commenterEmail; // Use commenter email as the "video owner" for testing
+      const mockVideoData = {
+        title: 'Mock Test Video',
+        userId: 'mock-user-id-123' // This would normally be a Firebase UID
+      };
+      
+      // Prepare email data
+      const emailData = {
+        videoTitle: mockVideoData.title,
+        videoId: videoId,
+        commenterName: commenterName || 'Test Commenter',
+        commenterEmail: commenterEmail || 'test@example.com',
+        commentText: commentText,
+        commentTimestamp: new Date().toLocaleString(),
+        videoUrl: `https://previu.online/watch/${videoId}`,
+        ownerEmail: mockOwnerEmail, // This should be different from previu.online@gmail.com
+        ownerName: 'Mock Video Owner'
+      };
+
+      console.log('📧 MOCK: Preparing to send email:', {
+        from: process.env.GMAIL_USER,
+        to: emailData.ownerEmail,
+        videoTitle: emailData.videoTitle,
+        commenterName: emailData.commenterName
+      });
+
+      const emailSent = await sendCommentNotification(emailData);
+      
+      return res.status(200).json({
+        success: true,
+        message: emailSent ? 'Mock email sent successfully!' : 'Mock email failed to send',
+        emailSent,
+        mockMode: true,
+        emailData: {
+          from: process.env.GMAIL_USER,
+          to: emailData.ownerEmail,
+          subject: `New comment on your video: ${emailData.videoTitle}`
+        }
+      });
+    }
+    
+    // TEMPORARY: For testing, let's bypass the authentication check if videoId starts with "debug-"
+    const isDebugMode = videoId.startsWith('debug-');
+    
+    // For anonymous users, skip email notification (unless in debug/mock mode)
+    if (!isDebugMode && !isMockMode && (isAnonymous || !isAuthenticated)) {
       console.log('Anonymous comment posted, skipping email notification');
       return res.status(200).json({ 
         success: true, 
         message: 'Comment posted successfully (anonymous)',
         emailSent: false
       });
+    }
+    
+    if (isDebugMode) {
+      console.log('🐛 DEBUG MODE: Bypassing authentication check for testing');
     }
 
     // Get video details from Firestore
@@ -89,6 +144,12 @@ export default async function handler(req, res) {
     }
 
     const videoData = videoDoc.data();
+    console.log('📹 Video data:', { 
+      videoId, 
+      title: videoData.title, 
+      userId: videoData.userId,
+      hasUserId: !!videoData.userId 
+    });
     
     // Get video owner's email
     if (!videoData.userId) {
@@ -100,11 +161,17 @@ export default async function handler(req, res) {
     let ownerName = null;
     
     try {
+      console.log('🔍 Looking up user with ID:', videoData.userId);
       const ownerUser = await getAuth().getUser(videoData.userId);
       ownerEmail = ownerUser.email;
       ownerName = ownerUser.displayName;
+      console.log('👤 Found video owner:', { 
+        userId: videoData.userId, 
+        email: ownerEmail, 
+        name: ownerName 
+      });
     } catch (userError) {
-      console.error('Error getting owner user data:', userError);
+      console.error('❌ Error getting owner user data:', userError);
       return res.status(400).json({ error: 'Could not get video owner information' });
     }
 
@@ -113,7 +180,8 @@ export default async function handler(req, res) {
     }
 
     // Don't send email if commenter is the video owner
-    if (decodedToken.email === ownerEmail) {
+    if (decodedToken && decodedToken.email === ownerEmail) {
+      console.log('🚫 Skipping email - commenter is video owner');
       return res.status(200).json({ 
         success: true, 
         message: 'No email sent - commenter is video owner' 
@@ -124,14 +192,21 @@ export default async function handler(req, res) {
     const emailData = {
       videoTitle: videoData.title,
       videoId: videoId,
-      commenterName: commenterName || decodedToken.name,
-      commenterEmail: commenterEmail || decodedToken.email,
+      commenterName: commenterName || decodedToken?.name,
+      commenterEmail: commenterEmail || decodedToken?.email,
       commentText: commentText,
       commentTimestamp: new Date().toLocaleString(),
       videoUrl: `${req.headers.origin || 'https://previu.online'}/watch/${videoId}`,
       ownerEmail: ownerEmail,
       ownerName: ownerName || 'there'
     };
+
+    console.log('📧 Preparing to send email:', {
+      from: process.env.GMAIL_USER,
+      to: emailData.ownerEmail,
+      videoTitle: emailData.videoTitle,
+      commenterName: emailData.commenterName
+    });
 
     // Send email notification
     const emailSent = await sendCommentNotification(emailData);
