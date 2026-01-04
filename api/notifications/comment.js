@@ -159,14 +159,31 @@ export default async function handler(req, res) {
 
 async function sendCommentNotification(data) {
   try {
+    // Check if Gmail credentials are configured
+    if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+      console.error('Gmail credentials not configured');
+      console.error('GMAIL_USER:', process.env.GMAIL_USER ? 'Set' : 'Missing');
+      console.error('GMAIL_APP_PASSWORD:', process.env.GMAIL_APP_PASSWORD ? 'Set' : 'Missing');
+      return false;
+    }
+
     // Initialize Gmail transporter
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       service: 'gmail',
       auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD,
       },
     });
+
+    // Test connection first
+    try {
+      await transporter.verify();
+      console.log('Gmail connection verified successfully');
+    } catch (verifyError) {
+      console.error('Gmail connection failed:', verifyError.message);
+      return false;
+    }
 
     const htmlTemplate = generateCommentEmailTemplate(data);
 
@@ -183,6 +200,12 @@ async function sendCommentNotification(data) {
     return true;
   } catch (error) {
     console.error('Error sending email:', error);
+    console.error('Error details:', {
+      message: error.message,
+      code: error.code,
+      command: error.command,
+      response: error.response
+    });
     return false;
   }
 }
