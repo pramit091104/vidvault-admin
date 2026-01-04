@@ -1,19 +1,16 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { 
   Video, 
-  Clock, 
   Eye, 
   Share2, 
   Trash2, 
   Calendar,
-  AlertTriangle,
-  CheckCircle2,
-  Infinity,
-  Settings
+  MessageSquare,
+  ChevronDown,
+  ChevronUp,
+  User
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
@@ -23,6 +20,7 @@ import {
   GCSVideoRecord, 
   isVideoLinkExpired 
 } from "@/integrations/firebase/videoService";
+import { getVideoTimestampedComments, TimestampedComment } from "@/integrations/firebase/commentService";
 import { LinkExpirationControl } from "./LinkExpirationControl";
 import { formatDistanceToNow } from "date-fns";
 
@@ -30,8 +28,10 @@ export const VideosManagement = () => {
   const { currentUser } = useAuth();
   const [videos, setVideos] = useState<GCSVideoRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedVideo, setSelectedVideo] = useState<GCSVideoRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [expandedComments, setExpandedComments] = useState<string | null>(null);
+  const [videoComments, setVideoComments] = useState<{ [key: string]: TimestampedComment[] }>({});
+  const [loadingComments, setLoadingComments] = useState<string | null>(null);
 
   const fetchVideos = async () => {
     if (!currentUser) return;
@@ -70,6 +70,38 @@ export const VideosManagement = () => {
     }
   };
 
+  const handleViewComments = async (video: GCSVideoRecord) => {
+    if (expandedComments === video.id) {
+      // Collapse if already expanded
+      setExpandedComments(null);
+      return;
+    }
+
+    // Expand and load comments
+    setExpandedComments(video.id);
+    
+    if (!videoComments[video.id]) {
+      setLoadingComments(video.id);
+      try {
+        const comments = await getVideoTimestampedComments(video.id);
+        setVideoComments(prev => ({
+          ...prev,
+          [video.id]: comments || []
+        }));
+      } catch (error) {
+        console.error('Error loading comments:', error);
+        toast.error('Failed to load comments');
+      } finally {
+        setLoadingComments(null);
+      }
+    }
+  };
+
+  const formatTimestamp = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  };
   const handleShareVideo = (video: GCSVideoRecord) => {
     const shareUrl = `${window.location.origin}/watch/${video.id}`;
     
@@ -86,47 +118,6 @@ export const VideosManagement = () => {
       document.body.removeChild(textArea);
       toast.success("Share link copied to clipboard!");
     }
-  };
-
-  const getExpirationStatus = (video: GCSVideoRecord) => {
-    if (!video.linkExpiresAt) {
-      return {
-        status: "never",
-        badge: (
-          <Badge variant="secondary" className="flex items-center gap-1">
-            <Infinity className="h-3 w-3" />
-            Never expires
-          </Badge>
-        ),
-        timeText: "No expiration set"
-      };
-    }
-
-    const isExpired = isVideoLinkExpired(video);
-    
-    if (isExpired) {
-      return {
-        status: "expired",
-        badge: (
-          <Badge variant="destructive" className="flex items-center gap-1">
-            <AlertTriangle className="h-3 w-3" />
-            Expired
-          </Badge>
-        ),
-        timeText: `Expired ${formatDistanceToNow(video.linkExpiresAt)} ago`
-      };
-    }
-
-    return {
-      status: "active",
-      badge: (
-        <Badge variant="default" className="flex items-center gap-1">
-          <CheckCircle2 className="h-3 w-3" />
-          Active
-        </Badge>
-      ),
-      timeText: `Expires ${formatDistanceToNow(video.linkExpiresAt, { addSuffix: true })}`
-    };
   };
 
   if (isLoading) {
@@ -175,8 +166,6 @@ export const VideosManagement = () => {
         <CardContent>
           <div className="space-y-4">
             {videos.map((video) => {
-              const expirationStatus = getExpirationStatus(video);
-              
               return (
                 <div key={video.id} className="border rounded-lg p-4 space-y-3">
                   {/* Video Info */}
@@ -203,15 +192,23 @@ export const VideosManagement = () => {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setSelectedVideo(selectedVideo?.id === video.id ? null : video)}
+                        onClick={() => handleViewComments(video)}
+                        title="View Comments"
                       >
-                        <Settings className="h-4 w-4" />
+                        <MessageSquare className="h-4 w-4 mr-1" />
+                        {videoComments[video.id]?.length || 0}
+                        {expandedComments === video.id ? (
+                          <ChevronUp className="h-3 w-3 ml-1" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3 ml-1" />
+                        )}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleShareVideo(video)}
                         disabled={isVideoLinkExpired(video)}
+                        title="Share Video"
                       >
                         <Share2 className="h-4 w-4" />
                       </Button>
@@ -220,36 +217,60 @@ export const VideosManagement = () => {
                         size="sm"
                         onClick={() => handleDeleteVideo(video.id)}
                         disabled={isDeleting === video.id}
+                        title="Delete Video"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
 
-                  {/* Expiration Status */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-sm text-muted-foreground">
-                        {expirationStatus.timeText}
-                      </span>
+                  {/* Comments Section (Expandable) */}
+                  {expandedComments === video.id && (
+                    <div className="mt-4 border-t pt-4">
+                      <h4 className="font-medium mb-3 flex items-center gap-2">
+                        <MessageSquare className="h-4 w-4" />
+                        Comments ({videoComments[video.id]?.length || 0})
+                      </h4>
+                      
+                      {loadingComments === video.id ? (
+                        <div className="text-center py-4 text-muted-foreground">
+                          Loading comments...
+                        </div>
+                      ) : videoComments[video.id]?.length > 0 ? (
+                        <div className="space-y-3 max-h-60 overflow-y-auto">
+                          {videoComments[video.id].map((comment, index) => (
+                            <div key={index} className="bg-muted/50 p-3 rounded-lg">
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex items-center gap-2">
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                  <span className="font-medium text-sm">
+                                    {comment.userName || 'Anonymous'}
+                                  </span>
+                                  <span className="text-xs text-muted-foreground">
+                                    at {formatTimestamp(comment.timestamp)}
+                                  </span>
+                                </div>
+                                <span className="text-xs text-muted-foreground">
+                                  {formatDistanceToNow(comment.createdAt, { addSuffix: true })}
+                                </span>
+                              </div>
+                              <p className="text-sm">{comment.comment}</p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-4 text-muted-foreground">
+                          No comments yet
+                        </div>
+                      )}
                     </div>
-                    {expirationStatus.badge}
-                  </div>
-
-                  {/* Expiration Control (Expanded) */}
-                  {selectedVideo?.id === video.id && (
-                    <>
-                      <Separator />
-                      <LinkExpirationControl 
-                        video={video} 
-                        onUpdate={() => {
-                          fetchVideos();
-                          setSelectedVideo(null);
-                        }}
-                      />
-                    </>
                   )}
+
+                  {/* Compact Expiration Control */}
+                  <LinkExpirationControl 
+                    video={video} 
+                    onUpdate={fetchVideos}
+                  />
                 </div>
               );
             })}

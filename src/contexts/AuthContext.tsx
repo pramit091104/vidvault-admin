@@ -68,7 +68,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     maxVideoUploads: 5,
     clientsUsed: 0,
     maxClients: 5,
-    maxFileSize: 50
+    maxFileSize: 100
   });
 
   // Validate Gmail address
@@ -271,7 +271,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         maxVideoUploads: 5,
         clientsUsed: 0,
         maxClients: 5,
-        maxFileSize: 50
+        maxFileSize: 100
       });
       toast.success("Logged out successfully");
     } catch (error: any) {
@@ -323,7 +323,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 maxVideoUploads: 5,
                 clientsUsed: 0,
                 maxClients: 5,
-                maxFileSize: 50,
+                maxFileSize: 100,
                 status: 'active' as const
               };
               await saveSubscription(defaultSubscription);
@@ -333,7 +333,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 maxVideoUploads: 5,
                 clientsUsed: 0,
                 maxClients: 5,
-                maxFileSize: 50
+                maxFileSize: 100
               });
             }
           } catch (fallbackError) {
@@ -345,7 +345,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
               maxVideoUploads: 5,
               clientsUsed: 0,
               maxClients: 5,
-              maxFileSize: 50
+              maxFileSize: 100
             });
           }
         }
@@ -357,7 +357,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           maxVideoUploads: 5,
           clientsUsed: 0,
           maxClients: 5,
-          maxFileSize: 50
+          maxFileSize: 100
         });
       }
     };

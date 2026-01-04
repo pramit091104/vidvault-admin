@@ -128,7 +128,7 @@ export async function getUserSubscription(userId) {
         maxVideoUploads: 5,
         clientsUsed: 0,
         maxClients: 5,
-        maxFileSize: 50, // 50MB
+        maxFileSize: 100, // 100MB
         status: 'active'
       };
     } else {
@@ -158,7 +158,7 @@ export async function getUserSubscription(userId) {
         maxVideoUploads: 5,
         clientsUsed: 0,
         maxClients: 5,
-        maxFileSize: 50, // 50MB
+        maxFileSize: 100, // 100MB
         status: 'active'
       };
       setCachedSubscription(userId, defaultSubscription);
@@ -278,7 +278,7 @@ export async function incrementVideoUploadCount(userId) {
         maxVideoUploads: 5,
         clientsUsed: 0,
         maxClients: 5,
-        maxFileSize: 50,
+        maxFileSize: 100,
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date()
@@ -327,7 +327,7 @@ export async function incrementClientCount(userId) {
         maxVideoUploads: 5,
         clientsUsed: 1,
         maxClients: 5,
-        maxFileSize: 50,
+        maxFileSize: 100,
         status: 'active',
         createdAt: new Date(),
         updatedAt: new Date()

@@ -591,20 +591,20 @@ app.post('/api/signed-url', async (req, res) => {
 import subscriptionHandler from './api/subscription.js';
 import clientsValidateHandler from './api/clients/validate.js';
 import clientsCreateHandler from './api/clients/create.js';
-import gcsValidateUploadHandler from './api/gcs/validate-upload.js';
-import gcsSimpleUploadHandler from './api/gcs/simple-upload.js';
+import uploadHandler from './api/upload.js';
 import gcsResumableUploadUrlHandler from './api/gcs/resumable-upload-url.js';
 import gcsDeleteHandler from './api/gcs/delete.js';
+import commentNotificationHandler from './api/notifications/comment.js';
 import paymentHandler from './api/payment.js';
 
 // Add the new API routes
 app.use('/api/subscription', subscriptionHandler);
 app.get('/api/clients/validate', clientsValidateHandler);
 app.post('/api/clients/create', clientsCreateHandler);
-app.post('/api/gcs/validate-upload', gcsValidateUploadHandler);
-app.post('/api/gcs/simple-upload', gcsSimpleUploadHandler);
+app.use('/api/upload', uploadHandler);
 app.post('/api/gcs/resumable-upload-url', gcsResumableUploadUrlHandler);
 app.delete('/api/gcs/delete', gcsDeleteHandler);
+app.post('/api/notifications/comment', commentNotificationHandler);
 
 // Payment routes - use the payment handler for both /api/payment and /api/razorpay routes
 app.use('/api/payment', paymentHandler);

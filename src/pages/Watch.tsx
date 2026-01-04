@@ -11,6 +11,7 @@ import { getVideoBySlugOrId, updateVideoViewCount, GCSVideoRecord, isVideoLinkEx
 import { addTimestampedComment, getVideoTimestampedComments, clearVideoCommentsCache, TimestampedComment } from "@/integrations/firebase/commentService";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
+import { notificationService } from "@/services/notificationService";
 
 interface PublicVideo {
   id: string;
@@ -324,6 +325,19 @@ const Watch = () => {
 
     if (!video) return;
 
+    // Simple rate limiting for anonymous users (client-side)
+    if (!currentUser) {
+      const lastCommentTime = localStorage.getItem('lastAnonymousComment');
+      const now = Date.now();
+      const cooldownPeriod = 30000; // 30 seconds
+
+      if (lastCommentTime && (now - parseInt(lastCommentTime)) < cooldownPeriod) {
+        const remainingTime = Math.ceil((cooldownPeriod - (now - parseInt(lastCommentTime))) / 1000);
+        toast.error(`Please wait ${remainingTime} seconds before posting another comment`);
+        return;
+      }
+    }
+
     try {
       setIsPostingComment(true);
       // Use captured time, fallback to current time
@@ -344,6 +358,23 @@ const Watch = () => {
         userEmail,
       });
 
+      // Store timestamp for anonymous rate limiting
+      if (!currentUser) {
+        localStorage.setItem('lastAnonymousComment', Date.now().toString());
+      }
+
+      // Send email notification to video owner (async, don't wait for it)
+      // This works for both authenticated and anonymous users
+      notificationService.sendCommentNotification({
+        videoId: video.id,
+        commentText: commentText.trim(),
+        commenterName: userName,
+        commenterEmail: userEmail
+      }).catch(error => {
+        console.error('Failed to send email notification:', error);
+        // Don't show error to user, just log it
+      });
+
       // Clear cache and refresh comments immediately
       clearVideoCommentsCache(video.id);
       setIsRefreshingComments(true);
@@ -353,7 +384,7 @@ const Watch = () => {
 
       setCommentText("");
       setCapturedTime(0);
-      toast.success("Comment posted successfully!");
+      toast.success(currentUser ? "Comment posted successfully!" : "Anonymous comment posted successfully!");
     } catch (err: any) {
       console.error('Error posting comment:', err);
       toast.error(err.message || "Failed to post comment");
@@ -555,11 +586,18 @@ const Watch = () => {
                   </Button>
 
                   <Textarea
-                    placeholder="Share your thoughts..."
+                    placeholder={currentUser ? "Share your thoughts..." : "Share your thoughts as Anonymous..."}
                     value={commentText}
                     onChange={(e) => setCommentText(e.target.value)}
                     className="resize-none text-sm border-border/50 focus:border-primary/50 bg-background min-h-[80px]"
                   />
+
+                  {!currentUser && (
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded-md">
+                      <AlertTriangle className="h-3 w-3" />
+                      <span>You're commenting as Anonymous. Consider signing in for a personalized experience.</span>
+                    </div>
+                  )}
 
                   <Button
                     onClick={handlePostComment}
@@ -569,7 +607,7 @@ const Watch = () => {
                     {isPostingComment ? (
                       <Loader2 className="h-4 w-4 animate-spin" />
                     ) : (
-                      "Post"
+                      currentUser ? "Post Comment" : "Post as Anonymous"
                     )}
                   </Button>
                 </div>
@@ -701,11 +739,18 @@ const Watch = () => {
                 </Button>
 
                 <Textarea
-                  placeholder="Share your thoughts..."
+                  placeholder={currentUser ? "Share your thoughts..." : "Share your thoughts as Anonymous..."}
                   value={commentText}
                   onChange={(e) => setCommentText(e.target.value)}
                   className="resize-none text-sm border-border/50 focus:border-primary/50 bg-background min-h-[80px]"
                 />
+
+                {!currentUser && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/30 p-2 rounded-md">
+                    <AlertTriangle className="h-3 w-3" />
+                    <span>You're commenting as Anonymous. Consider signing in for a personalized experience.</span>
+                  </div>
+                )}
 
                 <Button
                   onClick={handlePostComment}
@@ -715,7 +760,7 @@ const Watch = () => {
                   {isPostingComment ? (
                     <Loader2 className="h-4 w-4 animate-spin" />
                   ) : (
-                    "Post"
+                    currentUser ? "Post Comment" : "Post as Anonymous"
                   )}
                 </Button>
               </div>

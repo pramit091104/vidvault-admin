@@ -30,10 +30,11 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // Allow authenticated users to read/write timestamped comments
-    // Removed anonymous access for security and cost optimization
+    // Allow both authenticated and anonymous users to read/write timestamped comments
+    // Anonymous users can comment on public videos for better user experience
     match /timestampedComments/{document} {
-      allow read, write: if request.auth != null;
+      allow read: if true; // Anyone can read comments
+      allow write: if true; // Anyone can write comments (with client-side validation)
     }
     
     // Service account rules for server-side operations
