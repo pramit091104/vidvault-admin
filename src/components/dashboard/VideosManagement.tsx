@@ -195,11 +195,6 @@ export const VideosManagement = () => {
                           <Eye className="h-3 w-3" />
                           {video.viewCount || 0} views
                         </span>
-                        {/* Inline expiration status */}
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {expirationStatus.badge}
-                        </div>
                       </div>
                     </div>
                     
@@ -231,19 +226,28 @@ export const VideosManagement = () => {
                     </div>
                   </div>
 
-                  {/* Compact Expiration Control (Expanded) */}
+                  {/* Expiration Status */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm text-muted-foreground">
+                        {expirationStatus.timeText}
+                      </span>
+                    </div>
+                    {expirationStatus.badge}
+                  </div>
+
+                  {/* Expiration Control (Expanded) */}
                   {selectedVideo?.id === video.id && (
                     <>
                       <Separator />
-                      <div className="pt-3">
-                        <LinkExpirationControl 
-                          video={video} 
-                          onUpdate={() => {
-                            fetchVideos();
-                            setSelectedVideo(null);
-                          }}
-                        />
-                      </div>
+                      <LinkExpirationControl 
+                        video={video} 
+                        onUpdate={() => {
+                          fetchVideos();
+                          setSelectedVideo(null);
+                        }}
+                      />
                     </>
                   )}
                 </div>

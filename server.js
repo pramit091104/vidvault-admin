@@ -595,8 +595,6 @@ import gcsValidateUploadHandler from './api/gcs/validate-upload.js';
 import gcsSimpleUploadHandler from './api/gcs/simple-upload.js';
 import gcsResumableUploadUrlHandler from './api/gcs/resumable-upload-url.js';
 import gcsDeleteHandler from './api/gcs/delete.js';
-import videoStreamHandler from './api/video/stream.js';
-import videoValidateAccessHandler from './api/video/validate-access.js';
 import paymentHandler from './api/payment.js';
 
 // Add the new API routes
@@ -607,8 +605,6 @@ app.post('/api/gcs/validate-upload', gcsValidateUploadHandler);
 app.post('/api/gcs/simple-upload', gcsSimpleUploadHandler);
 app.post('/api/gcs/resumable-upload-url', gcsResumableUploadUrlHandler);
 app.delete('/api/gcs/delete', gcsDeleteHandler);
-app.get('/api/video/stream', videoStreamHandler);
-app.post('/api/video/validate-access', videoValidateAccessHandler);
 
 // Payment routes - use the payment handler for both /api/payment and /api/razorpay routes
 app.use('/api/payment', paymentHandler);

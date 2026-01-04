@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
@@ -12,12 +13,13 @@ interface LinkExpirationControlProps {
 }
 
 const EXPIRATION_OPTIONS = [
-  { value: "0", label: "Never expires" },
-  { value: "1", label: "1 hour" },
-  { value: "6", label: "6 hours" },
-  { value: "24", label: "24 hours" },
-  { value: "72", label: "3 days" },
-  { value: "168", label: "1 week" },
+  { value: "0", label: "Never expires", icon: Infinity },
+  { value: "1", label: "1 hour", icon: Clock },
+  { value: "6", label: "6 hours", icon: Clock },
+  { value: "24", label: "24 hours", icon: Clock },
+  { value: "72", label: "3 days", icon: Clock },
+  { value: "168", label: "1 week", icon: Clock },
+  { value: "720", label: "30 days", icon: Clock },
 ];
 
 export const LinkExpirationControl = ({ video, onUpdate }: LinkExpirationControlProps) => {
@@ -43,11 +45,11 @@ export const LinkExpirationControl = ({ video, onUpdate }: LinkExpirationControl
     
     if (hours > 24) {
       const days = Math.floor(hours / 24);
-      return `${days}d remaining`;
+      return `${days} day${days > 1 ? 's' : ''} remaining`;
     } else if (hours > 0) {
-      return `${hours}h ${minutes}m`;
+      return `${hours}h ${minutes}m remaining`;
     } else {
-      return `${minutes}m`;
+      return `${minutes}m remaining`;
     }
   };
 
@@ -59,14 +61,14 @@ export const LinkExpirationControl = ({ video, onUpdate }: LinkExpirationControl
       
       toast.success(
         hours 
-          ? `Link expires in ${hours} hours`
-          : "Link will never expire"
+          ? `Link expiration updated to ${hours} hours`
+          : "Link expiration removed - link will never expire"
       );
       
       onUpdate?.();
     } catch (error) {
       console.error("Error updating link expiration:", error);
-      toast.error("Failed to update expiration");
+      toast.error("Failed to update link expiration");
     } finally {
       setIsUpdating(false);
     }
@@ -75,8 +77,8 @@ export const LinkExpirationControl = ({ video, onUpdate }: LinkExpirationControl
   const getStatusBadge = () => {
     if (!hasExpiration) {
       return (
-        <Badge variant="secondary" className="text-xs">
-          <Infinity className="h-3 w-3 mr-1" />
+        <Badge variant="secondary" className="flex items-center gap-1">
+          <Infinity className="h-3 w-3" />
           Never expires
         </Badge>
       );
@@ -84,55 +86,91 @@ export const LinkExpirationControl = ({ video, onUpdate }: LinkExpirationControl
     
     if (isExpired) {
       return (
-        <Badge variant="destructive" className="text-xs">
-          <AlertTriangle className="h-3 w-3 mr-1" />
+        <Badge variant="destructive" className="flex items-center gap-1">
+          <AlertTriangle className="h-3 w-3" />
           Expired
         </Badge>
       );
     }
     
     return (
-      <Badge variant="default" className="text-xs">
-        <CheckCircle2 className="h-3 w-3 mr-1" />
-        {getTimeRemaining()}
+      <Badge variant="default" className="flex items-center gap-1">
+        <CheckCircle2 className="h-3 w-3" />
+        Active
       </Badge>
     );
   };
 
   return (
-    <div className="space-y-3">
-      {/* Status and Time */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Clock className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm font-medium">Link Expiration</span>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Clock className="h-5 w-5" />
+          Link Expiration Control
+        </CardTitle>
+        <CardDescription>
+          Control how long the preview link remains accessible
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Current Status */}
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-medium">Current Status:</span>
+          {getStatusBadge()}
         </div>
-        {getStatusBadge()}
-      </div>
 
-      {/* Controls */}
-      <div className="flex gap-2">
-        <Select value={selectedExpiration} onValueChange={setSelectedExpiration}>
-          <SelectTrigger className="flex-1">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {EXPIRATION_OPTIONS.map((option) => (
-              <SelectItem key={option.value} value={option.value}>
-                {option.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
+        {/* Time Remaining */}
+        {hasExpiration && (
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Time Remaining:</span>
+            <span className={`text-sm ${isExpired ? 'text-destructive' : 'text-muted-foreground'}`}>
+              {getTimeRemaining()}
+            </span>
+          </div>
+        )}
+
+        {/* Expiration Settings */}
+        <div className="space-y-3">
+          <label className="text-sm font-medium">Set Expiration:</label>
+          <Select value={selectedExpiration} onValueChange={setSelectedExpiration}>
+            <SelectTrigger>
+              <SelectValue placeholder="Select expiration time" />
+            </SelectTrigger>
+            <SelectContent>
+              {EXPIRATION_OPTIONS.map((option) => {
+                const Icon = option.icon;
+                return (
+                  <SelectItem key={option.value} value={option.value}>
+                    <div className="flex items-center gap-2">
+                      <Icon className="h-4 w-4" />
+                      {option.label}
+                    </div>
+                  </SelectItem>
+                );
+              })}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Update Button */}
         <Button 
           onClick={handleUpdateExpiration}
           disabled={isUpdating || selectedExpiration === (video.linkExpirationHours?.toString() || "24")}
-          size="sm"
+          className="w-full"
         >
-          {isUpdating ? "..." : "Update"}
+          {isUpdating ? "Updating..." : "Update Expiration"}
         </Button>
-      </div>
-    </div>
+
+        {/* Info */}
+        <div className="text-xs text-muted-foreground bg-muted p-3 rounded-md">
+          <p className="font-medium mb-1">How it works:</p>
+          <ul className="space-y-1">
+            <li>• Expired links will show an error message to viewers</li>
+            <li>• You can extend or remove expiration at any time</li>
+            <li>• Links without expiration remain accessible indefinitely</li>
+          </ul>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
