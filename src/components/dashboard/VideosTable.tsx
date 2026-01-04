@@ -17,6 +17,8 @@ import { getAllVideosForUser } from "@/integrations/firebase/videoService";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
 import { deleteVideo, toggleVideoPublicAccess } from "@/integrations/firebase/videoService";
+import { fixInvalidVideoSlugs } from "@/lib/fixVideoSlugs";
+import '@/lib/quickSlugFix'; // This will make fixTrueSlug available globally
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
 import TimestampedComments from "./TimestampedComments";
@@ -63,7 +65,6 @@ const VideosTable = () => {
         // Update the video record with the new slug
         await toggleVideoPublicAccess(
           video.id,
-          video.service,
           newPublicStatus,
           slugToUse
         );
@@ -86,7 +87,6 @@ const VideosTable = () => {
       // Normal toggle for existing slugs
       await toggleVideoPublicAccess(
         video.id,
-        video.service,
         newPublicStatus,
         slugToUse
       );
@@ -116,6 +116,28 @@ const VideosTable = () => {
     navigator.clipboard.writeText(publicUrl);
     toast.success('Public URL copied to clipboard!');
   };
+
+  // Admin utility function to fix invalid slugs
+  const handleFixSlugs = async () => {
+    try {
+      toast.info('Fixing invalid video slugs...');
+      await fixInvalidVideoSlugs();
+      toast.success('Video slugs fixed! Please refresh the page.');
+      // Refresh the videos list
+      fetchAllVideos();
+    } catch (error: any) {
+      console.error('Error fixing slugs:', error);
+      toast.error('Failed to fix slugs: ' + error.message);
+    }
+  };
+
+  // Make the fix function available globally for debugging
+  useEffect(() => {
+    (window as any).fixVideoSlugs = handleFixSlugs;
+    return () => {
+      delete (window as any).fixVideoSlugs;
+    };
+  }, []);
 
   useEffect(() => {
     fetchAllVideos();

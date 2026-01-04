@@ -104,7 +104,7 @@ const UploadSection = ({ preSelectedFile }: UploadSectionProps = {}) => {
         toast.error("Invalid file type. Please select a supported video format.");
         return;
       }
-      // Strict file size check (YouTube limit is 256GB, set a reasonable frontend limit)
+      // Strict file size check (set a reasonable frontend limit)
       const maxSize = 2 * 1024 * 1024 * 1024; // 2GB
       if (selectedFile.size > maxSize) {
         toast.error("File size exceeds the 2GB upload limit.");

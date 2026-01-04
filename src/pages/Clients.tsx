@@ -307,44 +307,32 @@ const Clients = () => {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Client Usage Status */}
         <div className="mb-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-white">Client Usage</span>
+          <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <Badge 
-                variant={subscription.tier === 'premium' ? 'default' : 'secondary'} 
-                className={`${subscription.tier === 'premium' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
-              >
-                {subscription.tier === 'premium' && <Crown className="h-3 w-3 mr-1" />}
-                {subscription.tier.toUpperCase()}
-              </Badge>
-              {subscription.tier === 'free' && (
-                <PremiumPaymentModal>
-                  <Button 
-                    size="sm" 
-                    className="bg-purple-500 hover:bg-purple-600 text-white"
-                  >
-                    <Crown className="h-3 w-3 mr-1" />
-                    Upgrade
-                  </Button>
-                </PremiumPaymentModal>
-              )}
+              <span className="text-sm font-medium text-white">
+                {subscription.tier === 'premium' ? 'Premium Plan' : 'Free Plan'}
+              </span>
+              {subscription.tier === 'premium' && <Crown className="h-4 w-4 text-yellow-500" />}
             </div>
-          </div>
-          <div className="flex items-center gap-2 mb-2">
-            <Progress 
-              value={(clients.length / subscription.maxClients) * 100} 
-              className="flex-1 h-2" 
-            />
-            <span className="text-sm text-muted-foreground">
-              {clients.length}/{subscription.maxClients}
-            </span>
+            {subscription.tier === 'free' && (
+              <PremiumPaymentModal>
+                <Button 
+                  size="sm" 
+                  className="bg-purple-500 hover:bg-purple-600 text-white"
+                >
+                  <Crown className="h-3 w-3 mr-1" />
+                  Upgrade
+                </Button>
+              </PremiumPaymentModal>
+            )}
           </div>
           {clients.length >= subscription.maxClients && (
-            <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <div className="flex items-center gap-2 text-amber-400 mt-3">
               <AlertCircle className="h-4 w-4" />
               <span className="text-sm">Client limit reached. {subscription.tier === 'free' ? 'Upgrade to add more clients.' : 'Limit resets monthly.'}</span>
             </div>
           )}
+        </div>
         </div>
         {/* Search and Filter Bar */}
         <div className="bg-[#14181f] rounded-xl border border-slate-700 p-4 mb-6">
@@ -518,7 +506,6 @@ const Clients = () => {
           </div>
         </div>
       </div>
-    </div>
   );
 };
 

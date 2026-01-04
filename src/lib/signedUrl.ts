@@ -4,7 +4,7 @@ import crypto from 'crypto';
 interface SignedUrlPayload {
   videoId: string;
   securityCode: string;
-  service: 'youtube' | 'gcs';
+  service: 'gcs';
   expires: number;
   nonce: string;
 }
@@ -15,7 +15,6 @@ interface SignedUrlPayload {
 export const generateSignedUrlPayload = (
   videoId: string,
   securityCode: string,
-  service: 'youtube' | 'gcs',
   expiresInMinutes: number = 60
 ): SignedUrlPayload => {
   const expires = Date.now() + (expiresInMinutes * 60 * 1000);
@@ -24,7 +23,7 @@ export const generateSignedUrlPayload = (
   return {
     videoId,
     securityCode,
-    service,
+    service: 'gcs',
     expires,
     nonce
   };

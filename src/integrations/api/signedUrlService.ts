@@ -9,21 +9,15 @@ const API_BASE_URL = getApiBaseUrl();
  */
 export const requestSignedUrl = async (
   videoId: string,
-  service: 'youtube' | 'gcs',
   gcsPath?: string
 ): Promise<string> => {
-  // If it's YouTube, we don't need a backend signature
-  if (service === 'youtube') {
-    return videoId; 
-  }
-
   // Ensure we don't send undefined/null values
   const safeVideoId = videoId || '';
 
   try {
     const requestBody: any = {
       videoId: safeVideoId,
-      service,
+      service: 'gcs',
     };
     
     // Include gcsPath if provided

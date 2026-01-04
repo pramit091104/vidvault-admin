@@ -246,8 +246,22 @@ export class UppyUploadService {
    */
   cleanup(): void {
     if (this.uppy) {
-      this.uppy.close();
-      this.uppy = null;
+      try {
+        // Try different cleanup methods based on Uppy version
+        if (typeof this.uppy.close === 'function') {
+          this.uppy.close();
+        } else if (typeof this.uppy.destroy === 'function') {
+          this.uppy.destroy();
+        } else {
+          // Fallback: just remove all files and reset
+          this.uppy.cancelAll();
+          this.uppy.reset();
+        }
+      } catch (error) {
+        console.warn('Uppy cleanup warning:', error);
+      } finally {
+        this.uppy = null;
+      }
     }
     window.removeEventListener('beforeunload', this.handleBeforeUnload);
   }

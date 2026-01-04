@@ -128,48 +128,61 @@ export interface TimestampedComment {
   userName: string;
   userEmail: string;
   createdAt: string; // ISO date string
+  isAnonymous?: boolean;
 }
 
 /**
- * Adds a timestamped comment to a video
+ * Adds a timestamped comment to a video (supports anonymous users)
  */
 export const addTimestampedComment = async (
-  commentData: Omit<TimestampedComment, 'id' | 'createdAt'>
+  videoId: string,
+  timestamp: number,
+  comment: string,
+  authorName?: string
 ): Promise<TimestampedComment> => {
   try {
     const user = auth.currentUser;
     const commentsRef = collection(db, 'timestampedComments');
     const now = new Date().toISOString();
     
-    let finalCommentData;
+    let commentData;
     
     if (user) {
-      // Authenticated user - verify the comment belongs to them
-      if (commentData.userId !== user.uid) {
-        throw new Error('Cannot add comment for another user');
-      }
-      
-      finalCommentData = {
-        ...commentData,
-        userId: user.uid, // Ensure userId is set to authenticated user
+      // Authenticated user
+      commentData = {
+        videoId,
+        videoTitle: '', // Will be filled by the calling component
+        timestamp,
+        comment: comment.trim(),
+        userId: user.uid,
+        userName: user.displayName || user.email || 'Authenticated User',
+        userEmail: user.email || '',
         createdAt: now,
+        isAnonymous: false
       };
     } else {
-      // Anonymous user - allow the comment with the provided anonymous userId
-      if (!commentData.userId.startsWith('anonymous_')) {
-        throw new Error('Invalid anonymous user ID format');
-      }
-      
-      finalCommentData = {
-        ...commentData,
+      // Anonymous user
+      const anonymousId = `anonymous_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      commentData = {
+        videoId,
+        videoTitle: '', // Will be filled by the calling component
+        timestamp,
+        comment: comment.trim(),
+        userId: anonymousId,
+        userName: authorName || 'Anonymous User',
+        userEmail: '',
         createdAt: now,
+        isAnonymous: true
       };
     }
 
-    const docRef = await addDoc(commentsRef, finalCommentData);
+    const docRef = await addDoc(commentsRef, commentData);
+    
+    // Clear cache to force refresh
+    clearVideoCommentsCache(videoId);
     
     return {
-      ...finalCommentData,
+      ...commentData,
       id: docRef.id,
     };
   } catch (error) {

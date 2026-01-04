@@ -1,17 +1,20 @@
 import { useState, useEffect } from "react";
-import { Users, Video, MessageSquare, TrendingUp, Clock, Star, Activity, BarChart3 } from "lucide-react";
+import { Users, Video, MessageSquare, TrendingUp, Clock, Star, Activity, BarChart3, HardDrive } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
 import { getClients } from "@/integrations/firebase/clientService";
 import { getAllVideosForUser } from "@/integrations/firebase/videoService";
 import { getUserTimestampedComments } from "@/integrations/firebase/commentService";
+import { SubscriptionStatus } from "./SubscriptionStatus";
+import { PaymentStatsCard } from "./PaymentStats";
 
 interface DashboardStats {
   totalClients: number;
   activeClients: number;
   totalVideos: number;
   totalComments: number;
+  totalStorageUsed: number; // in bytes
   recentActivity: number;
   averageRating: number;
   completionRate: number;
@@ -37,6 +40,7 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
     activeClients: 0,
     totalVideos: 0,
     totalComments: 0,
+    totalStorageUsed: 0,
     recentActivity: 0,
     averageRating: 0,
     completionRate: 0,
@@ -70,6 +74,11 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
         ).length;
         const totalVideos = videos.length;
         const totalComments = comments.length;
+        
+        // Calculate total storage used (sum of all video file sizes)
+        const totalStorageUsed = videos.reduce((total, video) => {
+          return total + (video.size || 0);
+        }, 0);
         
         // Calculate completion rate (clients with "Done" status)
         const completedClients = clients.filter(client => client.status === "Done").length;
@@ -133,6 +142,7 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
           activeClients,
           totalVideos,
           totalComments,
+          totalStorageUsed,
           recentActivity: activities.length,
           averageRating: 4.8, // Could be calculated from ratings if available
           completionRate,
@@ -167,6 +177,17 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
     } else {
       return date.toLocaleDateString();
     }
+  };
+
+  // Helper function to format file sizes
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
   // Helper function to convert timestamp string to numeric value for sorting
@@ -254,8 +275,11 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
 
   return (
     <div className="space-y-6 md:space-y-8">
+      {/* Subscription Status */}
+      <SubscriptionStatus />
+
       {/* Main Stats Grid - Better mobile layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 md:gap-6">
         <StatCard
           title="Total Clients"
           value={loading ? "..." : stats.totalClients}
@@ -286,59 +310,75 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
           description="Client feedback"
           color="orange"
         />
+        <StatCard
+          title="Storage Used"
+          value={loading ? "..." : formatFileSize(stats.totalStorageUsed)}
+          icon={HardDrive}
+          description="Total video storage"
+          color="cyan"
+        />
       </div>
 
       {/* Recent Activity - Better mobile spacing */}
-      <Card>
-        <CardHeader className="pb-4">
-          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-            <Clock className="h-5 w-5 md:h-6 md:w-6" />
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 md:p-6">
-          {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4].map((i) => (
-                <div key={i} className="flex items-start gap-3">
-                  <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : recentActivities.length > 0 ? (
-            <div className="space-y-4">
-              {recentActivities.map((activity) => (
-                <div key={activity.id} className="flex items-start gap-3">
-                  <div className={`p-2 rounded-lg ${getActivityColor(activity.type)} flex-shrink-0`}>
-                    {getActivityIcon(activity.type)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{activity.message}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                      <span>{activity.timestamp}</span>
-                      {activity.client && (
-                        <>
-                          <span>•</span>
-                          <span className="truncate max-w-[120px]">{activity.client}</span>
-                        </>
-                      )}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card>
+            <CardHeader className="pb-4">
+              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+                <Clock className="h-5 w-5 md:h-6 md:w-6" />
+                Recent Activity
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 md:p-6">
+              {loading ? (
+                <div className="space-y-4">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+                      <div className="flex-1">
+                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
+                        <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8 text-muted-foreground">
-              <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p className="text-sm">No recent activity</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : recentActivities.length > 0 ? (
+                <div className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-start gap-3">
+                      <div className={`p-2 rounded-lg ${getActivityColor(activity.type)} flex-shrink-0`}>
+                        {getActivityIcon(activity.type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{activity.message}</p>
+                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                          <span>{activity.timestamp}</span>
+                          {activity.client && (
+                            <>
+                              <span>•</span>
+                              <span className="truncate max-w-[120px]">{activity.client}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p className="text-sm">No recent activity</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Payment Stats Sidebar */}
+        <div>
+          <PaymentStatsCard />
+        </div>
+      </div>
 
       {/* Quick Actions - Better mobile layout */}
       <Card>

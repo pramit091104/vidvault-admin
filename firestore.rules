@@ -15,11 +15,6 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // Allow authenticated users to read/write video documents (YouTube)
-    match /youtubeClientCodes/{document} {
-      allow read, write: if request.auth != null;
-    }
-    
     // Allow authenticated users to read/write video documents (GCS)
     match /gcsClientCodes/{document} {
       allow read, write: if request.auth != null;
@@ -35,10 +30,9 @@ service cloud.firestore {
       allow read, write: if request.auth != null;
     }
     
-    // Allow authenticated users to read/write timestamped comments
-    // Removed anonymous access for security and cost optimization
+    // Allow anyone to read/write timestamped comments (anonymous commenting enabled)
     match /timestampedComments/{document} {
-      allow read, write: if request.auth != null;
+      allow read, write: if true;
     }
     
     // Service account rules for server-side operations

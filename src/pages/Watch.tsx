@@ -3,14 +3,19 @@ import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Share2, Eye, Calendar, Clock, RefreshCw } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Loader2, Share2, Eye, Calendar, Clock, RefreshCw, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import 'plyr/dist/plyr.css';
 import { requestSignedUrl } from '@/integrations/api/signedUrlService';
-import { getPublicVideoBySlug, updateVideoViewCount, YouTubeVideoRecord, GCSVideoRecord } from "@/integrations/firebase/videoService";
+import { getSecureStreamUrl } from '@/services/secureVideoService';
+import { getVideoBySlugOrId, updateVideoViewCount, GCSVideoRecord, isVideoLinkExpired } from "@/integrations/firebase/videoService";
 import { addTimestampedComment, getVideoTimestampedComments, clearVideoCommentsCache, TimestampedComment } from "@/integrations/firebase/commentService";
 import { useAuth } from "@/contexts/AuthContext";
 import { format } from "date-fns";
+import { SecureVideoPlayer } from "@/components/video/SecureVideoPlayer";
+import { initConsoleProtection, disableConsoleProtection } from "@/utils/consoleProtection";
+import '@/styles/video-protection.css';
 
 interface PublicVideo {
   id: string;
@@ -24,8 +29,7 @@ interface PublicVideo {
   isPublic: boolean;
   uploadedAt: Date;
   viewCount: number;
-  service: 'youtube' | 'gcs';
-  youtubeVideoId?: string;
+  service: 'gcs';
   publicUrl?: string;
 }
 
@@ -49,6 +53,16 @@ const Watch = () => {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [isMuted, setIsMuted] = useState(false);
   const [isRefreshingComments, setIsRefreshingComments] = useState(false);
+  const [anonymousName, setAnonymousName] = useState("");
+
+  // Initialize security protection
+  useEffect(() => {
+    initConsoleProtection();
+    
+    return () => {
+      disableConsoleProtection();
+    };
+  }, []);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
@@ -188,50 +202,63 @@ const Watch = () => {
 
       try {
         setIsLoading(true);
-        const videoData = await getPublicVideoBySlug(slug);
+        const videoData = await getVideoBySlugOrId(slug);
 
-        if (!videoData || !videoData.isPublic) {
-          setError("Video not found or private");
+        if (!videoData) {
+          setError("Video not found");
           setIsLoading(false);
           return;
         }
+
+        // Check if video link has expired
+        if (isVideoLinkExpired(videoData as GCSVideoRecord)) {
+          setError("This video link has expired and is no longer accessible.");
+          setIsLoading(false);
+          return;
+        }
+
+        // Check if video is private and show appropriate message
+        const isPrivateVideo = !videoData.isPublic;
 
         const mappedVideo: PublicVideo = {
           id: videoData.id,
           title: videoData.title,
           description: videoData.description || '',
           clientName: videoData.clientName,
-          videoUrl: videoData.service === 'youtube'
-            ? (videoData as YouTubeVideoRecord).youtubeVideoUrl
-            : (videoData as GCSVideoRecord).publicUrl,
-          thumbnailUrl: videoData.service === 'youtube'
-            ? (videoData as YouTubeVideoRecord).thumbnailUrl
-            : undefined,
+          videoUrl: (videoData as GCSVideoRecord).publicUrl,
+          thumbnailUrl: undefined,
           slug: videoData.publicSlug || slug,
           isPublic: videoData.isPublic || false,
           uploadedAt: videoData.uploadedAt instanceof Date ? videoData.uploadedAt : new Date(videoData.uploadedAt),
           viewCount: videoData.viewCount || 0,
           service: videoData.service,
-          youtubeVideoId: videoData.service === 'youtube'
-            ? (videoData as YouTubeVideoRecord).youtubeVideoId
-            : undefined,
-          publicUrl: videoData.service === 'youtube'
-            ? (videoData as YouTubeVideoRecord).publicUrl
-            : (videoData as GCSVideoRecord).publicUrl,
+          publicUrl: (videoData as GCSVideoRecord).publicUrl,
         };
 
         setVideo(mappedVideo);
 
-        // --- SECURE URL LOGIC ---
-        if (mappedVideo.service === 'gcs') {
+        // --- SECURE STREAMING LOGIC ---
+        try {
+          // Use secure streaming URL instead of direct GCS URLs
+          console.log('Getting secure stream URL for video:', videoData.id);
+          const secureUrl = await getSecureStreamUrl({ 
+            videoId: videoData.id,
+            includeAuth: true 
+          });
+          setSignedVideoUrl(secureUrl);
+          console.log('✅ Secure stream URL obtained');
+        } catch (err: any) {
+          console.error("Secure streaming failed:", err.message);
+          
+          // Fallback to signed URL method (less secure but functional)
           try {
+            console.log('Falling back to signed URL method...');
             // Use the stored gcsPath if available, otherwise fall back to fileName
             const gcsPath = (videoData as any).gcsPath;
             const targetId = (videoData as any).fileName || mappedVideo.id;
-            
+              
             const url = await requestSignedUrl(
               targetId,
-              'gcs',
               gcsPath // Pass the gcsPath if available
             );
             setSignedVideoUrl(url);
@@ -253,7 +280,7 @@ const Watch = () => {
               for (const altId of alternativeIds) {
                 try {
                   console.log('Trying alternative ID:', altId);
-                  foundUrl = await requestSignedUrl(altId, 'gcs');
+                  foundUrl = await requestSignedUrl(altId);
                   if (foundUrl) {
                     setSignedVideoUrl(foundUrl);
                     console.log('Successfully found video with alternative ID:', altId);
@@ -281,11 +308,10 @@ const Watch = () => {
               }
             }
           }
-        } else {
-          setSignedVideoUrl(mappedVideo.videoUrl);
         }
 
-        updateVideoViewCount(slug, mappedVideo.service).catch(console.error);
+        // Update view count (don't await to avoid blocking)
+        updateVideoViewCount(slug).catch(console.error);
 
       } catch (err: any) {
         console.error('Error fetching video:', err);
@@ -334,20 +360,15 @@ const Watch = () => {
       // Use captured time, fallback to current time
       const timeToUse = capturedTime > 0 ? capturedTime : currentTime;
 
-      // Generate anonymous user data if not signed in
-      const userId = currentUser?.uid || `anonymous_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const userName = currentUser?.displayName || currentUser?.email || "Anonymous";
-      const userEmail = currentUser?.email || "";
+      // Get author name for anonymous users
+      const authorName = currentUser?.displayName || currentUser?.email || anonymousName.trim() || "Anonymous User";
 
-      await addTimestampedComment({
-        videoId: video.id,
-        videoTitle: video.title,
-        timestamp: timeToUse,
-        comment: commentText,
-        userId,
-        userName,
-        userEmail,
-      });
+      await addTimestampedComment(
+        video.id,
+        timeToUse,
+        commentText,
+        authorName
+      );
 
       // Clear cache and refresh comments immediately
       clearVideoCommentsCache(video.id);
@@ -467,6 +488,19 @@ const Watch = () => {
 
       {/* Main Content: Responsive layout - mobile first approach */}
       <main className="w-full max-w-[1920px] mx-auto px-3 sm:px-4 lg:px-8 py-4 sm:py-6">
+        {/* Private Video Notice */}
+        {video && !video.isPublic && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <div className="flex items-center gap-2 text-amber-800">
+              <AlertTriangle className="h-4 w-4" />
+              <span className="text-sm font-medium">Private Video</span>
+            </div>
+            <p className="text-xs text-amber-700 mt-1">
+              This video is private and can only be accessed via direct link. To make it publicly discoverable, the owner needs to make it public.
+            </p>
+          </div>
+        )}
+
         {/* Mobile layout: Stacked */}
         <div className="lg:hidden space-y-4 sm:space-y-6">
           {/* Video Section */}
@@ -481,25 +515,21 @@ const Watch = () => {
                 <p className="text-sm text-gray-300">{videoError}</p>
               </div>
               )}
-              {video.service === 'youtube' ? (
-                <iframe src={`https://www.youtube.com/embed/${video.youtubeVideoId}`} title={video.title} className="w-full h-full" allowFullScreen />
-              ) : (
-                signedVideoUrl && (
-                  <video
-                    key={signedVideoUrl}
-                    ref={videoRef}
-                    className="w-full h-full bg-black"
-                    poster={video.thumbnailUrl}
-                    playsInline
-                    preload="metadata"
-                    crossOrigin="anonymous"
-                    onError={handleVideoError}
+              {signedVideoUrl && (
+                <div className="video-container no-context-menu">
+                  <SecureVideoPlayer
+                    src={signedVideoUrl}
+                    title={video.title}
+                    onTimeUpdate={(time) => setCurrentTime(time)}
                     onLoadedMetadata={handleVideoMetadata}
-                  >
-                    <source src={signedVideoUrl} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                )
+                    onError={(error) => setVideoError(error)}
+                    className="w-full h-full bg-black"
+                  />
+                  {/* Security watermark */}
+                  <div className="security-watermark">
+                    PREVIU PROTECTED
+                  </div>
+                </div>
               )}
             </div>
             
@@ -557,6 +587,16 @@ const Watch = () => {
                     className="resize-none text-sm border-border/50 focus:border-primary/50 bg-background min-h-[80px]"
                   />
 
+                  {/* Name input for anonymous users */}
+                  {!currentUser && (
+                    <Input
+                      placeholder="Your name (optional)"
+                      value={anonymousName}
+                      onChange={(e) => setAnonymousName(e.target.value)}
+                      className="text-sm border-border/50 focus:border-primary/50 bg-background"
+                    />
+                  )}
+
                   <Button
                     onClick={handlePostComment}
                     disabled={isPostingComment}
@@ -596,7 +636,12 @@ const Watch = () => {
                     videoComments.map((comment, idx) => (
                       <div key={idx} className="border-l-2 border-primary/30 pl-3 py-2 bg-muted/30 rounded-r-lg">
                         <div className="flex items-center justify-between gap-2 mb-1">
-                          <span className="font-semibold text-sm truncate max-w-[120px]">{comment.userName}</span>
+                          <div className="flex items-center gap-1">
+                            <span className="font-semibold text-sm truncate max-w-[120px]">{comment.userName}</span>
+                            {comment.isAnonymous && (
+                              <span className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">Guest</span>
+                            )}
+                          </div>
                           <span className="text-xs text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded">{formatTimestamp(comment.timestamp)}</span>
                         </div>
                         <p className="text-sm text-foreground leading-relaxed break-words">{comment.comment}</p>
@@ -621,25 +666,21 @@ const Watch = () => {
                 <p className="text-sm text-gray-300">{videoError}</p>
               </div>
             )}
-            {video.service === 'youtube' ? (
-              <iframe src={`https://www.youtube.com/embed/${video.youtubeVideoId}`} title={video.title} className="w-full h-full" allowFullScreen />
-            ) : (
-              signedVideoUrl && (
-                <video
-                  key={signedVideoUrl}
-                  ref={videoRef}
-                  className="w-full h-full bg-black"
-                  poster={video.thumbnailUrl}
-                  playsInline
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                  onError={handleVideoError}
+            {signedVideoUrl && (
+              <div className="video-container no-context-menu">
+                <SecureVideoPlayer
+                  src={signedVideoUrl}
+                  title={video.title}
+                  onTimeUpdate={(time) => setCurrentTime(time)}
                   onLoadedMetadata={handleVideoMetadata}
-                >
-                  <source src={signedVideoUrl} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-              )
+                  onError={(error) => setVideoError(error)}
+                  className="w-full h-full bg-black"
+                />
+                {/* Security watermark */}
+                <div className="security-watermark">
+                  PREVIU PROTECTED
+                </div>
+              </div>
             )}
           </div>
           
@@ -707,6 +748,16 @@ const Watch = () => {
                   className="resize-none text-sm border-border/50 focus:border-primary/50 bg-background min-h-[80px]"
                 />
 
+                {/* Name input for anonymous users */}
+                {!currentUser && (
+                  <Input
+                    placeholder="Your name (optional)"
+                    value={anonymousName}
+                    onChange={(e) => setAnonymousName(e.target.value)}
+                    className="text-sm border-border/50 focus:border-primary/50 bg-background"
+                  />
+                )}
+
                 <Button
                   onClick={handlePostComment}
                   disabled={isPostingComment}
@@ -746,7 +797,12 @@ const Watch = () => {
                   videoComments.map((comment, idx) => (
                     <div key={idx} className="border-l-2 border-primary/30 pl-3 py-2 bg-muted/30 rounded-r-lg">
                       <div className="flex items-center justify-between gap-2 mb-1">
-                        <span className="font-semibold text-sm truncate max-w-[120px]">{comment.userName}</span>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold text-sm truncate max-w-[120px]">{comment.userName}</span>
+                          {comment.isAnonymous && (
+                            <span className="text-xs text-muted-foreground bg-muted px-1 py-0.5 rounded">Guest</span>
+                          )}
+                        </div>
                         <span className="text-xs text-primary font-medium bg-primary/10 px-1.5 py-0.5 rounded">{formatTimestamp(comment.timestamp)}</span>
                       </div>
                       <p className="text-sm text-foreground leading-relaxed break-words">{comment.comment}</p>

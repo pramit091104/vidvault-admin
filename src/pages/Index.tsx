@@ -147,9 +147,9 @@ const Index = () => {
               </span>
             </h1>
             <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl text-gray-300 max-w-4xl mx-auto leading-relaxed font-light px-4">
-              The professional video collaboration platform that transforms 
-              <span className="text-white font-semibold"> how creators work with clients</span>. 
-              Share drafts securely, get precise feedback, and deliver projects 60% faster.
+              Professional video sharing platform for creators and agencies. 
+              <span className="text-white font-semibold"> Upload, share securely, and get precise timestamp feedback</span> 
+              from clients on your video projects.
             </p>
           </div>
 
@@ -179,7 +179,7 @@ const Index = () => {
               <span className="bg-gradient-to-r from-red-400 to-pink-400 bg-clip-text text-transparent"> Broken</span>
             </h2>
             <p className="text-lg sm:text-xl text-gray-400 max-w-4xl mx-auto leading-relaxed px-4">
-              Content creators and agencies are losing time, money, and clients due to inefficient collaboration workflows
+              Video creators and agencies struggle with secure sharing, vague feedback, and managing client access to video drafts
             </p>
           </div>
           
@@ -205,9 +205,9 @@ const Index = () => {
                 <div className="w-20 h-20 bg-red-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Lock className="h-10 w-10 text-red-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">Security Nightmares</h3>
+                <h3 className="text-2xl font-bold text-white mb-4">Insecure File Sharing</h3>
                 <p className="text-gray-400 leading-relaxed mb-6">
-                  Sharing drafts via email, Dropbox, or unsecured links risks content leaks, premature releases, and intellectual property theft.
+                  Sharing video drafts via email, Dropbox, or public links risks content leaks, unauthorized downloads, and loss of control over your work.
                 </p>
                 <div className="flex items-center gap-2 text-red-400 font-medium">
                   <span>→</span>
@@ -221,13 +221,13 @@ const Index = () => {
                 <div className="w-20 h-20 bg-red-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <BarChart3 className="h-10 w-10 text-red-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">Workflow Chaos</h3>
+                <h3 className="text-2xl font-bold text-white mb-4">Client Access Management</h3>
                 <p className="text-gray-400 leading-relaxed mb-6">
-                  Juggling multiple platforms, tracking versions, and managing feedback across emails, Slack, and spreadsheets creates chaos.
+                  Tracking which clients have access to which videos, managing permissions, and organizing feedback becomes chaotic across multiple projects.
                 </p>
                 <div className="flex items-center gap-2 text-red-400 font-medium">
                   <span>→</span>
-                  <span>40+ hours wasted per month on admin</span>
+                  <span>Hours wasted on client coordination</span>
                 </div>
               </div>
             </div>
@@ -249,7 +249,7 @@ const Index = () => {
               <span className="bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent"> Video Collaboration</span>
             </h2>
             <p className="text-lg sm:text-xl text-gray-400 max-w-4xl mx-auto leading-relaxed px-4">
-              One platform that transforms chaos into clarity, frustration into satisfaction, and delays into faster delivery
+              A secure video sharing platform that gives you control over access, precise feedback collection, and professional client management
             </p>
           </div>
           
@@ -261,13 +261,13 @@ const Index = () => {
                     <CheckCircle className="h-6 w-6 text-green-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Precise Timestamp Feedback</h3>
+                    <h3 className="text-2xl font-bold text-white">Secure Video Sharing</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      Clients comment at exact moments in the video. No more "change that part" - get specific, actionable feedback that eliminates guesswork.
+                      Upload videos to Google Cloud Storage with unique access codes for each client. Control who sees what and when.
                     </p>
                     <div className="flex items-center gap-2 text-green-400 font-medium">
                       <span>✓</span>
-                      <span>Reduce revision rounds by 80%</span>
+                      <span>Unique access codes per client</span>
                     </div>
                   </div>
                 </div>
@@ -279,13 +279,13 @@ const Index = () => {
                     <CheckCircle className="h-6 w-6 text-green-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Bank-Level Security</h3>
+                    <h3 className="text-2xl font-bold text-white">Timestamp Comments</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      Unique access codes for each client, encrypted storage, and granular permissions. Your intellectual property stays protected.
+                      Clients leave feedback at exact moments in your videos. Get precise, actionable comments instead of vague "change this" requests.
                     </p>
                     <div className="flex items-center gap-2 text-green-400 font-medium">
                       <span>✓</span>
-                      <span>Zero content leaks guaranteed</span>
+                      <span>Precise feedback at exact timestamps</span>
                     </div>
                   </div>
                 </div>
@@ -297,13 +297,13 @@ const Index = () => {
                     <CheckCircle className="h-6 w-6 text-green-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Centralized Command Center</h3>
+                    <h3 className="text-2xl font-bold text-white">Client & Project Management</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      All projects, versions, feedback, and client communications in one dashboard. No more juggling platforms.
+                      Organize clients, track video access, manage permissions, and monitor engagement. All your video projects in one dashboard.
                     </p>
                     <div className="flex items-center gap-2 text-green-400 font-medium">
                       <span>✓</span>
-                      <span>Save 40+ hours per month</span>
+                      <span>Centralized project management</span>
                     </div>
                   </div>
                 </div>
@@ -388,13 +388,13 @@ const Index = () => {
                 <div className="w-16 h-16 bg-purple-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Upload className="h-8 w-8 text-purple-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">Smart Upload</h3>
+                <h3 className="text-2xl font-bold text-white mb-4">Smart Video Upload</h3>
                 <p className="text-gray-400 leading-relaxed mb-6">
-                  Upload videos to YouTube or Google Cloud Storage with automatic transcoding and optimization for seamless client viewing.
+                  Upload videos up to 2GB with automatic method selection. Small files use direct upload, large files use resumable chunked upload with pause/resume.
                 </p>
                 <div className="flex items-center gap-2 text-purple-400 font-medium">
                   <span>⚡</span>
-                  <span>Auto-optimization included</span>
+                  <span>Auto-optimized upload method</span>
                 </div>
               </div>
             </div>
@@ -404,13 +404,13 @@ const Index = () => {
                 <div className="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Shield className="h-8 w-8 text-green-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">Fort Knox Security</h3>
+                <h3 className="text-2xl font-bold text-white mb-4">Access Control</h3>
                 <p className="text-gray-400 leading-relaxed mb-6">
-                  Generate unique security codes and control access with granular permissions. Your content stays protected until you're ready.
+                  Generate unique security codes for each video and client. Control access with granular permissions and track who viewed what when.
                 </p>
                 <div className="flex items-center gap-2 text-green-400 font-medium">
                   <span>🔒</span>
-                  <span>Bank-level encryption</span>
+                  <span>Secure access management</span>
                 </div>
               </div>
             </div>
@@ -438,13 +438,13 @@ const Index = () => {
                 <div className="w-16 h-16 bg-orange-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Play className="h-8 w-8 text-orange-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">Multi-Platform Support</h3>
+                <h3 className="text-2xl font-bold text-white mb-4">Secure Cloud Storage</h3>
                 <p className="text-gray-400 leading-relaxed mb-6">
-                  Works seamlessly with YouTube and Google Cloud Storage. Manage all your video content from one unified dashboard.
+                  Store videos on Google Cloud Storage with automatic method selection. Small files use direct upload, large files use resumable chunked upload with pause/resume.
                 </p>
                 <div className="flex items-center gap-2 text-orange-400 font-medium">
                   <span>🔄</span>
-                  <span>Unified management</span>
+                  <span>GCS integration</span>
                 </div>
               </div>
             </div>
@@ -472,13 +472,13 @@ const Index = () => {
                 <div className="w-16 h-16 bg-cyan-500/20 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-300">
                   <Zap className="h-8 w-8 text-cyan-400" />
                 </div>
-                <h3 className="text-2xl font-bold text-white mb-4">Real-Time Magic</h3>
+                <h3 className="text-2xl font-bold text-white mb-4">Analytics & Tracking</h3>
                 <p className="text-gray-400 leading-relaxed mb-6">
-                  Get instant notifications when clients comment or review your drafts. Stay in the loop without constantly checking email.
+                  Track video views, client engagement, access patterns, and comment activity. Monitor project progress and client interaction.
                 </p>
                 <div className="flex items-center gap-2 text-cyan-400 font-medium">
                   <span>⚡</span>
-                  <span>Instant updates</span>
+                  <span>Real-time analytics</span>
                 </div>
               </div>
             </div>
@@ -514,7 +514,7 @@ const Index = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                  <span className="text-gray-300">Up to 5 video uploads</span>
+                  <span className="text-gray-300">Up to 5 video uploads per month</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
@@ -530,7 +530,7 @@ const Index = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-                  <span className="text-gray-300">50MB file size limit</span>
+                  <span className="text-gray-300">100MB file size limit</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
@@ -568,7 +568,7 @@ const Index = () => {
               <div className="space-y-4 mb-8">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-purple-400 flex-shrink-0" />
-                  <span className="text-gray-300">Up to 50 video drafts</span>
+                  <span className="text-gray-300">Up to 50 video uploads per month</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-purple-400 flex-shrink-0" />
@@ -580,11 +580,11 @@ const Index = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-purple-400 flex-shrink-0" />
-                  <span className="text-gray-300">Priority video processing</span>
+                  <span className="text-gray-300">Resumable uploads (pause/resume)</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-purple-400 flex-shrink-0" />
-                  <span className="text-gray-300">500MB file size limit</span>
+                  <span className="text-gray-300">2GB file size limit</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-purple-400 flex-shrink-0" />
@@ -592,7 +592,7 @@ const Index = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-purple-400 flex-shrink-0" />
-                  <span className="text-gray-300">Real-time notifications</span>
+                  <span className="text-gray-300">Public video sharing with custom URLs</span>
                 </div>
                 <div className="flex items-center gap-3">
                   <CheckCircle className="h-5 w-5 text-purple-400 flex-shrink-0" />
@@ -617,7 +617,7 @@ const Index = () => {
           
           <div className="text-center mt-16">
             <p className="text-gray-400 mb-6">
-              All plans include our core features: secure video sharing, client management, and timestamp feedback
+              All plans include: secure video sharing, unique access codes, timestamp comments, and client management
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <div className="flex items-center gap-2 text-green-400">
@@ -658,13 +658,13 @@ const Index = () => {
                     <TrendingUp className="h-6 w-6 text-green-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">60% Faster Project Delivery</h3>
+                    <h3 className="text-2xl font-bold text-white">Faster Project Delivery</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      Eliminate back-and-forth emails and vague feedback. Get precise comments that reduce revision cycles by more than half.
+                      Eliminate back-and-forth emails and vague feedback. Timestamp comments provide precise feedback that reduces revision cycles.
                     </p>
                     <div className="flex items-center gap-2 text-green-400 font-medium">
                       <span>⚡</span>
-                      <span>Save 20+ hours per project</span>
+                      <span>Reduce revision rounds significantly</span>
                     </div>
                   </div>
                 </div>
@@ -676,13 +676,13 @@ const Index = () => {
                     <Shield className="h-6 w-6 text-blue-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Enterprise-Grade Security</h3>
+                    <h3 className="text-2xl font-bold text-white">Professional Security</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      Your intellectual property is protected with bank-level encryption and unique access codes for each client.
+                      Your videos are protected with unique access codes, secure cloud storage, and controlled permissions for each client.
                     </p>
                     <div className="flex items-center gap-2 text-blue-400 font-medium">
                       <span>🔒</span>
-                      <span>Zero content leaks ever</span>
+                      <span>Secure by design</span>
                     </div>
                   </div>
                 </div>
@@ -694,13 +694,13 @@ const Index = () => {
                     <Users className="h-6 w-6 text-purple-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Happier Clients</h3>
+                    <h3 className="text-2xl font-bold text-white">Better Client Experience</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      Clients love the professional experience. Easy access, clear feedback, and faster revisions lead to better relationships.
+                      Clients get easy access to videos with simple codes, can leave precise feedback, and enjoy a professional review experience.
                     </p>
                     <div className="flex items-center gap-2 text-purple-400 font-medium">
                       <span>😊</span>
-                      <span>95% client satisfaction</span>
+                      <span>Professional client portal</span>
                     </div>
                   </div>
                 </div>
@@ -714,26 +714,26 @@ const Index = () => {
                     <Zap className="h-6 w-6 text-orange-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Streamlined Workflow</h3>
+                    <h3 className="text-2xl font-bold text-white">Organized Workflow</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      From upload to delivery, everything happens in one dashboard. No more juggling multiple platforms and tools.
+                      Manage all your video projects, client access, and feedback from one dashboard. Track engagement and monitor project progress.
                     </p>
                     <div className="flex items-center gap-2 text-orange-400 font-medium">
                       <span>🚀</span>
-                      <span>10x productivity boost</span>
+                      <span>Centralized management</span>
                     </div>
                   </div>
                   <div className="w-12 h-12 bg-cyan-500/20 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
                     <BarChart3 className="h-6 w-6 text-cyan-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Better Project Insights</h3>
+                    <h3 className="text-2xl font-bold text-white">Project Analytics</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      Track project progress, client engagement, and revision history. Make data-driven decisions to improve your process.
+                      Track video views, client engagement, comment activity, and access patterns. Get insights into your project performance.
                     </p>
                     <div className="flex items-center gap-2 text-cyan-400 font-medium">
                       <span>📊</span>
-                      <span>Analytics included</span>
+                      <span>Engagement tracking</span>
                     </div>
                   </div>
                 </div>
@@ -745,13 +745,13 @@ const Index = () => {
                     <Star className="h-6 w-6 text-pink-400" />
                   </div>
                   <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-white">Professional Reputation</h3>
+                    <h3 className="text-2xl font-bold text-white">Professional Brand</h3>
                     <p className="text-gray-400 leading-relaxed">
-                      Impress clients with a polished, secure collaboration platform that sets you apart from the competition.
+                      Present a polished, secure video sharing experience that sets you apart. Custom access codes and professional interface impress clients.
                     </p>
                     <div className="flex items-center gap-2 text-pink-400 font-medium">
                       <span>⭐</span>
-                      <span>Stand out from crowd</span>
+                      <span>Professional presentation</span>
                     </div>
                   </div>
                 </div>
@@ -773,11 +773,11 @@ const Index = () => {
               </div>
             </div>
             <h2 className="text-4xl md:text-5xl font-bold mb-6 text-white">
-              Ready to Transform Your
-              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent"> Video Workflow</span>?
+              Ready to Streamline Your
+              <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent"> Video Sharing</span>?
             </h2>
             <p className="text-xl text-gray-400 mb-12 leading-relaxed">
-              Join hundreds of creators who've already streamlined their collaboration process
+              Join creators who've simplified their video collaboration workflow with secure sharing and precise feedback
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-12">
@@ -809,16 +809,16 @@ const Index = () => {
               
               <div className="flex items-center justify-center gap-8 pt-6">
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white mb-1">500+</p>
-                  <p className="text-sm text-gray-400">Happy Creators</p>
+                  <p className="text-3xl font-bold text-white mb-1">2GB</p>
+                  <p className="text-sm text-gray-400">Max File Size</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white mb-1">4.9/5</p>
-                  <p className="text-sm text-gray-400">Average Rating</p>
+                  <p className="text-3xl font-bold text-white mb-1">Secure</p>
+                  <p className="text-sm text-gray-400">Access Codes</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-3xl font-bold text-white mb-1">60%</p>
-                  <p className="text-sm text-gray-400">Faster Delivery</p>
+                  <p className="text-3xl font-bold text-white mb-1">Precise</p>
+                  <p className="text-sm text-gray-400">Timestamp Feedback</p>
                 </div>
               </div>
             </div>
@@ -836,7 +836,7 @@ const Index = () => {
                 <h3 className="text-xl font-bold text-white">Previu</h3>
               </div>
               <p className="text-gray-400 leading-relaxed">
-                The professional video collaboration platform that transforms how creators work with clients.
+                Professional video sharing platform for creators and agencies. Upload, share securely, and collect precise feedback from clients.
               </p>
             </div>
             

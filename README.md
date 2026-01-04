@@ -5,13 +5,13 @@
 [![React](https://img.shields.io/badge/React-18.2.0-61dafb.svg)](https://reactjs.org/)
 [![Vite](https://img.shields.io/badge/Vite-4.0.0-646CFF.svg)](https://vitejs.dev/)
 
-A modern, accessible, and performant admin dashboard for managing video content with YouTube and seamless storage integration. Built with React 18, TypeScript, and shadcn/ui components.
+A modern, accessible, and performant admin dashboard for managing video content with seamless GCS storage integration. Built with React 18, TypeScript, and shadcn/ui components.
 
 ## ✨ Features
 
 ### 🎬 Video Management
 - Upload and manage videos with seamless storage integration.
-- YouTube integration for video publishing.
+- GCS integration for secure video storage.
 - Track video status and analytics.
 
 ### 🔐 Authentication & Security
@@ -46,7 +46,7 @@ A modern, accessible, and performant admin dashboard for managing video content 
 - **Runtime**: Node.js (Express)
 - **Authentication**: Firebase Admin SDK
 - **Storage**: Seamless cloud storage integration
-- **APIs**: YouTube Data API v3
+- **APIs**: Google Cloud Storage API
 
 ### Development Tools
 - **Linting**: ESLint + Prettier
@@ -71,7 +71,7 @@ src/
 │   ├── api/             # API client and services
 │   ├── firebase/        # Firebase configuration
 │   ├── gcs/             # Google Cloud Storage
-│   └── youtube/         # YouTube API integration
+│   └── gcs/             # Google Cloud Storage integration
 │
 ├── lib/                 # Utility functions and helpers
 ├── pages/               # Page components
@@ -87,7 +87,7 @@ src/
 - Node.js 18+ and npm 9+
 - Firebase project with Authentication enabled
 -   # Cloud storage provider account
-- YouTube Data API v3 credentials
+- Google Cloud Storage credentials
 
 ### Installation
 
@@ -116,9 +116,6 @@ src/
    # Storage Configuration
    VITE_STORAGE_BUCKET=your-bucket-name
    VITE_STORAGE_PROJECT_ID=your-project-id
-   
-   # YouTube API
-   VITE_YOUTUBE_API_KEY=your-youtube-api-key
    
    # API Configuration
    VITE_API_URL=http://localhost:3001

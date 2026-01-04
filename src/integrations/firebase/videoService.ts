@@ -18,8 +18,7 @@ import { increment } from 'firebase/firestore';
 import { ref, getDownloadURL, uploadBytes } from 'firebase/storage';
 import { logger } from '../../lib/logger';
 
-// Collections for different upload services
-export const YOUTUBE_VIDEOS_COLLECTION = 'youtubeClientCodes';
+// Collection for GCS video uploads
 export const GCS_VIDEOS_COLLECTION = 'gcsClientCodes';
 
 export interface BaseVideoRecord {
@@ -38,16 +37,6 @@ export interface BaseVideoRecord {
   viewCount?: number;
 }
 
-export interface YouTubeVideoRecord extends BaseVideoRecord {
-  service: 'youtube';
-  youtubeVideoId: string;
-  youtubeVideoUrl: string;
-  privacyStatus: 'private' | 'unlisted' | 'public';
-  thumbnailUrl?: string;
-  uploadStatus: 'processing' | 'completed' | 'failed';
-  publicUrl?: string;
-}
-
 export interface GCSVideoRecord extends BaseVideoRecord {
   service: 'gcs';
   fileName: string;
@@ -57,74 +46,59 @@ export interface GCSVideoRecord extends BaseVideoRecord {
   privacyStatus: 'private' | 'unlisted' | 'public';
   isPubliclyAccessible: boolean;
   publicWebsiteUrl?: string;
+  linkExpiresAt?: Date;
+  linkExpirationHours?: number; // User-configurable expiration time
 }
 
-export type VideoRecord = YouTubeVideoRecord | GCSVideoRecord;
+export type VideoRecord = GCSVideoRecord;
 
 /**
- * Save YouTube video record to Firestore
- */
-export const saveYouTubeVideo = async (
-  videoData: Omit<YouTubeVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date }
-): Promise<void> => {
-  try {
-    const docId = videoData.id;
-    const docRef = doc(db, YOUTUBE_VIDEOS_COLLECTION, docId);
-    const firestoreData = {
-      ...videoData,
-      service: 'youtube',
-      uploadedAt: Timestamp.fromDate(videoData.uploadedAt),
-      lastAccessed: videoData.lastAccessed ? Timestamp.fromDate(videoData.lastAccessed) : null,
-    };
-    await setDoc(docRef, firestoreData);
-  } catch (error) {
-    logger.error('Error saving YouTube video', error);
-    throw error;
-  }
-};
-
-/**
- * Save GCS video record to Firestore
+ * Save GCS video record to Firestore with retry logic
  */
 export const saveGCSVideo = async (
   videoData: Omit<GCSVideoRecord, 'uploadedAt' | 'service'> & { uploadedAt: Date }
 ): Promise<void> => {
-  try {
-    const docId = videoData.id;
-    const docRef = doc(db, GCS_VIDEOS_COLLECTION, docId);
-    const firestoreData = {
-      ...videoData,
-      service: 'gcs',
-      uploadedAt: Timestamp.fromDate(videoData.uploadedAt),
-      lastAccessed: videoData.lastAccessed ? Timestamp.fromDate(videoData.lastAccessed) : null,
-    };
-    await setDoc(docRef, firestoreData);
-  } catch (error) {
-    logger.error('Error saving GCS video', error);
-    throw error;
-  }
-};
-
-/**
- * Get YouTube video by ID
- */
-export const getYouTubeVideo = async (videoId: string): Promise<YouTubeVideoRecord | null> => {
-  try {
-    const docRef = doc(db, YOUTUBE_VIDEOS_COLLECTION, videoId);
-    const docSnap = await getDoc(docRef);
-    
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return {
-        ...data,
-        uploadedAt: data.uploadedAt.toDate(),
-        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
-      } as YouTubeVideoRecord;
+  const maxRetries = 3;
+  let lastError: any;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`saveGCSVideo attempt ${attempt}/${maxRetries} with data:`, {
+        id: videoData.id,
+        userId: videoData.userId,
+        isActive: videoData.isActive,
+        hasRequiredFields: !!(videoData.id && videoData.userId && videoData.title)
+      });
+      
+      const docId = videoData.id;
+      const docRef = doc(db, GCS_VIDEOS_COLLECTION, docId);
+      const firestoreData = {
+        ...videoData,
+        service: 'gcs',
+        uploadedAt: Timestamp.fromDate(videoData.uploadedAt),
+        lastAccessed: videoData.lastAccessed ? Timestamp.fromDate(videoData.lastAccessed) : null,
+        linkExpiresAt: videoData.linkExpiresAt ? Timestamp.fromDate(videoData.linkExpiresAt) : null,
+      };
+      
+      console.log(`Attempt ${attempt}: About to save to Firestore with docId:`, docId);
+      await setDoc(docRef, firestoreData);
+      console.log(`Attempt ${attempt}: Successfully saved to Firestore`);
+      return; // Success, exit the retry loop
+    } catch (error: any) {
+      lastError = error;
+      console.error(`Attempt ${attempt} failed:`, error);
+      
+      // If it's the last attempt, throw the error
+      if (attempt === maxRetries) {
+        logger.error('Error saving GCS video after all retries', error);
+        throw error;
+      }
+      
+      // Wait before retrying (exponential backoff)
+      const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
-    return null;
-  } catch (error) {
-    logger.error('Error retrieving YouTube video', error);
-    throw error;
   }
 };
 
@@ -142,6 +116,7 @@ export const getGCSVideo = async (videoId: string): Promise<GCSVideoRecord | nul
         ...data,
         uploadedAt: data.uploadedAt.toDate(),
         lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+        linkExpiresAt: data.linkExpiresAt ? data.linkExpiresAt.toDate() : undefined,
       } as GCSVideoRecord;
     }
     return null;
@@ -152,37 +127,14 @@ export const getGCSVideo = async (videoId: string): Promise<GCSVideoRecord | nul
 };
 
 /**
- * Get all videos for a specific user from both collections
+ * Get all videos for a specific user from GCS collection
  */
 export const getAllVideosForUser = async (
   userId: string, 
   maxResults: number = 50
 ): Promise<VideoRecord[]> => {
   try {
-   
-    // Get YouTube videos
-    const youtubeQuery = query(
-      collection(db, YOUTUBE_VIDEOS_COLLECTION),
-      where('userId', '==', userId),
-      where('isActive', '==', true),
-      orderBy('uploadedAt', 'desc'),
-      limit(maxResults)
-    );
-    
-    const youtubeSnapshot = await getDocs(youtubeQuery);
-    const youtubeVideos: YouTubeVideoRecord[] = [];
-    
-    youtubeSnapshot.forEach((doc) => {
-      const data = doc.data();
-      console.log('YouTube video doc:', doc.id, data);
-      youtubeVideos.push({
-        ...data,
-        uploadedAt: data.uploadedAt.toDate(),
-        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
-      } as YouTubeVideoRecord);
-    });
-
-    // Get GCS videos - also try query with just userId if first query returns nothing
+    // Get GCS videos - try query with isActive first, fallback if needed
     let gcsVideos: GCSVideoRecord[] = [];
     try {
       const gcsQuery = query(
@@ -201,6 +153,7 @@ export const getAllVideosForUser = async (
           ...data,
           uploadedAt: data.uploadedAt.toDate(),
           lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+          linkExpiresAt: data.linkExpiresAt ? data.linkExpiresAt.toDate() : undefined,
         } as GCSVideoRecord);
       });
     } catch (gcsError: any) {
@@ -225,6 +178,7 @@ export const getAllVideosForUser = async (
               ...data,
               uploadedAt: data.uploadedAt.toDate(),
               lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+              linkExpiresAt: data.linkExpiresAt ? data.linkExpiresAt.toDate() : undefined,
             } as GCSVideoRecord);
           }
         });
@@ -233,9 +187,8 @@ export const getAllVideosForUser = async (
       }
     }
 
-    // Combine and sort by upload date
-    const allVideos = [...youtubeVideos, ...gcsVideos];
-    const sorted = allVideos.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()).slice(0, maxResults);
+    // Sort by upload date and limit results
+    const sorted = gcsVideos.sort((a, b) => b.uploadedAt.getTime() - a.uploadedAt.getTime()).slice(0, maxResults);
     return sorted;
   } catch (error) {
     logger.error('Error retrieving all videos for user', error);
@@ -246,13 +199,9 @@ export const getAllVideosForUser = async (
 /**
  * Update video access count and last accessed timestamp
  */
-export const updateVideoAccess = async (
-  videoId: string, 
-  service: 'youtube' | 'gcs'
-): Promise<void> => {
+export const updateVideoAccess = async (videoId: string): Promise<void> => {
   try {
-    const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
-    const docRef = doc(db, collectionName, videoId);
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoId);
     
     await updateDoc(docRef, {
       accessCount: increment(1),
@@ -267,13 +216,9 @@ export const updateVideoAccess = async (
 /**
  * Deactivate a video record (soft delete)
  */
-export const deactivateVideo = async (
-  videoId: string, 
-  service: 'youtube' | 'gcs'
-): Promise<void> => {
+export const deactivateVideo = async (videoId: string): Promise<void> => {
   try {
-    const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
-    const docRef = doc(db, collectionName, videoId);
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoId);
     
     await updateDoc(docRef, { isActive: false });
   } catch (error) {
@@ -285,17 +230,13 @@ export const deactivateVideo = async (
 /**
  * Delete a video record permanently
  */
-export const deleteVideo = async (
-  videoId: string, 
-  service: 'youtube' | 'gcs'
-): Promise<void> => {
+export const deleteVideo = async (videoId: string): Promise<void> => {
   try {
     // First delete all comments associated with this video
     await deleteCommentsByVideoId(videoId);
     
     // Then delete the video record
-    const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
-    const docRef = doc(db, collectionName, videoId);
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoId);
     
     await deleteDoc(docRef);
     
@@ -307,34 +248,14 @@ export const deleteVideo = async (
 };
 
 /**
- * Get public video by slug
+ * Get video by slug (public) or ID (private)
  */
-export const getPublicVideoBySlug = async (slug: string): Promise<VideoRecord | null> => {
+export const getVideoBySlugOrId = async (slugOrId: string): Promise<VideoRecord | null> => {
   try {
-    // Search in YouTube videos first
-    const youtubeQuery = query(
-      collection(db, YOUTUBE_VIDEOS_COLLECTION),
-      where('publicSlug', '==', slug),
-      where('isPublic', '==', true),
-      where('isActive', '==', true),
-      limit(1)
-    );
-    
-    const youtubeSnapshot = await getDocs(youtubeQuery);
-    if (!youtubeSnapshot.empty) {
-      const doc = youtubeSnapshot.docs[0];
-      const data = doc.data();
-      return {
-        ...data,
-        uploadedAt: data.uploadedAt.toDate(),
-        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
-      } as YouTubeVideoRecord;
-    }
-    
-    // Search in GCS videos
+    // First, try to find a public video by slug
     const gcsQuery = query(
       collection(db, GCS_VIDEOS_COLLECTION),
-      where('publicSlug', '==', slug),
+      where('publicSlug', '==', slugOrId),
       where('isPublic', '==', true),
       where('isActive', '==', true),
       limit(1)
@@ -351,9 +272,22 @@ export const getPublicVideoBySlug = async (slug: string): Promise<VideoRecord | 
       } as GCSVideoRecord;
     }
     
+    // If no public video found, try to find by video ID (for private videos)
+    // This allows direct access to videos by their ID even if not made public
+    try {
+      const videoById = await getGCSVideo(slugOrId);
+      if (videoById && videoById.isActive) {
+        // Return the video even if it's private - the watch page can handle the display
+        return videoById;
+      }
+    } catch (error) {
+      // If video ID lookup fails, continue to return null
+      console.log('Video ID lookup failed:', error);
+    }
+    
     return null;
   } catch (error) {
-    logger.error('Error retrieving public video by slug', error);
+    logger.error('Error retrieving video by slug or ID', error);
     throw error;
   }
 };
@@ -361,21 +295,17 @@ export const getPublicVideoBySlug = async (slug: string): Promise<VideoRecord | 
 /**
  * Update public video view count
  */
-export const updateVideoViewCount = async (
-  slug: string, 
-  service: 'youtube' | 'gcs'
-): Promise<void> => {
+export const updateVideoViewCount = async (slug: string): Promise<void> => {
   try {
-    const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
     const docsQuery = query(
-      collection(db, collectionName),
+      collection(db, GCS_VIDEOS_COLLECTION),
       where('publicSlug', '==', slug),
       limit(1)
     );
     
     const snapshot = await getDocs(docsQuery);
     if (!snapshot.empty) {
-      const docRef = doc(db, collectionName, snapshot.docs[0].id);
+      const docRef = doc(db, GCS_VIDEOS_COLLECTION, snapshot.docs[0].id);
       await updateDoc(docRef, {
         viewCount: increment(1),
         lastAccessed: Timestamp.now(),
@@ -388,17 +318,58 @@ export const updateVideoViewCount = async (
 };
 
 /**
+ * Update video link expiration settings
+ */
+export const updateVideoLinkExpiration = async (
+  videoId: string,
+  expirationHours: number | null
+): Promise<void> => {
+  try {
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoId);
+    
+    const updateData: any = {
+      linkExpirationHours: expirationHours,
+    };
+    
+    // Calculate expiration date if hours are provided
+    if (expirationHours && expirationHours > 0) {
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + expirationHours);
+      updateData.linkExpiresAt = Timestamp.fromDate(expiresAt);
+    } else {
+      // Remove expiration if set to null/0
+      updateData.linkExpiresAt = null;
+    }
+    
+    await updateDoc(docRef, updateData);
+    logger.info(`Updated link expiration for video ${videoId}: ${expirationHours} hours`);
+  } catch (error) {
+    logger.error('Error updating video link expiration', error);
+    throw error;
+  }
+};
+
+/**
+ * Check if a video link has expired
+ */
+export const isVideoLinkExpired = (video: GCSVideoRecord): boolean => {
+  if (!video.linkExpiresAt) {
+    return false; // No expiration set
+  }
+  
+  return new Date() > video.linkExpiresAt;
+};
+
+/**
  * Toggle public access for a video
  */
 export const toggleVideoPublicAccess = async (
-  videoId: string, 
-  service: 'youtube' | 'gcs',
+  videoId: string,
   isPublic: boolean,
   publicSlug?: string
 ): Promise<void> => {
   try {
-    const collectionName = service === 'youtube' ? YOUTUBE_VIDEOS_COLLECTION : GCS_VIDEOS_COLLECTION;
-    const docRef = doc(db, collectionName, videoId);
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoId);
     
     const updateData: any = { isPublic };
     if (isPublic && publicSlug) {

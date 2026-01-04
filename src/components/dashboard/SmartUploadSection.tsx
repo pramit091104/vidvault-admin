@@ -15,6 +15,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useUppyUpload } from "@/hooks/useUppyUpload";
 import { useSimpleUpload } from "@/hooks/useSimpleUpload";
 import { saveGCSVideo } from "@/integrations/firebase/videoService";
+import { validateVideoUploadData, generateSecurityCode } from "@/lib/videoUploadValidator";
 import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
 import { v4 as uuidv4 } from 'uuid';
 import { FEATURES, formatFileSize } from "@/config/features";
@@ -25,7 +26,6 @@ const SmartUploadSection = () => {
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState(false);
-  const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const { subscription, canUploadVideo, incrementVideoUpload } = useAuth();
@@ -102,7 +102,6 @@ const SmartUploadSection = () => {
     // Check subscription limits
     if (!canUploadVideo()) {
       toast.error(`Upload limit reached. You've used ${subscription.videoUploadsUsed}/${subscription.maxVideoUploads} uploads.`);
-      setShowPaymentModal(true);
       return;
     }
 
@@ -118,7 +117,6 @@ const SmartUploadSection = () => {
       
       if (subscription.tier === 'free') {
         toast.error(`File too large (${currentSizeFormatted}). Free users can upload up to ${maxSizeFormatted}. Upgrade to Premium for larger files.`);
-        setShowPaymentModal(true);
       } else {
         toast.error(`File too large (${currentSizeFormatted}). Maximum file size is ${maxSizeFormatted}.`);
       }
@@ -144,7 +142,6 @@ const SmartUploadSection = () => {
 
     if (!canUploadVideo()) {
       toast.error("Upload limit reached. Please upgrade to continue.");
-      setShowPaymentModal(true);
       return;
     }
 
@@ -153,26 +150,96 @@ const SmartUploadSection = () => {
 
     const handleUploadSuccess = async (result: any) => {
       try {
-        // Save to Firestore when upload is successful
+        // Ensure user is still authenticated
+        if (!currentUser || !currentUser.uid) {
+          throw new Error('User not authenticated');
+        }
+        
+        // Generate security code for the video
+        const securityCode = generateSecurityCode();
+        
+        // Prepare video data with all required fields
         const videoData = {
           id: videoId,
           title: title.trim(),
           description: description.trim(),
           clientName: clientName.trim(),
+          userId: currentUser.uid,
           fileName: selectedFile.name,
-          fileSize: selectedFile.size,
+          publicUrl: result.publicUrl || result.signedUrl || `https://storage.googleapis.com/${import.meta.env.VITE_GCS_BUCKET_NAME}/${result.gcsPath || fileName}`,
+          size: selectedFile.size,
+          contentType: selectedFile.type,
           uploadedAt: new Date(),
-          service: 'gcs' as const,
-          gcsPath: result.gcsPath || result.fileName || fileName,
+          securityCode: securityCode,
+          isActive: true,
+          accessCount: 0,
+          privacyStatus: 'private' as const,
+          isPubliclyAccessible: false,
           isPublic: false,
-          viewCount: 0
+          viewCount: 0,
+          gcsPath: result.gcsPath || result.fileName || fileName,
+          linkExpirationHours: 24, // Default 24 hours expiration
+          linkExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
         };
 
-        await saveGCSVideo(videoData, currentUser.uid);
-        await incrementVideoUpload();
+        // Validate data before saving
+        const validatedData = validateVideoUploadData(videoData);
+        
+        console.log('Saving video data to Firestore:', {
+          videoId: validatedData.id,
+          userId: validatedData.userId,
+          isActive: validatedData.isActive,
+          hasRequiredFields: !!(validatedData.userId && validatedData.isActive)
+        });
+        
+        console.log('About to save video data:', validatedData);
+        console.log('Current user auth state:', {
+          uid: currentUser.uid,
+          email: currentUser.email,
+          isAuthenticated: !!currentUser
+        });
+        
+        try {
+          await saveGCSVideo(validatedData);
+          console.log('Video data saved successfully to Firestore');
+        } catch (firestoreError) {
+          console.error('Firestore save failed:', firestoreError);
+          throw new Error(`Firestore error: ${firestoreError.message}`);
+        }
+        
+        try {
+          await incrementVideoUpload();
+          console.log('Video upload count incremented');
+        } catch (incrementError) {
+          console.error('Increment upload count failed:', incrementError);
+          throw new Error(`Increment error: ${incrementError.message}`);
+        }
 
         setUploadSuccess(true);
-        toast.success("Video uploaded successfully!");
+        
+        // Generate shareable link using video ID
+        const shareUrl = `${window.location.origin}/watch/${videoId}`;
+        
+        // Copy to clipboard and show success message with share option
+        try {
+          await navigator.clipboard.writeText(shareUrl);
+          toast.success("Video uploaded successfully! Share link copied to clipboard.", {
+            action: {
+              label: "Share",
+              onClick: () => {
+                if (navigator.share) {
+                  navigator.share({
+                    title: title.trim(),
+                    text: `Check out this video: ${title.trim()}`,
+                    url: shareUrl
+                  });
+                }
+              }
+            }
+          });
+        } catch (err) {
+          toast.success(`Video uploaded successfully! Share link: ${shareUrl}`);
+        }
 
         // Dispatch event for other components to refresh
         window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
@@ -186,7 +253,29 @@ const SmartUploadSection = () => {
         resetSimpleUpload();
       } catch (error: any) {
         console.error("Error saving video data:", error);
-        toast.error("Upload completed but failed to save video data. Please try again.");
+        console.error("Error details:", {
+          message: error.message,
+          code: error.code,
+          stack: error.stack
+        });
+        
+        // Check for billing-related errors
+        if (error.code === 'UserProjectAccountProblem' || 
+            error.message?.includes('billing account') ||
+            error.message?.includes('absent billing')) {
+          console.error('Billing error details:', {
+            projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+            gcsProjectId: import.meta.env.VITE_GCS_PROJECT_ID,
+            bucketName: import.meta.env.VITE_GCS_BUCKET_NAME,
+            errorCode: error.code,
+            errorMessage: error.message
+          });
+          toast.error("Service temporarily unavailable due to billing configuration. Please contact support.");
+        } else if (error.code === 'permission-denied' || error.message?.includes('permission')) {
+          toast.error("Permission denied. Please check your account permissions.");
+        } else {
+          toast.error(`Upload completed but failed to save video data: ${error.message || 'Unknown error'}. Please try again.`);
+        }
       }
     };
 
@@ -269,20 +358,18 @@ const SmartUploadSection = () => {
                   {subscription.tier === 'premium' ? 'Premium Plan' : 'Free Plan'}
                 </span>
               </div>
-              <Badge variant="outline">
-                {subscription.videoUploadsUsed}/{subscription.maxVideoUploads} uploads used
-              </Badge>
             </div>
             {subscription.tier === 'free' && (
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => setShowPaymentModal(true)}
-                className="flex items-center gap-2"
-              >
-                <Crown className="h-4 w-4" />
-                Upgrade to Premium
-              </Button>
+              <PremiumPaymentModal>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="flex items-center gap-2"
+                >
+                  <Crown className="h-4 w-4" />
+                  Upgrade to Premium
+                </Button>
+              </PremiumPaymentModal>
             )}
           </div>
           
@@ -472,12 +559,6 @@ const SmartUploadSection = () => {
           </CardContent>
         </Card>
       )}
-
-      {/* Premium Payment Modal */}
-      <PremiumPaymentModal 
-        isOpen={showPaymentModal} 
-        onClose={() => setShowPaymentModal(false)} 
-      />
     </div>
   );
 };

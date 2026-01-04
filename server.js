@@ -22,7 +22,13 @@ const PORT = process.env.PORT || 3001;
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 
 // Multer for multipart/form-data (file uploads)
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 2 * 1024 * 1024 * 1024, // 2GB limit
+    fieldSize: 100 * 1024 * 1024 // 100MB for metadata fields
+  }
+});
 
 // --- Middleware ---
 app.use(helmet());
@@ -30,7 +36,9 @@ app.use(cors({
   origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000', 'https://previu.online'],
   credentials: true 
 }));
-app.use(express.json());
+// Increase body size limits for large file uploads
+app.use(express.json({ limit: '2gb' }));
+app.use(express.urlencoded({ limit: '2gb', extended: true }));
 
 // --- Initialize Google Cloud Storage ---
 let bucket = null;
@@ -586,6 +594,9 @@ import clientsCreateHandler from './api/clients/create.js';
 import gcsValidateUploadHandler from './api/gcs/validate-upload.js';
 import gcsSimpleUploadHandler from './api/gcs/simple-upload.js';
 import gcsResumableUploadUrlHandler from './api/gcs/resumable-upload-url.js';
+import gcsDeleteHandler from './api/gcs/delete.js';
+import videoStreamHandler from './api/video/stream.js';
+import videoValidateAccessHandler from './api/video/validate-access.js';
 import paymentHandler from './api/payment.js';
 
 // Add the new API routes
@@ -595,6 +606,9 @@ app.post('/api/clients/create', clientsCreateHandler);
 app.post('/api/gcs/validate-upload', gcsValidateUploadHandler);
 app.post('/api/gcs/simple-upload', gcsSimpleUploadHandler);
 app.post('/api/gcs/resumable-upload-url', gcsResumableUploadUrlHandler);
+app.delete('/api/gcs/delete', gcsDeleteHandler);
+app.get('/api/video/stream', videoStreamHandler);
+app.post('/api/video/validate-access', videoValidateAccessHandler);
 
 // Payment routes - use the payment handler for both /api/payment and /api/razorpay routes
 app.use('/api/payment', paymentHandler);
@@ -647,19 +661,20 @@ app.post('/api/gcs/upload', upload.single('file'), async (req, res) => {
   }
 });
 
-app.delete('/api/gcs/delete', express.json(), async (req, res) => {
-  try {
-    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
-    const { fileName } = req.body;
-    if (!fileName) return res.status(400).json({ error: 'fileName required' });
+// Old delete route - replaced by dedicated handler above
+// app.delete('/api/gcs/delete', express.json(), async (req, res) => {
+//   try {
+//     if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
+//     const { fileName } = req.body;
+//     if (!fileName) return res.status(400).json({ error: 'fileName required' });
 
-    await bucket.file(fileName).delete();
-    res.json({ success: true });
-  } catch (error) {
-    console.error('GCS delete error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+//     await bucket.file(fileName).delete();
+//     res.json({ success: true });
+//   } catch (error) {
+//     console.error('GCS delete error:', error);
+//     res.status(500).json({ error: error.message });
+//   }
+// });
 
 app.get('/api/gcs/metadata', async (req, res) => {
   try {

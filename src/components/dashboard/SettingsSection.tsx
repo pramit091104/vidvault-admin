@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   User, 
   Mail, 
@@ -16,12 +17,15 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Trash2 // Imported Trash2
+  Trash2,
+  CreditCard,
+  Crown
 } from "lucide-react";
 import { toast } from "sonner";
 import { onAuthStateChanged, signOut, updateProfile as updateFirebaseProfile, deleteUser } from "firebase/auth";
 import { auth } from "@/integrations/firebase/config";
-import { youtubeService } from "@/integrations/youtube/youtubeService";
+import { PaymentHistory } from "@/components/settings/PaymentHistory";
+import { SubscriptionManagement } from "@/components/settings/SubscriptionManagement";
 
 interface UserProfile {
   displayName: string;
@@ -35,7 +39,6 @@ const SettingsSection = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
-  const [isSwitchingAccount, setIsSwitchingAccount] = useState(false); 
   const [isDeleting, setIsDeleting] = useState(false); // New state for deletion
   
   // Form states
@@ -100,28 +103,12 @@ const SettingsSection = () => {
     setIsSigningOut(true);
     try {
       await signOut(auth);
-      localStorage.removeItem("youtube_access_token");
       toast.success("Signed out successfully");
     } catch (error: any) {
       console.error("Error signing out:", error);
       toast.error("Failed to sign out");
     } finally {
       setIsSigningOut(false);
-    }
-  };
-
-  const handleSwitchAccount = async () => {
-    setIsSwitchingAccount(true);
-    try {
-      await signOut(auth);
-      localStorage.removeItem("youtube_access_token");
-      await youtubeService.authenticate();
-      toast.success("Account switched successfully!");
-    } catch (error: any) {
-      console.error("Error switching account:", error);
-      toast.error(error.message || "Failed to switch account");
-    } finally {
-      setIsSwitchingAccount(false);
     }
   };
 
@@ -138,7 +125,6 @@ const SettingsSection = () => {
       const currentUser = auth.currentUser;
       if (currentUser) {
         await deleteUser(currentUser);
-        localStorage.removeItem("youtube_access_token");
         toast.success("Account deleted successfully.");
         // UI will update via the onAuthStateChanged listener
       }
@@ -190,192 +176,204 @@ const SettingsSection = () => {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Profile Section */}
-      <Card className="border-border/50 bg-card/95">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <User className="h-5 w-5 text-primary" />
-            Profile Settings
-          </CardTitle>
-          <CardDescription>
-            Update your personal information and profile details
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {/* Avatar Section */}
-          <div className="flex items-center space-x-4">
-            <div className="relative">
-              <Avatar className="h-20 w-20">
-                <AvatarImage src={photoURL} alt={displayName} />
-                <AvatarFallback className="text-lg">
-                  {getInitials(displayName)}
-                </AvatarFallback>
-              </Avatar>
-              <Button
-                size="sm"
-                variant="outline"
-                className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
-                disabled
-              >
-                <Camera className="h-4 w-4" />
-              </Button>
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-lg font-medium">{displayName}</h3>
-              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Mail className="h-4 w-4" />
-                {user.email}
-              </p>
-              <Badge variant="secondary" className="text-xs">
-                UID: {user.uid.slice(0, 8)}...
-              </Badge>
-            </div>
-          </div>
+    <div className="max-w-4xl mx-auto space-y-6">
+      <div className="flex items-center gap-2 mb-6">
+        <Settings className="h-6 w-6" />
+        <h1 className="text-2xl font-bold">Settings</h1>
+      </div>
 
-          <Separator />
+      <Tabs defaultValue="profile" className="w-full">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="profile" className="flex items-center gap-2">
+            <User className="h-4 w-4" />
+            Profile
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="flex items-center gap-2">
+            <Crown className="h-4 w-4" />
+            Subscription
+          </TabsTrigger>
+          <TabsTrigger value="payments" className="flex items-center gap-2">
+            <CreditCard className="h-4 w-4" />
+            Payments
+          </TabsTrigger>
+          <TabsTrigger value="account" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            Account
+          </TabsTrigger>
+        </TabsList>
 
-          {/* Profile Form */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="displayName">Display Name *</Label>
-              <Input
-                id="displayName"
-                placeholder="Enter your name"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                disabled={isUpdating}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email Address</Label>
-              <Input
-                id="email"
-                value={user.email}
-                disabled
-                className="bg-muted/50"
-              />
-              <p className="text-xs text-muted-foreground">
-                Email cannot be changed here. Sign in with a different account to change email.
-              </p>
-            </div>
-          </div>
-          <div className="flex justify-end">
-            <Button
-              onClick={handleUpdateProfile}
-              disabled={isUpdating || !displayName.trim()}
-            >
-              {isUpdating ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="mr-2 h-4 w-4" />
-                  Update Profile
-                </>
-              )}
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Account Management */}
-      <Card className="border-border/50 bg-card/95">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Settings className="h-5 w-5 text-primary" />
-            Account Management
-          </CardTitle>
-          <CardDescription>
-            Manage your Google account and authentication settings
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-4">
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="space-y-1">
-                <h4 className="font-medium">Google Account</h4>
-                <p className="text-sm text-muted-foreground">
-                  Currently signed in as {user.email}
-                </p>
+        <TabsContent value="profile" className="space-y-6">
+          {/* Profile Management */}
+          <Card className="border-border/50 bg-card/95">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Profile Settings
+              </CardTitle>
+              <CardDescription>
+                Update your personal information and profile details
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* Avatar Section */}
+              <div className="flex items-center space-x-4">
+                <div className="relative">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage src={photoURL} alt={displayName} />
+                    <AvatarFallback className="text-lg">
+                      {getInitials(displayName)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
+                    disabled
+                  >
+                    <Camera className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-medium">{displayName}</h3>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <Mail className="h-4 w-4" />
+                    {user?.email}
+                  </p>
+                  <Badge variant="secondary" className="text-xs">
+                    UID: {user?.uid.slice(0, 8)}...
+                  </Badge>
+                </div>
               </div>
-              <Button
-                variant="outline"
-                onClick={handleSwitchAccount}
-                disabled={isSwitchingAccount}
-              >
-                {isSwitchingAccount ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Switching...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="mr-2 h-4 w-4" />
-                    Switch Account
-                  </>
-                )}
-              </Button>
-            </div>
 
-            <div className="flex items-center justify-between p-4 border rounded-lg">
-              <div className="space-y-1">
-                <h4 className="font-medium">Sign Out</h4>
-                <p className="text-sm text-muted-foreground">
-                  Sign out from your account and clear all local data
-                </p>
+              <Separator />
+
+              {/* Profile Form */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="displayName">Display Name *</Label>
+                  <Input
+                    id="displayName"
+                    placeholder="Enter your name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    disabled={isUpdating}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input
+                    id="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="bg-muted/50"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Email cannot be changed here. Sign in with a different account to change email.
+                  </p>
+                </div>
               </div>
-              <Button
-                variant="secondary"
-                onClick={handleSignOut}
-                disabled={isSigningOut}
-              >
-                {isSigningOut ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing Out...
-                  </>
-                ) : (
-                  <>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Sign Out
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* DELETE ACCOUNT SECTION */}
-            <div className="flex items-center justify-between p-4 border border-destructive/50 bg-destructive/5 rounded-lg">
-              <div className="space-y-1">
-                <h4 className="font-medium text-destructive">Delete Account</h4>
-                <p className="text-sm text-muted-foreground">
-                  Permanently remove your account and all associated data
-                </p>
+              <div className="flex justify-end">
+                <Button
+                  onClick={handleUpdateProfile}
+                  disabled={isUpdating || !displayName.trim()}
+                >
+                  {isUpdating ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Updating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      Update Profile
+                    </>
+                  )}
+                </Button>
               </div>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteAccount}
-                disabled={isDeleting}
-              >
-                {isDeleting ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Deleting...
-                  </>
-                ) : (
-                  <>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Delete Account
-                  </>
-                )}
-              </Button>
-            </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
 
-          </div>
-        </CardContent>
-      </Card>
+        <TabsContent value="subscription" className="space-y-6">
+          <SubscriptionManagement />
+        </TabsContent>
+
+        <TabsContent value="payments" className="space-y-6">
+          <PaymentHistory />
+        </TabsContent>
+
+        <TabsContent value="account" className="space-y-6">
+          {/* Account Management */}
+          <Card className="border-border/50 bg-card/95">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5 text-primary" />
+                Account Management
+              </CardTitle>
+              <CardDescription>
+                Manage your Google account and authentication settings
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="space-y-1">
+                    <h4 className="font-medium">Sign Out</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Sign out from your account and clear all local data
+                    </p>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    onClick={handleSignOut}
+                    disabled={isSigningOut}
+                  >
+                    {isSigningOut ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Signing Out...
+                      </>
+                    ) : (
+                      <>
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* DELETE ACCOUNT SECTION */}
+                <div className="flex items-center justify-between p-4 border border-destructive/50 bg-destructive/5 rounded-lg">
+                  <div className="space-y-1">
+                    <h4 className="font-medium text-destructive">Delete Account</h4>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently remove your account and all associated data
+                    </p>
+                  </div>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteAccount}
+                    disabled={isDeleting}
+                  >
+                    {isDeleting ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Deleting...
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Delete Account
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

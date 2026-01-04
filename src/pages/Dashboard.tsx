@@ -1,7 +1,7 @@
 import { useState } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import SmartUploadSection from "@/components/dashboard/SmartUploadSection";
-import VideosTable from "@/components/dashboard/VideosTable";
+import VideosManagement from "@/components/dashboard/VideosManagement";
 import Clients from "@/pages/Clients";
 import SettingsSection from "@/components/dashboard/SettingsSection";
 import OverviewSection from "@/components/dashboard/OverviewSection";
@@ -16,7 +16,7 @@ const Dashboard = () => {
       case "upload":
         return <SmartUploadSection />;
       case "videos":
-        return <VideosTable />;
+        return <VideosManagement />;
       case "clients":
         return <Clients />;
       case "settings":
