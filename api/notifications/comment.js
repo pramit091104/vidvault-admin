@@ -71,15 +71,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // For anonymous users, skip email notification
-    if (isAnonymous || !isAuthenticated) {
-      console.log('Anonymous comment posted, skipping email notification');
-      return res.status(200).json({ 
-        success: true, 
-        message: 'Comment posted successfully (anonymous)',
-        emailSent: false
-      });
-    }
+    // Send email notifications for both authenticated and anonymous users
 
     // Get video details from Firestore
     const videoDoc = await db.collection('gcsClientCodes').doc(videoId).get();
@@ -112,7 +104,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Video owner email not found' });
     }
 
-    // Don't send email if commenter is the video owner
+    // Don't send email if commenter is the video owner (only check for authenticated users)
     if (decodedToken && decodedToken.email === ownerEmail) {
       return res.status(200).json({ 
         success: true, 
@@ -120,12 +112,12 @@ export default async function handler(req, res) {
       });
     }
 
-    // Prepare email data
+    // Prepare email data (works for both authenticated and anonymous users)
     const emailData = {
       videoTitle: videoData.title,
       videoId: videoId,
-      commenterName: commenterName || decodedToken?.name,
-      commenterEmail: commenterEmail || decodedToken?.email,
+      commenterName: commenterName || decodedToken?.name || 'Anonymous User',
+      commenterEmail: commenterEmail || decodedToken?.email || 'Anonymous',
       commentText: commentText,
       commentTimestamp: new Date().toLocaleString(),
       videoUrl: `${req.headers.origin || 'https://previu.online'}/watch/${videoId}`,
