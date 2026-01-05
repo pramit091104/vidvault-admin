@@ -71,9 +71,66 @@ export default async function handler(req, res) {
       });
     }
 
+    // DEMO: Create a test scenario to show how it works with different users
+    // Format: demo-user-email@domain.com-videoname
+    const isDemoMode = videoId.startsWith('demo-user-');
+    
+    if (isDemoMode) {
+      console.log('🎬 DEMO MODE: Simulating real user scenario');
+      
+      // Extract user email from videoId format: demo-user-pramit.0904@gmail.com-myvideo
+      const parts = videoId.replace('demo-user-', '').split('-');
+      const userEmail = parts[0].replace(/\./g, '.'); // Convert back dots
+      const videoName = parts.slice(1).join('-') || 'My Video';
+      
+      if (!userEmail.includes('@')) {
+        return res.status(400).json({ 
+          error: 'Invalid demo format. Use: demo-user-pramit.0904@gmail.com-videoname' 
+        });
+      }
+      
+      console.log('📹 DEMO: Video uploaded by user:', userEmail);
+      console.log('💬 DEMO: Comment from:', commenterName || 'Anonymous');
+      
+      // Create email data showing the correct flow
+      const emailData = {
+        videoTitle: `${videoName} (Demo Video)`,
+        videoId: videoId,
+        commenterName: commenterName || 'Anonymous User',
+        commenterEmail: commenterEmail || 'Anonymous',
+        commentText: commentText,
+        commentTimestamp: new Date().toLocaleString(),
+        videoUrl: `https://previu.online/watch/${videoId}`,
+        ownerEmail: userEmail, // This is the key - different user gets the email
+        ownerName: userEmail.split('@')[0]
+      };
+
+      console.log('📧 DEMO: Email notification flow:');
+      console.log('  FROM: previu.online@gmail.com (your platform)');
+      console.log('  TO:', userEmail, '(video owner)');
+      console.log('  REASON: Someone commented on their video');
+
+      const emailSent = await sendCommentNotification(emailData);
+      
+      return res.status(200).json({
+        success: true,
+        message: `DEMO: Email sent to video owner (${userEmail})`,
+        emailSent,
+        demoMode: true,
+        explanation: {
+          scenario: `User ${userEmail} uploaded a video, someone commented, so ${userEmail} gets notified`,
+          emailFlow: {
+            from: 'previu.online@gmail.com',
+            to: userEmail,
+            reason: 'Video owner notification'
+          }
+        }
+      });
+    }
+
     // Send email notifications for both authenticated and anonymous users
 
-    // Get video details from Firestore
+    // DEBUG: Let's check what user owns this video
     const videoDoc = await db.collection('gcsClientCodes').doc(videoId).get();
     
     if (!videoDoc.exists) {
@@ -81,6 +138,13 @@ export default async function handler(req, res) {
     }
 
     const videoData = videoDoc.data();
+    
+    console.log('🔍 DEBUG - Video ownership check:', {
+      videoId: videoId,
+      videoTitle: videoData.title,
+      videoUserId: videoData.userId,
+      videoOwnerType: videoData.userId === 'your-firebase-uid' ? 'You (previu.online)' : 'Different User'
+    });
     
     // Get video owner's email
     if (!videoData.userId) {
@@ -95,6 +159,14 @@ export default async function handler(req, res) {
       const ownerUser = await getAuth().getUser(videoData.userId);
       ownerEmail = ownerUser.email;
       ownerName = ownerUser.displayName;
+      
+      console.log('👤 DEBUG - Video owner details:', {
+        userId: videoData.userId,
+        ownerEmail: ownerEmail,
+        ownerName: ownerName,
+        isYourAccount: ownerEmail === 'previu.online@gmail.com'
+      });
+      
     } catch (userError) {
       console.error('Error getting owner user data:', userError);
       return res.status(400).json({ error: 'Could not get video owner information' });
