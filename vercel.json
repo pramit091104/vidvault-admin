@@ -35,6 +35,10 @@
     {
       "src": "api/cost-monitor.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "api/notifications/comment.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -91,6 +95,10 @@
       "dest": "/api/cost-monitor.js"
     },
     {
+      "src": "/api/notifications/comment",
+      "dest": "/api/notifications/comment.js"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.html",
       "headers": {
@@ -98,6 +106,11 @@
       }
     }
   ],
+  "functions": {
+    "api/notifications/comment.js": {
+      "maxDuration": 30
+    }
+  },
   "env": {
     "NODE_ENV": "production"
   }

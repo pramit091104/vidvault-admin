@@ -167,6 +167,11 @@ async function sendCommentNotification(data) {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_APP_PASSWORD,
       },
+      // Add additional options for better reliability
+      pool: true,
+      maxConnections: 1,
+      rateDelta: 20000,
+      rateLimit: 5,
     });
 
     // Test connection first
@@ -190,6 +195,10 @@ async function sendCommentNotification(data) {
 
     const result = await transporter.sendMail(mailOptions);
     console.log('Email sent successfully:', result.messageId);
+    
+    // Close the transporter
+    transporter.close();
+    
     return true;
   } catch (error) {
     console.error('Error sending email:', error);
