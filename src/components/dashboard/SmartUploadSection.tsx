@@ -19,6 +19,8 @@ import { validateVideoUploadData, generateSecurityCode } from "@/lib/videoUpload
 import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
 import { v4 as uuidv4 } from 'uuid';
 import { FEATURES, formatFileSize } from "@/config/features";
+import { getClientByName, createClient } from "@/integrations/firebase/clientService";
+import { validateClientCreation } from "@/services/backendApiService";
 
 const SmartUploadSection = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -29,6 +31,52 @@ const SmartUploadSection = () => {
   const [currentUser, setCurrentUser] = useState<any>(null);
 
   const { subscription, canUploadVideo, incrementVideoUpload } = useAuth();
+
+  // Function to automatically create client if it doesn't exist
+  const ensureClientExists = async (clientNameValue: string, videoTitle: string): Promise<void> => {
+    if (!currentUser || !clientNameValue.trim() || !videoTitle.trim()) {
+      return;
+    }
+
+    try {
+      // Check if client already exists
+      const existingClient = await getClientByName(clientNameValue.trim(), currentUser.uid);
+      
+      if (existingClient) {
+        console.log(`Client "${clientNameValue}" already exists, skipping creation`);
+        return;
+      }
+
+      // Validate if user can create a new client
+      const validation = await validateClientCreation();
+      if (!validation.allowed) {
+        console.warn(`Cannot auto-create client: ${validation.error}`);
+        // Don't throw error, just log warning - video upload should still succeed
+        return;
+      }
+
+      // Create new client with video title as work/project name
+      const newClientData = {
+        clientName: clientNameValue.trim(),
+        work: videoTitle.trim(), // Use video title as project name
+        status: "In progress" as const,
+        prePayment: 0,
+        paidPayment: 0,
+        finalPayment: 0,
+        duration: "1 week",
+        userId: currentUser.uid
+      };
+
+      const clientId = await createClient(newClientData);
+      console.log(`Auto-created client "${clientNameValue}" with ID: ${clientId}, project: "${videoTitle}"`);
+      
+      toast.success(`Client "${clientNameValue}" created automatically with project "${videoTitle}"`);
+    } catch (error) {
+      console.error("Error auto-creating client:", error);
+      // Don't throw error - video upload should still succeed even if client creation fails
+      toast.warning(`Video uploaded successfully, but couldn't auto-create client: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
 
   // Use both upload hooks
   const {
@@ -154,6 +202,9 @@ const SmartUploadSection = () => {
         if (!currentUser || !currentUser.uid) {
           throw new Error('User not authenticated');
         }
+        
+        // Auto-create client if it doesn't exist (before saving video)
+        await ensureClientExists(clientName.trim(), title.trim());
         
         // Generate security code for the video
         const securityCode = generateSecurityCode();
