@@ -23,19 +23,37 @@ export const SubscriptionManagement = () => {
 
   const isPremium = subscription.tier === 'premium';
   
-  const formatDate = (date?: Date) => {
+  const formatDate = (date?: Date | string) => {
     if (!date) return 'N/A';
+    
+    // Convert to Date object if it's a string
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if the date is valid
+    if (isNaN(dateObj.getTime())) {
+      return 'N/A';
+    }
+    
     return new Intl.DateTimeFormat('en-IN', {
       day: 'numeric',
       month: 'long',
       year: 'numeric'
-    }).format(date);
+    }).format(dateObj);
   };
 
   const getDaysRemaining = () => {
     if (!subscription.expiryDate) return null;
+    
     const now = new Date();
-    const expiry = new Date(subscription.expiryDate);
+    const expiry = typeof subscription.expiryDate === 'string' 
+      ? new Date(subscription.expiryDate) 
+      : subscription.expiryDate;
+    
+    // Check if the expiry date is valid
+    if (isNaN(expiry.getTime())) {
+      return null;
+    }
+    
     const diffTime = expiry.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     return diffDays;

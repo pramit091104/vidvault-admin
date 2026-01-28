@@ -105,6 +105,20 @@ export default async function handler(req, res) {
         }
         return await handleClientValidation(userId, res);
 
+      case 'increment-video':
+        if (req.method !== 'POST') {
+          res.setHeader('Allow', ['POST']);
+          return res.status(405).json({ error: 'Method not allowed' });
+        }
+        return await handleIncrementVideo(userId, res);
+
+      case 'increment-client':
+        if (req.method !== 'POST') {
+          res.setHeader('Allow', ['POST']);
+          return res.status(405).json({ error: 'Method not allowed' });
+        }
+        return await handleIncrementClient(userId, res);
+
       default:
         return res.status(404).json({ error: 'Endpoint not found' });
     }
@@ -119,7 +133,21 @@ export default async function handler(req, res) {
 
 async function handleSubscriptionStatus(userId, res) {
   try {
-    const subscription = await getUserSubscription(userId);
+    // Import cache manager for unified caching
+    const { cacheManager } = await import('../middleware/cacheManager.js');
+    
+    // Check cache first with unified TTL (3 minutes)
+    const cacheKey = `subscription_${userId}`;
+    let subscription = await cacheManager.get('subscription', userId);
+    
+    if (!subscription) {
+      // Use optimized subscription service with caching
+      const { OptimizedSubscriptionService } = await import('../middleware/batchOperations.js');
+      subscription = await OptimizedSubscriptionService.getSubscription(userId);
+      
+      // Cache with unified 3-minute TTL
+      await cacheManager.set('subscription', userId, subscription, 180); // 3 minutes in seconds
+    }
 
     res.status(200).json({
       success: true,
@@ -217,6 +245,10 @@ async function handleSubscriptionUpdate(userId, req, res) {
     const updatedDoc = await docRef.get();
     const updatedData = updatedDoc.data();
     
+    // Invalidate cache after subscription update to ensure consistency
+    const { cacheManager } = await import('../middleware/cacheManager.js');
+    await cacheManager.delete('subscription', userId);
+    
     res.status(200).json({
       success: true,
       subscription: {
@@ -276,6 +308,52 @@ async function handleClientValidation(userId, res) {
     res.status(500).json({ 
       error: 'Failed to validate client creation permissions',
       code: 'VALIDATION_ERROR'
+    });
+  }
+}
+
+async function handleIncrementVideo(userId, res) {
+  try {
+    // Import batch operations dynamically
+    const { OptimizedSubscriptionService } = await import('../middleware/batchOperations.js');
+    await OptimizedSubscriptionService.incrementVideoUploadCount(userId);
+    
+    // Invalidate cache after increment to ensure consistency
+    const { cacheManager } = await import('../middleware/cacheManager.js');
+    await cacheManager.delete('subscription', userId);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Video upload count incremented'
+    });
+  } catch (error) {
+    console.error('❌ Error incrementing video count:', error);
+    res.status(500).json({ 
+      error: 'Failed to increment video upload count',
+      code: 'INCREMENT_ERROR'
+    });
+  }
+}
+
+async function handleIncrementClient(userId, res) {
+  try {
+    // Import batch operations dynamically
+    const { OptimizedSubscriptionService } = await import('../middleware/batchOperations.js');
+    await OptimizedSubscriptionService.incrementClientCount(userId);
+    
+    // Invalidate cache after increment to ensure consistency
+    const { cacheManager } = await import('../middleware/cacheManager.js');
+    await cacheManager.delete('subscription', userId);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Client count incremented'
+    });
+  } catch (error) {
+    console.error('❌ Error incrementing client count:', error);
+    res.status(500).json({ 
+      error: 'Failed to increment client count',
+      code: 'INCREMENT_ERROR'
     });
   }
 }

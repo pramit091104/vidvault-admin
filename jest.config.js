@@ -11,6 +11,8 @@ export default {
   collectCoverageFrom: [
     'src/**/*.{js,jsx,ts,tsx}',
     '!src/**/*.d.ts',
+    '!src/test/**/*',
+    '!src/database/**/*',
   ],
   extensionsToTreatAsEsm: ['.ts', '.tsx'],
   transform: {
@@ -24,7 +26,7 @@ export default {
     }]
   },
   transformIgnorePatterns: [
-    'node_modules/(?!(uuid)/)'
+    'node_modules/(?!(uuid|fast-check)/)'
   ],
   testEnvironment: 'jsdom',
   globals: {
@@ -33,5 +35,8 @@ export default {
         VITE_RAZORPAY_KEY_ID: 'test_key_id'
       }
     }
-  }
+  },
+  // Property-based testing configuration
+  testTimeout: 30000, // Increased timeout for property tests
+  maxWorkers: '50%', // Limit workers for property tests
 };

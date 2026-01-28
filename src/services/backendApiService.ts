@@ -1,7 +1,8 @@
 import { auth } from '@/integrations/firebase/config';
+import { getCachedSubscription, setCachedSubscription, clearCachedSubscription } from '@/lib/subscriptionCache';
 
 export interface BackendSubscription {
-  tier: 'free' | 'premium';
+  tier: 'free' | 'premium' | 'enterprise';
   videoUploadsUsed: number;
   maxVideoUploads: number;
   clientsUsed: number;
@@ -43,10 +44,21 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 }
 
 /**
- * Get user subscription status from backend
+ * Get user subscription status from backend with caching
  */
 export async function getSubscriptionStatus(): Promise<BackendSubscription> {
   try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
+    // Check cache first
+    const cached = getCachedSubscription(user.uid);
+    if (cached) {
+      return cached;
+    }
+
     const headers = await getAuthHeaders();
     
     const response = await fetch('/api/subscription/status', {
@@ -61,6 +73,10 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
     }
 
     const data: SubscriptionStatusResponse = await response.json();
+    
+    // Cache the successful response
+    setCachedSubscription(user.uid, data.subscription);
+    
     return data.subscription;
   } catch (error) {
     console.error('Error getting subscription status:', error);
@@ -72,15 +88,22 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
  * Update user subscription in backend
  */
 export async function updateSubscription(subscriptionData: {
-  tier: 'free' | 'premium';
+  tier: 'free' | 'premium' | 'enterprise';
   maxVideoUploads: number;
   maxClients: number;
   maxFileSize: number;
   subscriptionDate?: Date;
   expiryDate?: Date;
   status?: string;
+  videoUploadsUsed?: number;
+  clientsUsed?: number;
 }): Promise<BackendSubscription> {
   try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error('User not authenticated');
+    }
+
     const headers = await getAuthHeaders();
     
     const response = await fetch('/api/subscription/update', {
@@ -100,6 +123,10 @@ export async function updateSubscription(subscriptionData: {
     }
 
     const data = await response.json();
+    
+    // Update cache with new subscription data
+    setCachedSubscription(user.uid, data.subscription);
+    
     return data.subscription;
   } catch (error) {
     console.error('Error updating subscription:', error);

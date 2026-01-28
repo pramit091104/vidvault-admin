@@ -10,6 +10,29 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+// Import critical middleware
+import { 
+  generalLimiter, 
+  uploadLimiter, 
+  apiLimiter, 
+  commentLimiter,
+  strictLimiter 
+} from './middleware/rateLimiter.js';
+import sessionManager from './middleware/sessionManager.js';
+import { 
+  requestDeduplication, 
+  uploadDeduplication, 
+  paymentDeduplication,
+  commentDeduplication 
+} from './middleware/requestDeduplication.js';
+import cacheManager from './middleware/cacheManager.js';
+import sseManager from './middleware/sseManager.js';
+import { batchManager, OptimizedSubscriptionService } from './middleware/batchOperations.js';
+import { PaginationHelper, paginationMiddleware, sendPaginatedResponse } from './middleware/paginationHelper.js';
+import { messageQueue, queueEmail, queueNotification } from './middleware/messageQueue.js';
+import urlObfuscation from './middleware/urlObfuscation.js';
+import networkProtection from './middleware/networkTabProtection.js';
+
 // ES module compatibility
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -36,6 +59,22 @@ app.use(cors({
   origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000', 'https://previu.online'],
   credentials: true 
 }));
+
+// Apply rate limiting BEFORE other middleware
+app.use('/api/', generalLimiter);
+app.use('/api/upload', uploadLimiter);
+app.use('/api/gcs/upload', uploadLimiter);
+app.use('/api/gcs/init-chunked-upload', uploadLimiter);
+app.use('/api/gcs/upload-chunk', uploadLimiter);
+app.use('/api/payment', strictLimiter);
+app.use('/api/razorpay', strictLimiter);
+app.use('/api/notifications/comment', commentLimiter);
+
+// Apply request deduplication
+app.use('/api/upload', uploadDeduplication);
+app.use('/api/payment', paymentDeduplication);
+app.use('/api/notifications/comment', commentDeduplication);
+
 // Increase body size limits for large file uploads
 app.use(express.json({ limit: '2gb' }));
 app.use(express.urlencoded({ limit: '2gb', extended: true }));
@@ -87,6 +126,418 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
     console.warn('❌ Failed to initialize GCS:', error.message);
   }
 }
+
+// --- Real-time Upload Progress Endpoints ---
+
+// SSE endpoint for upload progress
+app.get('/api/gcs/upload-progress/:sessionId', (req, res) => {
+  const { sessionId } = req.params;
+  sseManager.addUploadConnection(sessionId, res, req);
+});
+
+// --- Helper Functions ---
+
+// Get video file path from storage
+async function getVideoPath(videoId) {
+  try {
+    // This is a simplified version - in your actual implementation,
+    // you'll need to query your database to get the video file path
+    // and then download it from GCS or serve it directly
+    
+    // For GCS, you might want to stream directly from GCS
+    // or download to temp directory first for watermarking
+    
+    const tempDir = path.join(__dirname, 'temp');
+    await fs.promises.mkdir(tempDir, { recursive: true });
+    
+    // Example: Download from GCS to temp file
+    if (bucket) {
+      const gcsFile = bucket.file(`uploads/${videoId}`);
+      const [exists] = await gcsFile.exists();
+      
+      if (exists) {
+        const tempPath = path.join(tempDir, `${videoId}_temp.mp4`);
+        await gcsFile.download({ destination: tempPath });
+        return tempPath;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('Error getting video path:', error);
+    return null;
+  }
+}
+
+// --- Protected Content Endpoints ---
+
+// Generate stream-only URL (no downloads allowed) with URL obfuscation
+app.post('/api/stream-only/generate', apiLimiter, async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const token = authHeader.substring(7);
+    const { getAuth } = await import('firebase-admin/auth');
+    const decodedToken = await getAuth().verifyIdToken(token);
+    const userId = decodedToken.uid;
+
+    const { videoId, quality = 'standard' } = req.body; // Same quality for all
+
+    if (!videoId) {
+      return res.status(400).json({ error: 'Video ID required' });
+    }
+
+    // Generate obfuscated URL that hides the real video URL from network tab
+    const obfuscatedData = urlObfuscation.generateObfuscatedUrl(videoId, userId);
+
+    res.json({
+      success: true,
+      streamUrl: `${req.protocol}://${req.get('host')}${obfuscatedData.obfuscatedUrl}`,
+      expiresAt: new Date(obfuscatedData.expiresAt).toISOString(),
+      downloadAllowed: false, // Always false for everyone
+      quality: 'standard', // Same for all users
+      sessionId: obfuscatedData.sessionId
+    });
+
+  } catch (error) {
+    console.error('Stream URL generation error:', error);
+    res.status(500).json({ error: 'Failed to generate stream URL' });
+  }
+});
+
+// Serve obfuscated stream content (replaces the old stream-only endpoint)
+app.get('/api/media/stream/:a/:b/:c/:d/:e/:t/:f/:signature', async (req, res) => {
+  try {
+    const path = req.path;
+    
+    // Decode obfuscated URL
+    const decodedData = urlObfuscation.decodeObfuscatedUrl(path);
+    
+    if (!decodedData || !decodedData.isValid) {
+      return res.status(403).json({ error: 'Invalid or expired stream URL' });
+    }
+
+    const { videoId } = decodedData;
+
+    // Import download prevention
+    const { downloadPrevention } = await import('./middleware/downloadPrevention.js');
+    
+    // Validate stream request and detect download attempts
+    const validation = await downloadPrevention.validateStreamRequest(req, res, videoId);
+    
+    if (!validation.valid) {
+      return res.status(403).json({ error: validation.error });
+    }
+
+    // Get video file path
+    const videoPath = await getVideoPath(videoId);
+    
+    if (!videoPath) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    // Apply network tab protection
+    networkProtection.generateDecoyRequests();
+    
+    // Serve with download prevention and network tab obfuscation
+    await downloadPrevention.serveProtectedVideo(
+      req, 
+      res, 
+      videoPath, 
+      validation.session, 
+      validation.forceWatermark
+    );
+
+  } catch (error) {
+    console.error('Obfuscated stream serving error:', error);
+    res.status(500).json({ error: 'Stream serving failed' });
+  }
+});
+
+// Log download attempts
+app.post('/api/log-download-attempt', apiLimiter, async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { videoId, timestamp, userAgent } = req.body;
+    
+    console.warn('🚨 DOWNLOAD ATTEMPT LOGGED:', {
+      videoId,
+      timestamp,
+      userAgent: userAgent?.substring(0, 100),
+      ip: req.ip,
+      referer: req.get('Referer')
+    });
+
+    // In production, store in database for analytics and security monitoring
+    
+    res.json({ success: true, logged: true });
+  } catch (error) {
+    console.error('Download attempt logging error:', error);
+    res.status(500).json({ error: 'Logging failed' });
+  }
+});
+
+// Log developer tools attempts
+app.post('/api/log-devtools-attempt', apiLimiter, async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { videoId, timestamp } = req.body;
+    
+    console.warn('🔧 DEVELOPER TOOLS DETECTED:', {
+      videoId,
+      timestamp,
+      ip: req.ip,
+      userAgent: req.get('User-Agent')?.substring(0, 100)
+    });
+
+    res.json({ success: true, logged: true });
+  } catch (error) {
+    console.error('DevTools attempt logging error:', error);
+    res.status(500).json({ error: 'Logging failed' });
+  }
+});
+
+// Generate protected URL for content access
+app.post('/api/protected/generate-url', apiLimiter, async (req, res) => {
+  try {
+    // Get user ID from token
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const token = authHeader.substring(7);
+    const { getAuth } = await import('firebase-admin/auth');
+    const decodedToken = await getAuth().verifyIdToken(token);
+    const userId = decodedToken.uid;
+
+    const { videoId, permissions = {} } = req.body;
+
+    if (!videoId) {
+      return res.status(400).json({ error: 'Video ID required' });
+    }
+
+    // Import content protection
+    const { contentProtection } = await import('./middleware/contentProtection.js');
+    
+    // Add IP restriction for additional security
+    permissions.restrictToIp = req.ip;
+    permissions.allowedReferrers = ['localhost', 'previu.online'];
+
+    const protectedUrl = contentProtection.generateProtectedUrl(videoId, userId, permissions);
+
+    res.json({
+      success: true,
+      protectedUrl: `${req.protocol}://${req.get('host')}${protectedUrl}`,
+      expiresAt: new Date(Date.now() + 3600000).toISOString(), // 1 hour
+      permissions
+    });
+
+  } catch (error) {
+    console.error('Protected URL generation error:', error);
+    res.status(500).json({ error: 'Failed to generate protected URL' });
+  }
+});
+
+// Serve protected content
+app.get('/api/protected/stream/:videoId', async (req, res) => {
+  try {
+    const { videoId } = req.params;
+    const { contentProtection } = await import('./middleware/contentProtection.js');
+    
+    await contentProtection.serveProtectedContent(req, res, videoId);
+  } catch (error) {
+    console.error('Protected content serving error:', error);
+    res.status(500).json({ error: 'Content serving failed' });
+  }
+});
+
+// Log protection violations
+app.post('/api/protected/log-violation', apiLimiter, async (req, res) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const { videoId, violationType, timestamp, userAgent } = req.body;
+    
+    // Log violation (in production, store in database)
+    console.warn('🚨 Content Protection Violation:', {
+      videoId,
+      violationType,
+      timestamp,
+      userAgent: userAgent?.substring(0, 100), // Truncate for security
+      ip: req.ip,
+      referer: req.get('Referer')
+    });
+
+    // Could store in database for analytics
+    // await logViolationToDatabase({ videoId, violationType, timestamp, ip: req.ip });
+
+    res.json({ success: true, logged: true });
+  } catch (error) {
+    console.error('Violation logging error:', error);
+    res.status(500).json({ error: 'Logging failed' });
+  }
+});
+
+// --- Health and Monitoring Endpoints ---
+
+// Health check endpoint (not rate limited)
+app.get('/health', (req, res) => {
+  res.json({ 
+    status: 'healthy', 
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
+    version: process.version
+  });
+});
+
+// System status endpoint
+app.get('/api/system/status', apiLimiter, async (req, res) => {
+  try {
+    // Helper function to get content protection stats
+    async function getContentProtectionStats() {
+      try {
+        const { contentProtection } = await import('./middleware/contentProtection.js');
+        return contentProtection.getStats();
+      } catch (error) {
+        return { error: 'Content protection not available' };
+      }
+    }
+
+    // Helper function to get download prevention stats
+    async function getDownloadPreventionStats() {
+      try {
+        const { downloadPrevention } = await import('./middleware/downloadPrevention.js');
+        return downloadPrevention.getStats();
+      } catch (error) {
+        return { error: 'Download prevention not available' };
+      }
+    }
+
+    const stats = {
+      server: {
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        version: process.version,
+        platform: process.platform
+      },
+      cache: cacheManager.getStats(),
+      sessions: {
+        active: (await sessionManager.getAllSessions()).length
+      },
+      realtime: sseManager.getStats(),
+      batching: batchManager.getStats(),
+      messageQueue: messageQueue.getStats(),
+      contentProtection: await getContentProtectionStats(),
+      downloadPrevention: await getDownloadPreventionStats(),
+      storage: {
+        available: !!bucket,
+        bucketName: BUCKET_NAME
+      }
+    };
+
+    res.json(stats);
+  } catch (error) {
+    console.error('System status error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Cache management endpoints
+app.post('/api/system/cache/clear', strictLimiter, async (req, res) => {
+  try {
+    await cacheManager.clearAll();
+    res.json({ success: true, message: 'All caches cleared' });
+  } catch (error) {
+    console.error('Cache clear error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Session management endpoint
+app.get('/api/system/sessions', strictLimiter, async (req, res) => {
+  try {
+    const sessions = await sessionManager.getAllSessions();
+    res.json({ 
+      total: sessions.length,
+      sessions: sessions.map(s => ({
+        sessionId: s.sessionId,
+        fileName: s.fileName,
+        status: s.status,
+        progress: s.uploadedChunks ? Math.round((s.uploadedChunks.length / s.totalChunks) * 100) : 0,
+        createdAt: s.createdAt,
+        expiresAt: s.expiresAt
+      }))
+    });
+  } catch (error) {
+    console.error('Sessions list error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Batch operations management
+app.post('/api/system/batch/flush', strictLimiter, async (req, res) => {
+  try {
+    await batchManager.flushAll();
+    res.json({ success: true, message: 'All pending batches flushed' });
+  } catch (error) {
+    console.error('Batch flush error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Message queue management
+app.get('/api/system/queue/stats', strictLimiter, (req, res) => {
+  try {
+    const stats = messageQueue.getStats();
+    res.json(stats);
+  } catch (error) {
+    console.error('Queue stats error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test email queue
+app.post('/api/system/test-email', strictLimiter, async (req, res) => {
+  try {
+    const { to, subject = 'Test Email', message = 'This is a test email from the queue system.' } = req.body;
+    
+    if (!to) {
+      return res.status(400).json({ error: 'Email address required' });
+    }
+
+    const jobId = await queueEmail(
+      to,
+      subject,
+      `<p>${message}</p>`,
+      message
+    );
+
+    res.json({ 
+      success: true, 
+      message: 'Email queued successfully',
+      jobId 
+    });
+  } catch (error) {
+    console.error('Test email error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
 
 // --- Endpoints ---
 
@@ -244,7 +695,7 @@ app.post('/api/gcs/init-chunked-upload', express.json(), async (req, res) => {
     const sessionId = crypto.randomUUID();
     const totalChunks = Math.ceil(totalSize / chunkSize);
     
-    // Store session info (in production, use a database)
+    // Store session info using persistent session manager
     const sessionData = {
       sessionId,
       fileName,
@@ -257,10 +708,8 @@ app.post('/api/gcs/init-chunked-upload', express.json(), async (req, res) => {
       expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours
     };
 
-    // In production, store this in a database
-    // For now, we'll use a simple in-memory store
-    global.uploadSessions = global.uploadSessions || new Map();
-    global.uploadSessions.set(sessionId, sessionData);
+    // Use persistent session manager instead of global variable
+    await sessionManager.set(sessionId, sessionData);
 
     res.json({
       sessionId,
@@ -286,17 +735,16 @@ app.post('/api/gcs/upload-chunk', upload.single('chunk'), async (req, res) => {
       return res.status(400).json({ error: 'Missing required chunk data' });
     }
 
-    // Get session data
-    global.uploadSessions = global.uploadSessions || new Map();
-    const session = global.uploadSessions.get(sessionId);
+    // Get session data from persistent storage
+    const session = await sessionManager.get(sessionId);
     
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
     }
 
     // Check if session is expired
-    if (new Date() > session.expiresAt) {
-      global.uploadSessions.delete(sessionId);
+    if (new Date() > new Date(session.expiresAt)) {
+      await sessionManager.delete(sessionId);
       return res.status(410).json({ error: 'Upload session expired' });
     }
 
@@ -329,13 +777,22 @@ app.post('/api/gcs/upload-chunk', upload.single('chunk'), async (req, res) => {
       uploadedAt: new Date()
     };
 
-    res.json({
+    // Update session in persistent storage
+    await sessionManager.set(sessionId, session);
+
+    const progressData = {
       success: true,
       chunkId,
       uploadedChunks: session.uploadedChunks.length,
       totalChunks: session.totalChunks,
-      isComplete: session.uploadedChunks.length === session.totalChunks
-    });
+      isComplete: session.uploadedChunks.length === session.totalChunks,
+      progress: Math.round((session.uploadedChunks.length / session.totalChunks) * 100)
+    };
+
+    // Send real-time progress update
+    sseManager.updateUploadProgress(sessionId, progressData);
+
+    res.json(progressData);
 
     // If all chunks uploaded, trigger assembly
     if (session.uploadedChunks.length === session.totalChunks) {
@@ -353,16 +810,15 @@ app.get('/api/gcs/verify-chunks/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    global.uploadSessions = global.uploadSessions || new Map();
-    const session = global.uploadSessions.get(sessionId);
+    const session = await sessionManager.get(sessionId);
     
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
     }
 
     // Check if session is expired
-    if (new Date() > session.expiresAt) {
-      global.uploadSessions.delete(sessionId);
+    if (new Date() > new Date(session.expiresAt)) {
+      await sessionManager.delete(sessionId);
       return res.status(410).json({ error: 'Upload session expired' });
     }
 
@@ -381,8 +837,7 @@ app.get('/api/gcs/verify-chunks/:sessionId', async (req, res) => {
 // Assemble chunks into final file
 async function assembleChunks(sessionId) {
   try {
-    global.uploadSessions = global.uploadSessions || new Map();
-    const session = global.uploadSessions.get(sessionId);
+    const session = await sessionManager.get(sessionId);
     
     if (!session) {
       console.error('Session not found for assembly:', sessionId);
@@ -428,16 +883,34 @@ async function assembleChunks(sessionId) {
     session.status = 'completed';
     session.gcsPath = finalFileName;
     session.completedAt = new Date();
+    
+    await sessionManager.set(sessionId, session);
 
     console.log(`Successfully assembled file for session ${sessionId}: ${finalFileName}`);
+    
+    // Send completion notification
+    sseManager.completeUpload(sessionId, {
+      status: 'completed',
+      gcsPath: finalFileName,
+      fileName: session.fileName,
+      completedAt: session.completedAt
+    });
   } catch (error) {
     console.error('Error assembling chunks:', error);
     
     // Update session with error
-    const session = global.uploadSessions.get(sessionId);
+    const session = await sessionManager.get(sessionId);
     if (session) {
       session.status = 'failed';
       session.error = error.message;
+      await sessionManager.set(sessionId, session);
+      
+      // Send error notification
+      sseManager.failUpload(sessionId, {
+        status: 'failed',
+        error: error.message,
+        fileName: session.fileName
+      });
     }
   }
 }
@@ -447,8 +920,7 @@ app.get('/api/gcs/upload-status/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
     
-    global.uploadSessions = global.uploadSessions || new Map();
-    const session = global.uploadSessions.get(sessionId);
+    const session = await sessionManager.get(sessionId);
     
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
@@ -500,6 +972,13 @@ app.post('/api/signed-url', async (req, res) => {
     
     // Clean up the input ID (remove doubles extensions if present)
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
+    
+    // Check cache first
+    const cachedUrl = await cacheManager.getSignedUrl(cleanId);
+    if (cachedUrl && cachedUrl.expiresAt && new Date(cachedUrl.expiresAt) > new Date()) {
+      console.log(`✅ Cache hit for signed URL: ${cleanId}`);
+      return res.json(cachedUrl);
+    }
     
     console.log(`\n🔍 Searching for: "${cleanId}"`);
 
@@ -576,7 +1055,15 @@ app.post('/api/signed-url', async (req, res) => {
       expires: expiresAt,
     });
 
-    res.json({ signedUrl, expiresAt: new Date(expiresAt).toISOString() });
+    const urlData = { 
+      signedUrl, 
+      expiresAt: new Date(expiresAt).toISOString() 
+    };
+
+    // Cache the signed URL for 5 minutes (much shorter than expiry)
+    await cacheManager.setSignedUrl(cleanId, urlData, 300);
+
+    res.json(urlData);
 
   } catch (error) {
     console.error('Error:', error);

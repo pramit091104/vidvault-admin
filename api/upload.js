@@ -29,11 +29,11 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   }
 }
 
-// Multer for handling file uploads
+// Multer for handling file uploads - Limited by Vercel's 4.5MB body size limit
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 500 * 1024 * 1024, // 500MB max
+    fileSize: 4 * 1024 * 1024, // 4MB max (under Vercel's 4.5MB limit)
   }
 });
 
@@ -143,7 +143,12 @@ async function handleSimpleUpload(req, res) {
     if (err) {
       console.error('❌ Multer error:', err);
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'File too large. Maximum size is 500MB.' });
+        return res.status(413).json({ 
+          error: 'File too large for simple upload. Files over 4MB must use resumable upload.',
+          code: 'FILE_TOO_LARGE_FOR_SIMPLE_UPLOAD',
+          maxSize: 4 * 1024 * 1024,
+          recommendedMethod: 'resumable'
+        });
       }
       return res.status(400).json({ error: err.message });
     }

@@ -26,11 +26,19 @@
     },
     {
       "src": "api/upload.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 60,
+        "memory": 1024
+      }
     },
     {
       "src": "api/gcs/resumable-upload-url.js",
-      "use": "@vercel/node"
+      "use": "@vercel/node",
+      "config": {
+        "maxDuration": 60,
+        "memory": 1024
+      }
     },
     {
       "src": "api/cost-monitor.js",
@@ -42,6 +50,10 @@
       "config": {
         "maxDuration": 30
       }
+    },
+    {
+      "src": "api/payment-stats.js",
+      "use": "@vercel/node"
     }
   ],
   "routes": [
@@ -100,6 +112,10 @@
     {
       "src": "/api/notifications/comment",
       "dest": "/api/notifications/comment.js"
+    },
+    {
+      "src": "/api/payment-stats",
+      "dest": "/api/payment-stats.js"
     },
     {
       "src": "/(.*)",

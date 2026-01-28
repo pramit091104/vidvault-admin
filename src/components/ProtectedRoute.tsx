@@ -8,14 +8,16 @@ interface ProtectedRouteProps {
 }
 
 const ProtectedRoute = ({ children }: ProtectedRouteProps) => {
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, showLoginConfirmation } = useAuth();
 
-  if (loading) {
+  if (loading || showLoginConfirmation) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">Loading...</p>
+          <p className="text-muted-foreground">
+            {showLoginConfirmation ? "Checking authentication..." : "Loading..."}
+          </p>
         </div>
       </div>
     );

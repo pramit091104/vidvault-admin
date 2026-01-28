@@ -26,3 +26,7 @@ gcs-key.json
 .vercel
 .env*.local
 .kiro
+
+# Temporary directories
+temp/
+uploads/

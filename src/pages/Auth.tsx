@@ -62,14 +62,14 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-3 sm:p-4">
       <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-accent/5" />
       
-      <Card className="w-full max-w-md relative animate-fade-in-up border-border/50 bg-card/95">
-        <CardHeader className="space-y-4 p-6 sm:p-8">
+      <Card className="w-full max-w-md relative animate-fade-in-up border-border/50 bg-card/95 mx-3 sm:mx-0">
+        <CardHeader className="space-y-3 sm:space-y-4 p-4 sm:p-6 lg:p-8">
           <div className="text-center space-y-2">
-            <CardTitle className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              Previu
+            <CardTitle className="text-xl sm:text-2xl lg:text-3xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+              <a href="/">Previu</a>
             </CardTitle>
             <CardDescription className="text-muted-foreground text-sm sm:text-base">
               {isLogin ? "Sign in to your account" : "Create a new account"}
@@ -81,7 +81,7 @@ const Auth = () => {
           </div>
         </CardHeader>
         
-        <CardContent className="space-y-4 p-6 sm:p-8 pt-0">
+        <CardContent className="space-y-4 p-4 sm:p-6 lg:p-8 pt-0">
           <form onSubmit={handleEmailSubmit} className="space-y-4">
             {!isLogin && (
               <div className="space-y-2">
@@ -94,7 +94,7 @@ const Auth = () => {
                   placeholder="John Doe"
                   required={!isLogin}
                   disabled={isLoading}
-                  className="h-11 touch-manipulation"
+                  className="h-10 sm:h-11 touch-manipulation text-base sm:text-sm"
                 />
               </div>
             )}
@@ -109,7 +109,7 @@ const Auth = () => {
                 placeholder="you@gmail.com"
                 required
                 disabled={isLoading}
-                className="h-11 touch-manipulation"
+                className="h-10 sm:h-11 touch-manipulation text-base sm:text-sm"
               />
             </div>
             
@@ -119,7 +119,7 @@ const Auth = () => {
                 {isLogin && (
                   <button
                     type="button"
-                    className="text-xs text-muted-foreground hover:underline touch-manipulation"
+                    className="text-xs text-muted-foreground hover:underline touch-manipulation p-1"
                     onClick={() => {/* Add forgot password functionality */}}
                   >
                     Forgot password?
@@ -135,7 +135,7 @@ const Auth = () => {
                 required
                 minLength={6}
                 disabled={isLoading}
-                className="h-11 touch-manipulation"
+                className="h-10 sm:h-11 touch-manipulation text-base sm:text-sm"
               />
               {!isLogin && (
                 <p className="text-xs text-muted-foreground">
@@ -151,7 +151,7 @@ const Auth = () => {
               </div>
             )}
 
-            <Button type="submit" className="w-full h-11 text-base font-medium touch-manipulation" disabled={isLoading}>
+            <Button type="submit" className="w-full h-10 sm:h-11 text-base font-medium touch-manipulation" disabled={isLoading}>
               {isLoading ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : null}
@@ -167,7 +167,7 @@ const Auth = () => {
                 setError("");
                 setIsLogin(!isLogin);
               }}
-              className="font-medium text-primary hover:underline touch-manipulation"
+              className="font-medium text-primary hover:underline touch-manipulation p-1"
               disabled={isLoading}
             >
               {isLogin ? "Sign up" : "Sign in"}

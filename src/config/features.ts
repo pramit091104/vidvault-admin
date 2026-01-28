@@ -8,8 +8,8 @@ export const FEATURES = {
   AUTO_SELECT_METHOD: true,
   MANUAL_METHOD_OVERRIDE: true,
   
-  // File size thresholds (in bytes)
-  SIMPLE_UPLOAD_MAX_SIZE: parseInt(import.meta.env.VITE_UPLOAD_SIMPLE_MAX_SIZE || '104857600'), // 100MB
+  // File size thresholds (in bytes) - Updated for Vercel limits
+  SIMPLE_UPLOAD_MAX_SIZE: parseInt(import.meta.env.VITE_UPLOAD_SIMPLE_MAX_SIZE || '4194304'), // 4MB (Vercel limit)
   RESUMABLE_UPLOAD_MAX_SIZE: parseInt(import.meta.env.VITE_UPLOAD_RESUMABLE_MAX_SIZE || '2147483648'), // 2GB
   CHUNK_SIZE: parseInt(import.meta.env.VITE_UPLOAD_CHUNK_SIZE || '10485760'), // 10MB
   

@@ -135,8 +135,8 @@ export const deleteClient = async (clientId: string): Promise<void> => {
   }
 };
 
-// Get client by name (for payment integration)
-export const getClientByName = async (clientName: string, userId?: string): Promise<ClientRecord | null> => {
+// Get client by name and user ID (for payment integration and approval workflow)
+export const getClientByName = async (clientName: string, userId: string): Promise<ClientRecord | null> => {
   try {
     // Validate input
     if (!clientName || clientName.trim().length === 0) {
@@ -144,21 +144,17 @@ export const getClientByName = async (clientName: string, userId?: string): Prom
       return null;
     }
 
-    let q;
-    if (userId) {
-      q = query(
-        collection(db, CLIENTS_COLLECTION), 
-        where('clientName', '==', clientName.trim()),
-        where('userId', '==', userId),
-        limit(1)
-      );
-    } else {
-      q = query(
-        collection(db, CLIENTS_COLLECTION), 
-        where('clientName', '==', clientName.trim()),
-        limit(1)
-      );
+    if (!userId) {
+      console.warn('getClientByName called with empty userId');
+      return null;
     }
+
+    const q = query(
+      collection(db, CLIENTS_COLLECTION), 
+      where('clientName', '==', clientName.trim()),
+      where('userId', '==', userId),
+      limit(1)
+    );
     
     const querySnapshot = await getDocs(q);
     if (!querySnapshot.empty) {
@@ -175,10 +171,46 @@ export const getClientByName = async (clientName: string, userId?: string): Prom
       } as ClientRecord;
     }
     
-    console.log(`No client found with name: "${clientName}"`);
+    console.log(`No client found with name: "${clientName}" for user: "${userId}"`);
     return null;
   } catch (error) {
     console.error('Error fetching client by name:', error);
     throw new Error(`Failed to fetch client by name: ${error instanceof Error ? error.message : 'Unknown error'}`);
+  }
+};
+/**
+ * Update client project status based on video approval
+ */
+export const updateClientProjectStatus = async (
+  clientName: string, 
+  userId: string, 
+  newStatus: "Done" | "Not paid yet" | "In progress" | "Not started"
+): Promise<void> => {
+  try {
+    // Find the client by name and userId
+    const q = query(
+      collection(db, CLIENTS_COLLECTION), 
+      where('clientName', '==', clientName),
+      where('userId', '==', userId)
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    if (querySnapshot.empty) {
+      console.warn(`No client found with name: ${clientName} for user: ${userId}`);
+      return;
+    }
+
+    // Update the first matching client (there should only be one)
+    const clientDoc = querySnapshot.docs[0];
+    await updateDoc(clientDoc.ref, {
+      status: newStatus,
+      updatedAt: Timestamp.now(),
+    });
+    
+    console.log(`Updated client ${clientName} status to ${newStatus}`);
+  } catch (error) {
+    console.error('Error updating client project status:', error);
+    throw new Error(error instanceof Error ? error.message : 'Failed to update client project status');
   }
 };

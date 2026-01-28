@@ -35,6 +35,12 @@ export interface BaseVideoRecord {
   isPublic?: boolean;
   publicSlug?: string;
   viewCount?: number;
+  // Approval workflow fields
+  approvalStatus?: 'draft' | 'pending_review' | 'needs_changes' | 'approved' | 'completed';
+  reviewedAt?: Date;
+  reviewedBy?: string; // client user ID or identifier
+  revisionNotes?: string;
+  version?: number; // Track draft versions
 }
 
 export interface GCSVideoRecord extends BaseVideoRecord {
@@ -125,6 +131,11 @@ export const getGCSVideo = async (videoId: string): Promise<GCSVideoRecord | nul
     throw error;
   }
 };
+
+/**
+ * Get video by ID (alias for getGCSVideo)
+ */
+export const getVideoById = getGCSVideo;
 
 /**
  * Get all videos for a specific user from GCS collection
@@ -379,6 +390,143 @@ export const toggleVideoPublicAccess = async (
     await updateDoc(docRef, updateData);
   } catch (error) {
     logger.error('Error toggling video public access', error);
+    throw error;
+  }
+};
+
+/**
+ * Update video approval status
+ */
+export const updateVideoApprovalStatus = async (
+  videoId: string, 
+  status: 'draft' | 'pending_review' | 'needs_changes' | 'approved' | 'completed',
+  reviewedBy?: string,
+  revisionNotes?: string
+): Promise<void> => {
+  try {
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoId);
+    
+    // First get the current document to read the current version
+    const docSnap = await getDoc(docRef);
+    if (!docSnap.exists()) {
+      throw new Error('Video not found');
+    }
+    
+    const currentData = docSnap.data();
+    const currentVersion = currentData.version || 0;
+    
+    const updateData: any = {
+      approvalStatus: status,
+      reviewedAt: Timestamp.now(),
+    };
+
+    if (reviewedBy) {
+      updateData.reviewedBy = reviewedBy;
+    }
+
+    if (revisionNotes) {
+      updateData.revisionNotes = revisionNotes;
+    }
+
+    // If marking as needs changes, increment version for tracking
+    if (status === 'needs_changes') {
+      updateData.version = currentVersion + 1;
+    }
+
+    await updateDoc(docRef, updateData);
+    
+    logger.info(`Updated video ${videoId} approval status to ${status}`);
+  } catch (error) {
+    logger.error('Error updating video approval status', error);
+    throw error;
+  }
+};
+
+/**
+ * Get videos by approval status for a user
+ */
+export const getVideosByApprovalStatus = async (
+  userId: string, 
+  status: 'draft' | 'pending_review' | 'needs_changes' | 'approved' | 'completed'
+): Promise<GCSVideoRecord[]> => {
+  try {
+    const q = query(
+      collection(db, GCS_VIDEOS_COLLECTION),
+      where('userId', '==', userId),
+      where('approvalStatus', '==', status),
+      where('isActive', '==', true),
+      orderBy('uploadedAt', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    
+    return querySnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        ...data,
+        id: doc.id,
+        uploadedAt: data.uploadedAt.toDate(),
+        lastAccessed: data.lastAccessed ? data.lastAccessed.toDate() : undefined,
+        reviewedAt: data.reviewedAt ? data.reviewedAt.toDate() : undefined,
+        linkExpiresAt: data.linkExpiresAt ? data.linkExpiresAt.toDate() : undefined,
+      } as GCSVideoRecord;
+    });
+  } catch (error) {
+    logger.error('Error fetching videos by approval status', error);
+    throw error;
+  }
+};
+/**
+ * Mark video as ready for client review
+ */
+export const markVideoForReview = async (videoId: string): Promise<void> => {
+  try {
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, videoId);
+    
+    await updateDoc(docRef, {
+      approvalStatus: 'pending_review',
+      reviewedAt: Timestamp.now(),
+    });
+    
+    logger.info(`Marked video ${videoId} for client review`);
+  } catch (error) {
+    logger.error('Error marking video for review', error);
+    throw error;
+  }
+};
+
+/**
+ * Upload new version of a video (for revision workflow)
+ */
+export const uploadVideoRevision = async (
+  originalVideoId: string,
+  newVideoData: Omit<GCSVideoRecord, 'uploadedAt' | 'service' | 'version'> & { uploadedAt: Date }
+): Promise<void> => {
+  try {
+    // Get the original video to increment version
+    const originalVideo = await getGCSVideo(originalVideoId);
+    if (!originalVideo) {
+      throw new Error('Original video not found');
+    }
+
+    // Update the original video with new data and incremented version
+    const docRef = doc(db, GCS_VIDEOS_COLLECTION, originalVideoId);
+    
+    const updateData = {
+      ...newVideoData,
+      service: 'gcs',
+      uploadedAt: Timestamp.fromDate(newVideoData.uploadedAt),
+      version: (originalVideo.version || 1) + 1,
+      approvalStatus: 'pending_review', // Reset to pending review
+      reviewedAt: Timestamp.now(),
+      revisionNotes: null, // Clear previous revision notes
+    };
+
+    await updateDoc(docRef, updateData);
+    
+    logger.info(`Uploaded revision for video ${originalVideoId}, version ${updateData.version}`);
+  } catch (error) {
+    logger.error('Error uploading video revision', error);
     throw error;
   }
 };

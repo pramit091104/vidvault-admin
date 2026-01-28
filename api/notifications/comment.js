@@ -126,18 +126,18 @@ export default async function handler(req, res) {
       isAnonymousComment: !decodedToken && (!commenterEmail || commenterEmail === '')
     };
 
-    // Send email notification
-    const emailSent = await sendCommentNotification(emailData);
+    // Send email notification using message queue
+    const emailSent = await queueCommentNotification(emailData);
 
     if (emailSent) {
       res.status(200).json({ 
         success: true, 
-        message: 'Comment notification sent successfully' 
+        message: 'Comment notification queued successfully' 
       });
     } else {
       res.status(500).json({ 
         success: false, 
-        error: 'Failed to send email notification' 
+        error: 'Failed to queue email notification' 
       });
     }
 
@@ -147,6 +147,30 @@ export default async function handler(req, res) {
       error: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
+  }
+}
+
+async function queueCommentNotification(data) {
+  try {
+    // Import message queue dynamically
+    const { queueEmail } = await import('../../middleware/messageQueue.js');
+    
+    const htmlTemplate = generateCommentEmailTemplate(data);
+    const textTemplate = generatePlainTextEmail(data);
+    
+    const jobId = await queueEmail(
+      data.ownerEmail,
+      `New comment on your video: ${data.videoTitle}`,
+      htmlTemplate,
+      textTemplate,
+      { priority: 1 } // High priority for notifications
+    );
+    
+    console.log(`✅ Comment notification queued with job ID: ${jobId}`);
+    return true;
+  } catch (error) {
+    console.error('Error queueing comment notification:', error);
+    return false;
   }
 }
 

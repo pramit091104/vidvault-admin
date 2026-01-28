@@ -14,6 +14,7 @@ import { saveGCSVideo } from "@/integrations/firebase/videoService";
 import { useAuth } from "@/contexts/AuthContext";
 import { v4 as uuidv4 } from 'uuid';
 import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
+import { applicationService } from "@/services";
 
 interface UppyUploadSectionProps {
   preSelectedFile?: File | null;
@@ -25,6 +26,19 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [canUpload, setCanUpload] = useState<{
+    canUpload: boolean;
+    reason?: string;
+    upgradeRequired?: boolean;
+  }>({ canUpload: true });
+  const [usageStats, setUsageStats] = useState<{
+    uploadCount: number;
+    maxUploads: number;
+    clientsUsed: number;
+    maxClients: number;
+    tier: string;
+    isActive: boolean;
+  } | null>(null);
   
   const { currentUser, subscription } = useAuth();
 
@@ -43,6 +57,35 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
     reset: resetUpload,
     isPaused
   } = useUppyUpload();
+
+  // Check upload permissions and load usage stats using application service
+  useEffect(() => {
+    const loadUploadData = async () => {
+      if (!currentUser?.uid) {
+        setCanUpload({ canUpload: false, reason: 'Please sign in to upload videos' });
+        return;
+      }
+
+      try {
+        // Check upload permissions
+        const uploadPermission = await applicationService.canUserUpload(currentUser.uid);
+        setCanUpload(uploadPermission);
+
+        // Load usage statistics
+        const stats = await applicationService.getUserUsageStats(currentUser.uid);
+        setUsageStats(stats);
+      } catch (error) {
+        console.error('Error loading upload data:', error);
+        setCanUpload({ 
+          canUpload: false, 
+          reason: 'Error checking upload permissions',
+          upgradeRequired: false 
+        });
+      }
+    };
+
+    loadUploadData();
+  }, [currentUser?.uid, subscription]);
 
   useEffect(() => {
     if (preSelectedFile) {
@@ -85,9 +128,11 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
       }
       
       // Basic size check for UI feedback (backend will do the real validation)
-      const maxSize = subscription.maxFileSize * 1024 * 1024; // Convert MB to bytes
+      const maxSize = (usageStats?.maxFileSize || subscription.maxFileSize) * 1024 * 1024; // Convert MB to bytes
       if (selectedFile.size > maxSize) {
-        toast.error(`File size exceeds the ${subscription.maxFileSize}MB limit for ${subscription.tier} users. ${subscription.tier === 'free' ? 'Upgrade to Premium for larger file uploads.' : 'Please compress your video first.'}`);
+        const tier = usageStats?.tier || subscription.tier;
+        const maxFileSize = usageStats?.maxFileSize || subscription.maxFileSize;
+        toast.error(`File size exceeds the ${maxFileSize}MB limit for ${tier} users. ${tier === 'free' ? 'Upgrade to Premium for larger file uploads.' : 'Please compress your video first.'}`);
         return;
       }
       
@@ -116,6 +161,11 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
 
     if (!currentUser) {
       toast.error("Please sign in to upload videos");
+      return;
+    }
+
+    if (!canUpload.canUpload) {
+      toast.error(canUpload.reason || "Upload not allowed");
       return;
     }
 
@@ -163,7 +213,10 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
         isPubliclyAccessible: false,
         uploadedAt: new Date(),
         // Store the actual GCS path for signed URL generation
-        gcsPath: uploadResult.gcsPath
+        gcsPath: uploadResult.gcsPath,
+        // Approval workflow fields - start as draft
+        approvalStatus: 'draft',
+        version: 1
       } as any);
 
       setUploadSuccess(true);
@@ -225,7 +278,7 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
               Upload Video (Uppy - Resumable)
             </CardTitle>
             <CardDescription>
-              Upload videos (up to {subscription.maxFileSize}MB for {subscription.tier} users) with resumable upload support
+              Upload videos (up to {usageStats?.maxFileSize || subscription.maxFileSize}MB for {usageStats?.tier || subscription.tier} users) with resumable upload support
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
@@ -234,20 +287,20 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
               Resumable
             </Badge>
             <Badge 
-              variant={subscription.tier === 'premium' ? 'default' : 'secondary'} 
-              className={`flex items-center gap-1 ${subscription.tier === 'premium' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
+              variant={(usageStats?.tier || subscription.tier) === 'premium' ? 'default' : 'secondary'} 
+              className={`flex items-center gap-1 ${(usageStats?.tier || subscription.tier) === 'premium' ? 'bg-purple-500 hover:bg-purple-600' : ''}`}
             >
-              {subscription.tier === 'premium' && <Crown className="h-3 w-3" />}
-              {subscription.tier.toUpperCase()}
+              {(usageStats?.tier || subscription.tier) === 'premium' && <Crown className="h-3 w-3" />}
+              {(usageStats?.tier || subscription.tier).toUpperCase()}
             </Badge>
           </div>
         </div>
         
         {/* Subscription Status */}
-        <div className="mt-4 p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+        <div className="mt-4 p-3 bg-muted/50 rounded-lg">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium">Upload Usage</span>
-            {subscription.tier === 'free' && (
+            {(usageStats?.tier || subscription.tier) === 'free' && (
               <PremiumPaymentModal>
                 <Button 
                   size="sm" 
@@ -261,17 +314,17 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
           </div>
           <div className="flex items-center gap-2 mb-2">
             <Progress 
-              value={(subscription.videoUploadsUsed / subscription.maxVideoUploads) * 100} 
+              value={((usageStats?.uploadCount || subscription.videoUploadsUsed) / (usageStats?.maxUploads || subscription.maxVideoUploads)) * 100} 
               className="flex-1 h-2" 
             />
             <span className="text-sm text-muted-foreground">
-              {subscription.videoUploadsUsed}/{subscription.maxVideoUploads}
+              {usageStats?.uploadCount || subscription.videoUploadsUsed}/{usageStats?.maxUploads || subscription.maxVideoUploads}
             </span>
           </div>
-          {subscription.videoUploadsUsed >= subscription.maxVideoUploads && (
+          {(usageStats?.uploadCount || subscription.videoUploadsUsed) >= (usageStats?.maxUploads || subscription.maxVideoUploads) && (
             <div className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
               <AlertCircle className="h-4 w-4" />
-              <span className="text-sm">Upload limit reached. {subscription.tier === 'free' ? 'Upgrade to continue uploading.' : 'Limit resets monthly.'}</span>
+              <span className="text-sm">Upload limit reached. {(usageStats?.tier || subscription.tier) === 'free' ? 'Upgrade to continue uploading.' : 'Limit resets monthly.'}</span>
             </div>
           )}
         </div>
@@ -331,7 +384,7 @@ const UppyUploadSection = ({ preSelectedFile }: UppyUploadSectionProps = {}) => 
 
             <Button
               onClick={handleUpload}
-              disabled={!file || isUploading || !currentUser}
+              disabled={!file || isUploading || !currentUser || !canUpload.canUpload}
               className="w-full"
             >
               <Upload className="mr-2 h-4 w-4" />

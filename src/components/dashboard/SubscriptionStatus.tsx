@@ -4,11 +4,96 @@ import { Button } from "@/components/ui/button";
 import { Crown } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
+import { applicationService } from "@/services";
+import { useEffect, useState } from "react";
+import { SubscriptionStatus as SubscriptionStatusType } from "@/types/subscription";
 
 export const SubscriptionStatus = () => {
-  const { subscription } = useAuth();
+  const { subscription, currentUser } = useAuth();
+  const [cachedSubscription, setCachedSubscription] = useState<SubscriptionStatusType | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const isPremium = subscription.tier === 'premium';
+  useEffect(() => {
+    const loadSubscriptionData = async () => {
+      if (!currentUser?.uid) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        // Use the application service to get subscription status
+        const subscriptionData = await applicationService.getSubscriptionStatus(currentUser.uid);
+        if (subscriptionData) {
+          setCachedSubscription(subscriptionData);
+        } else {
+          // Fallback to auth context subscription if application service fails
+          if (subscription) {
+            const fallbackData: SubscriptionStatusType = {
+              isActive: subscription.tier === 'premium',
+              tier: subscription.tier,
+              expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // Default 30 days
+              uploadCount: 0, // Would be fetched from backend
+              features: subscription.tier === 'premium' 
+                ? ['basic_upload', 'basic_sharing', 'advanced_analytics', 'priority_support']
+                : ['basic_upload', 'basic_sharing'],
+              maxUploads: subscription.tier === 'premium' ? 50 : 5,
+              maxClients: subscription.tier === 'premium' ? 50 : 5,
+              maxFileSize: subscription.tier === 'premium' ? 500 : 100,
+              clientsUsed: 0, // Would be fetched from backend
+              status: subscription.tier === 'premium' ? 'active' : 'active'
+            };
+            setCachedSubscription(fallbackData);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading subscription data:', error);
+        // Fallback to auth context on error
+        if (subscription) {
+          const fallbackData: SubscriptionStatusType = {
+            isActive: subscription.tier === 'premium',
+            tier: subscription.tier,
+            expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            uploadCount: 0,
+            features: subscription.tier === 'premium' 
+              ? ['basic_upload', 'basic_sharing', 'advanced_analytics', 'priority_support']
+              : ['basic_upload', 'basic_sharing'],
+            maxUploads: subscription.tier === 'premium' ? 50 : 5,
+            maxClients: subscription.tier === 'premium' ? 50 : 5,
+            maxFileSize: subscription.tier === 'premium' ? 500 : 100,
+            clientsUsed: 0,
+            status: subscription.tier === 'premium' ? 'active' : 'active'
+          };
+          setCachedSubscription(fallbackData);
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadSubscriptionData();
+  }, [currentUser?.uid, subscription]);
+
+  // Use cached subscription data if available, otherwise fall back to auth context
+  const currentSubscription = cachedSubscription || subscription;
+  const isPremium = currentSubscription?.tier === 'premium';
+
+  if (isLoading) {
+    return (
+      <Card className="w-full">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Crown className="h-5 w-5 text-gray-400 animate-pulse" />
+              <CardTitle className="text-lg">Loading...</CardTitle>
+            </div>
+            <Badge variant="secondary" className="animate-pulse">
+              ...
+            </Badge>
+          </div>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   return (
     <Card className="w-full">

@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 
 // Firebase configuration
@@ -36,8 +36,14 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase Authentication and get a reference to the service
 export const auth = getAuth(app);
 
+// Set authentication persistence to LOCAL (persists until explicitly signed out)
+// This ensures users stay logged in across browser tabs, windows, and sessions
+setPersistence(auth, browserLocalPersistence).catch((error) => {
+  console.error('Error setting auth persistence:', error);
+});
+
 // Debug: Log auth configuration
-console.log('Firebase Auth initialized for email/password authentication');
+console.log('Firebase Auth initialized for email/password authentication with LOCAL persistence');
 console.log('Auth domain:', import.meta.env.VITE_FIREBASE_AUTH_DOMAIN);
 
 // Initialize Firestore

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { 
   Table,
   TableBody,
@@ -255,28 +256,29 @@ const Clients = () => {
 
   if (loading && clients.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white">Loading clients...</div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-foreground">Loading clients...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#14181f]">
-      {/* Navigation Header */}
-      <nav className="sticky top-0 z-50 bg-slate-900/95 border-b border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-white">Personal Client Management</h2>
+    <div className="min-h-screen bg-background">
+      {/* Navigation Header - Mobile Optimized */}
+      <nav className="sticky top-0 z-50 bg-card/95 border-b border-border backdrop-blur-sm">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
+          <h2 className="text-base sm:text-lg font-semibold text-foreground">Personal Client Management</h2>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
             {subscription.tier === 'free' && clients.length >= subscription.maxClients && (
               <PremiumPaymentModal>
                 <Button
                   size="sm"
-                  className="bg-purple-500 hover:bg-purple-600 text-white font-medium shadow-lg transition-all duration-300"
+                  className="bg-purple-500 hover:bg-purple-600 text-white font-medium shadow-lg transition-all duration-300 px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm touch-manipulation"
                 >
-                  <Crown className="h-4 w-4 mr-2" />
-                  Upgrade
+                  <Crown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">Upgrade</span>
+                  <span className="sm:hidden">Up</span>
                 </Button>
               </PremiumPaymentModal>
             )}
@@ -285,17 +287,19 @@ const Clients = () => {
               onClick={handleAddNewClient}
               size="sm"
               disabled={clients.length >= subscription.maxClients || isCreatingClient}
-              className="bg-gray-700 hover:bg-gray-600 text-white font-medium shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-primary hover:bg-primary/90 text-primary-foreground font-medium shadow-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm touch-manipulation"
             >
               {isCreatingClient ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Creating...
+                  <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 animate-spin" />
+                  <span className="hidden sm:inline">Creating...</span>
+                  <span className="sm:hidden">...</span>
                 </>
               ) : (
                 <>
-                  <Plus className="h-4 w-4 mr-2" />
-                  {clients.length >= subscription.maxClients ? 'Limit Reached' : 'New'}
+                  <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                  <span className="hidden sm:inline">{clients.length >= subscription.maxClients ? 'Limit Reached' : 'New'}</span>
+                  <span className="sm:hidden">{clients.length >= subscription.maxClients ? 'Max' : '+'}</span>
                 </>
               )}
             </Button>
@@ -303,56 +307,57 @@ const Clients = () => {
         </div>
       </nav>
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      {/* Main Content - Mobile Optimized */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         {/* Client Usage Status */}
-        <div className="mb-6 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
+        <div className="mb-4 sm:mb-6 p-3 sm:p-4 bg-card/50 rounded-xl border border-border">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-white">
+              <span className="text-xs sm:text-sm font-medium text-foreground">
                 {subscription.tier === 'premium' ? 'Premium Plan' : 'Free Plan'}
               </span>
-              {subscription.tier === 'premium' && <Crown className="h-4 w-4 text-yellow-500" />}
+              {subscription.tier === 'premium' && <Crown className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-500" />}
             </div>
             {subscription.tier === 'free' && (
               <PremiumPaymentModal>
                 <Button 
                   size="sm" 
-                  className="bg-purple-500 hover:bg-purple-600 text-white"
+                  className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 text-xs touch-manipulation"
                 >
                   <Crown className="h-3 w-3 mr-1" />
-                  Upgrade
+                  <span className="hidden sm:inline">Upgrade</span>
+                  <span className="sm:hidden">Up</span>
                 </Button>
               </PremiumPaymentModal>
             )}
           </div>
           {clients.length >= subscription.maxClients && (
-            <div className="flex items-center gap-2 text-amber-400 mt-3">
-              <AlertCircle className="h-4 w-4" />
-              <span className="text-sm">Client limit reached. {subscription.tier === 'free' ? 'Upgrade to add more clients.' : 'Limit resets monthly.'}</span>
+            <div className="flex items-center gap-2 text-amber-600 mt-2 sm:mt-3">
+              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
+              <span className="text-xs sm:text-sm">Client limit reached. {subscription.tier === 'free' ? 'Upgrade to add more clients.' : 'Limit resets monthly.'}</span>
             </div>
           )}
         </div>
-        </div>
-        {/* Search and Filter Bar */}
-        <div className="bg-[#14181f] rounded-xl border border-slate-700 p-4 mb-6">
-          <div className="flex flex-col md:flex-row gap-4">
+
+        {/* Search and Filter Bar - Mobile Optimized */}
+        <div className="bg-card rounded-xl border border-border p-3 sm:p-4 mb-4 sm:mb-6">
+          <div className="flex flex-col gap-3 sm:gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search clients..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 bg-[#14181f] border-slate-600 text-white placeholder-gray-400 focus:border-gray-500 focus:ring-gray-500/20"
+                className="pl-10 bg-background border-border text-foreground placeholder-muted-foreground focus:border-primary focus:ring-primary/20 h-10 sm:h-auto text-base sm:text-sm touch-manipulation"
               />
             </div>
             
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-400" />
+              <Filter className="h-4 w-4 text-muted-foreground" />
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="bg-slate-900/50 border-slate-600 text-white rounded-lg px-3 py-2 focus:border-gray-500 focus:ring-gray-500/20"
+                className="bg-background border-border text-foreground rounded-lg px-3 py-2 focus:border-primary focus:ring-primary/20 flex-1 sm:flex-none text-sm touch-manipulation"
               >
                 <option value="all">All Status</option>
                 <option value="Done">Done</option>
@@ -364,30 +369,167 @@ const Clients = () => {
           </div>
         </div>
 
-        {/* Clients Table */}
-        <div className="bg-[#14181f] rounded-xl border border-slate-700 overflow-hidden">
+        {/* Mobile Cards View */}
+        <div className="block sm:hidden space-y-4">
+          {filteredClients.map((client) => (
+            <Card key={client.id} className="border border-border/50 hover:border-border transition-colors">
+              <CardContent className="p-4">
+                <div className="space-y-3">
+                  {/* Client Name */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Client Name</label>
+                    {client.isEditing ? (
+                      <Input
+                        value={editingClient?.clientName || ''}
+                        onChange={(e) => handleCellEdit('clientName', e.target.value)}
+                        className="bg-background border-border text-foreground h-8 mt-1 text-base touch-manipulation"
+                      />
+                    ) : (
+                      <p className="text-sm font-medium text-foreground mt-1">{client.clientName}</p>
+                    )}
+                  </div>
+
+                  {/* Work */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Work</label>
+                    {client.isEditing ? (
+                      <Input
+                        value={editingClient?.work || ''}
+                        onChange={(e) => handleCellEdit('work', e.target.value)}
+                        className="bg-background border-border text-foreground h-8 mt-1 text-base touch-manipulation"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-1">{client.work}</p>
+                    )}
+                  </div>
+
+                  {/* Status */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Status</label>
+                    {client.isEditing ? (
+                      <select
+                        value={editingClient?.status || 'Not started'}
+                        onChange={(e) => handleCellEdit('status', e.target.value)}
+                        className="bg-background border-border text-foreground rounded px-2 py-1 h-8 mt-1 w-full text-sm touch-manipulation"
+                      >
+                        <option value="Done">Done</option>
+                        <option value="Not paid yet">Not paid yet</option>
+                        <option value="In progress">In progress</option>
+                        <option value="Not started">Not started</option>
+                      </select>
+                    ) : (
+                      <div className="mt-1">
+                        <Badge className={`${getStatusColor(client.status)} font-medium text-xs`}>
+                          {client.status}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Duration */}
+                  <div>
+                    <label className="text-xs font-medium text-muted-foreground">Duration</label>
+                    {client.isEditing ? (
+                      <Input
+                        value={editingClient?.duration || ''}
+                        onChange={(e) => handleCellEdit('duration', e.target.value)}
+                        className="bg-background border-border text-foreground h-8 mt-1 text-base touch-manipulation"
+                      />
+                    ) : (
+                      <p className="text-sm text-muted-foreground mt-1">{client.duration}</p>
+                    )}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-center gap-2 pt-2 border-t border-border/50">
+                    {client.isEditing ? (
+                      <>
+                        <Button
+                          onClick={() => handleSaveClient(client.id!)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 px-3 touch-manipulation"
+                          title="Save"
+                        >
+                          <Save className="h-4 w-4 mr-1" />
+                          Save
+                        </Button>
+                        <Button
+                          onClick={() => handleCancelEdit(client.id!)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 px-3 touch-manipulation"
+                          title="Cancel"
+                        >
+                          <X className="h-4 w-4 mr-1" />
+                          Cancel
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={() => handleEditClient(client.id!)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 px-3 touch-manipulation"
+                          title="Edit client"
+                        >
+                          <Edit className="h-4 w-4 mr-1" />
+                          Edit
+                        </Button>
+                        <Button
+                          onClick={() => handleDeleteClient(client.id!, client.clientName)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-destructive hover:bg-muted h-8 px-3 touch-manipulation"
+                          title="Delete client"
+                        >
+                          <Trash2 className="h-4 w-4 mr-1" />
+                          Delete
+                        </Button>
+                        <Button
+                          onClick={() => handleShareClient(client)}
+                          variant="ghost"
+                          size="sm"
+                          className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 px-3 touch-manipulation"
+                          title="Share client"
+                        >
+                          <Share2 className="h-4 w-4 mr-1" />
+                          Share
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden sm:block bg-card rounded-xl border border-border overflow-hidden">
           <Table>
-            <TableHeader className="bg-slate-900/50">
+            <TableHeader className="bg-muted/50">
               <TableRow>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Client Name</TableHead>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Work</TableHead>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Status</TableHead>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700">Duration</TableHead>
-                <TableHead className="text-gray-300 font-semibold border-b border-slate-700 text-center">Actions</TableHead>
+                <TableHead className="text-foreground font-semibold border-b border-border">Client Name</TableHead>
+                <TableHead className="text-foreground font-semibold border-b border-border">Work</TableHead>
+                <TableHead className="text-foreground font-semibold border-b border-border">Status</TableHead>
+                <TableHead className="text-foreground font-semibold border-b border-border">Duration</TableHead>
+                <TableHead className="text-foreground font-semibold border-b border-border text-center">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredClients.map((client) => (
-                <TableRow key={client.id} className="hover:bg-slate-700/30 transition-colors border-b border-slate-700/50">
+                <TableRow key={client.id} className="hover:bg-muted/30 transition-colors border-b border-border/50">
                   <TableCell>
                     {client.isEditing ? (
                       <Input
                         value={editingClient?.clientName || ''}
                         onChange={(e) => handleCellEdit('clientName', e.target.value)}
-                        className="bg-slate-900/50 border-slate-600 text-white h-8"
+                        className="bg-background border-border text-foreground h-8"
                       />
                     ) : (
-                      <span className="text-white font-medium">{client.clientName}</span>
+                      <span className="text-foreground font-medium">{client.clientName}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -395,10 +537,10 @@ const Clients = () => {
                       <Input
                         value={editingClient?.work || ''}
                         onChange={(e) => handleCellEdit('work', e.target.value)}
-                        className="bg-slate-900/50 border-slate-600 text-white h-8"
+                        className="bg-background border-border text-foreground h-8"
                       />
                     ) : (
-                      <span className="text-gray-300">{client.work}</span>
+                      <span className="text-muted-foreground">{client.work}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -406,7 +548,7 @@ const Clients = () => {
                       <select
                         value={editingClient?.status || 'Not started'}
                         onChange={(e) => handleCellEdit('status', e.target.value)}
-                        className="bg-slate-900/50 border-slate-600 text-white rounded px-2 py-1 h-8"
+                        className="bg-background border-border text-foreground rounded px-2 py-1 h-8"
                       >
                         <option value="Done">Done</option>
                         <option value="Not paid yet">Not paid yet</option>
@@ -424,10 +566,10 @@ const Clients = () => {
                       <Input
                         value={editingClient?.duration || ''}
                         onChange={(e) => handleCellEdit('duration', e.target.value)}
-                        className="bg-slate-900/50 border-slate-600 text-white h-8"
+                        className="bg-background border-border text-foreground h-8"
                       />
                     ) : (
-                      <span className="text-gray-300">{client.duration}</span>
+                      <span className="text-muted-foreground">{client.duration}</span>
                     )}
                   </TableCell>
                   <TableCell>
@@ -438,7 +580,7 @@ const Clients = () => {
                             onClick={() => handleSaveClient(client.id!)}
                             variant="ghost"
                             size="sm"
-                            className="text-gray-400 hover:text-white hover:bg-slate-700 h-8 w-8 p-0"
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 p-0"
                             title="Save"
                           >
                             <Save className="h-4 w-4" />
@@ -447,7 +589,7 @@ const Clients = () => {
                             onClick={() => handleCancelEdit(client.id!)}
                             variant="ghost"
                             size="sm"
-                            className="text-gray-400 hover:text-white hover:bg-slate-700 h-8 w-8 p-0"
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 p-0"
                             title="Cancel"
                           >
                             <X className="h-4 w-4" />
@@ -459,7 +601,7 @@ const Clients = () => {
                             onClick={() => handleEditClient(client.id!)}
                             variant="ghost"
                             size="sm"
-                            className="text-gray-400 hover:text-white hover:bg-slate-700 h-8 w-8 p-0"
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 p-0"
                             title="Edit client"
                           >
                             <Edit className="h-4 w-4" />
@@ -468,7 +610,7 @@ const Clients = () => {
                             onClick={() => handleDeleteClient(client.id!, client.clientName)}
                             variant="ghost"
                             size="sm"
-                            className="text-gray-400 hover:text-red-400 hover:bg-slate-700 h-8 w-8 p-0"
+                            className="text-muted-foreground hover:text-destructive hover:bg-muted h-8 w-8 p-0"
                             title="Delete client"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -477,7 +619,7 @@ const Clients = () => {
                             onClick={() => handleShareClient(client)}
                             variant="ghost"
                             size="sm"
-                            className="text-gray-400 hover:text-white hover:bg-slate-700 h-8 w-8 p-0"
+                            className="text-muted-foreground hover:text-foreground hover:bg-muted h-8 w-8 p-0"
                             title="Share client"
                           >
                             <Share2 className="h-4 w-4" />
@@ -492,20 +634,21 @@ const Clients = () => {
           </Table>
         </div>
 
-        {/* Summary Section */}
-        <div className="mt-6 bg-slate-800/50 rounded-xl border border-slate-700 p-6">
-          <div className="grid grid-cols-2 gap-6">
+        {/* Summary Section - Mobile Optimized */}
+        <div className="mt-4 sm:mt-6 bg-card/50 rounded-xl border border-border p-4 sm:p-6">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6">
             <div className="text-center">
-              <p className="text-gray-400 text-sm mb-1">TOTAL CLIENTS</p>
-              <p className="text-2xl font-bold text-white">{clients.length}</p>
+              <p className="text-muted-foreground text-xs sm:text-sm mb-1">TOTAL CLIENTS</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground">{clients.length}</p>
             </div>
             <div className="text-center">
-              <p className="text-gray-400 text-sm mb-1">COMPLETED</p>
-              <p className="text-2xl font-bold text-white">{completedClients}</p>
+              <p className="text-muted-foreground text-xs sm:text-sm mb-1">COMPLETED</p>
+              <p className="text-xl sm:text-2xl font-bold text-foreground">{completedClients}</p>
             </div>
           </div>
         </div>
       </div>
+    </div>
   );
 };
 

@@ -24,7 +24,7 @@ interface PaymentRecord {
   type: 'pre' | 'post' | 'final' | 'video_completion';
   amount: number;
   currency: string;
-  status: 'pending' | 'completed' | 'failed' | 'cancelled';
+  status?: 'pending' | 'completed' | 'failed' | 'cancelled' | string;
   razorpayOrderId?: string;
   razorpayPaymentId?: string;
   clientName?: string;
@@ -68,8 +68,10 @@ export const PaymentHistory = () => {
     await loadPayments();
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
+  const getStatusIcon = (status: string | undefined | null) => {
+    const statusStr = status?.toString() || 'unknown';
+    
+    switch (statusStr) {
       case 'completed':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'failed':
@@ -83,17 +85,21 @@ export const PaymentHistory = () => {
     }
   };
 
-  const getStatusBadge = (status: string) => {
+  const getStatusBadge = (status: string | undefined | null) => {
+    // Ensure status is a string and provide a fallback
+    const statusStr = status?.toString() || 'unknown';
+    
     const variants = {
       completed: "default",
       failed: "destructive",
       pending: "secondary",
-      cancelled: "outline"
+      cancelled: "outline",
+      unknown: "outline"
     } as const;
 
     return (
-      <Badge variant={variants[status as keyof typeof variants] || "outline"}>
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+      <Badge variant={variants[statusStr as keyof typeof variants] || "outline"}>
+        {statusStr.charAt(0).toUpperCase() + statusStr.slice(1)}
       </Badge>
     );
   };
@@ -142,7 +148,7 @@ Order ID: ${payment.razorpayOrderId || 'N/A'}
 Date: ${formatDate(payment.completedAt || payment.createdAt)}
 Type: ${getPaymentTypeLabel(payment.type, payment.notes)}
 Amount: ${formatAmount(payment.amount, payment.currency)}
-Status: ${payment.status.toUpperCase()}
+Status: ${(payment.status?.toString() || 'unknown').toUpperCase()}
 ${payment.clientName ? `Client: ${payment.clientName}` : ''}
 
 Thank you for your payment!

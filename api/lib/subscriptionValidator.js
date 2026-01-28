@@ -7,10 +7,13 @@ dotenv.config();
 
 // Initialize Firebase Admin if not already initialized
 let db;
+let adminInitialized = false;
 
 // In-memory cache for subscription data (5 minute TTL)
 const subscriptionCache = new Map();
+const tokenCache = new Map(); // Cache for verified tokens
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const TOKEN_CACHE_TTL = 10 * 60 * 1000; // 10 minutes for tokens
 
 // Cache helper functions
 function getCachedSubscription(userId) {
@@ -28,7 +31,35 @@ function setCachedSubscription(userId, data) {
   });
 }
 
+function getCachedToken(token) {
+  const cached = tokenCache.get(token);
+  if (cached && Date.now() - cached.timestamp < TOKEN_CACHE_TTL) {
+    return cached.userId;
+  }
+  return null;
+}
+
+function setCachedToken(token, userId) {
+  tokenCache.set(token, {
+    userId,
+    timestamp: Date.now()
+  });
+  
+  // Clean up old tokens to prevent memory leaks
+  if (tokenCache.size > 1000) {
+    const oldestEntries = Array.from(tokenCache.entries())
+      .sort(([,a], [,b]) => a.timestamp - b.timestamp)
+      .slice(0, 100);
+    
+    oldestEntries.forEach(([key]) => tokenCache.delete(key));
+  }
+}
+
 function initializeFirebaseAdmin() {
+  if (adminInitialized && db) {
+    return db;
+  }
+
   try {
     if (getApps().length === 0) {
       let credentials;
@@ -81,9 +112,8 @@ function initializeFirebaseAdmin() {
       }
     }
     
-    if (!db) {
-      db = getFirestore();
-    }
+    db = getFirestore();
+    adminInitialized = true;
     
     return db;
   } catch (error) {
@@ -358,7 +388,7 @@ export async function incrementClientCount(userId) {
 }
 
 /**
- * Extract user ID from Firebase Auth token
+ * Extract user ID from Firebase Auth token with caching
  */
 export async function getUserIdFromToken(authHeader) {
   try {
@@ -368,11 +398,19 @@ export async function getUserIdFromToken(authHeader) {
     
     const token = authHeader.substring(7);
     
-    // For development, you might want to decode the token
-    // In production, you should verify it with Firebase Admin
+    // Check token cache first
+    const cachedUserId = getCachedToken(token);
+    if (cachedUserId) {
+      return cachedUserId;
+    }
+    
+    // Verify token with Firebase Admin
     const { getAuth } = await import('firebase-admin/auth');
     const auth = getAuth();
     const decodedToken = await auth.verifyIdToken(token);
+    
+    // Cache the verified token
+    setCachedToken(token, decodedToken.uid);
     
     return decodedToken.uid;
   } catch (error) {

@@ -13,9 +13,10 @@ import { auth } from "@/integrations/firebase/config";
 import { toast } from "sonner";
 import { getSubscription, saveSubscription, incrementVideoUploadCount } from "@/integrations/firebase/subscriptionService";
 import { getSubscriptionStatus, validateClientCreation, updateSubscription } from "@/services/backendApiService";
+import { getCachedSubscription, setCachedSubscription, clearCachedSubscription } from "@/lib/subscriptionCache";
 
 export interface UserSubscription {
-  tier: 'free' | 'premium';
+  tier: 'free' | 'premium' | 'enterprise';
   videoUploadsUsed: number;
   maxVideoUploads: number;
   clientsUsed: number;
@@ -191,8 +192,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         clientsUsed: updatedBackendSubscription.clientsUsed,
         maxClients: updatedBackendSubscription.maxClients,
         maxFileSize: updatedBackendSubscription.maxFileSize,
-        subscriptionDate: updatedBackendSubscription.subscriptionDate,
-        expiryDate: updatedBackendSubscription.expiryDate
+        subscriptionDate: updatedBackendSubscription.subscriptionDate 
+          ? new Date(updatedBackendSubscription.subscriptionDate) 
+          : undefined,
+        expiryDate: updatedBackendSubscription.expiryDate 
+          ? new Date(updatedBackendSubscription.expiryDate) 
+          : undefined
       });
       
       toast.success("Welcome to Premium! You now have access to 50 video uploads and larger file sizes.");
@@ -264,6 +269,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       await signOut(auth);
       setCurrentUser(null);
+      clearCachedSubscription(); // Clear subscription cache
       // Reset subscription to free tier on logout
       setSubscription({
         tier: 'free',
@@ -281,12 +287,51 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   };
 
-  // Load user subscription data
+  // Load user subscription data with caching
   useEffect(() => {
     const loadSubscription = async () => {
       if (currentUser) {
         try {
-          // Use backend API to get subscription status
+          // Check cache first for instant loading
+          const cached = getCachedSubscription(currentUser.uid);
+          if (cached) {
+            setSubscription({
+              tier: cached.tier,
+              videoUploadsUsed: cached.videoUploadsUsed,
+              maxVideoUploads: cached.maxVideoUploads,
+              clientsUsed: cached.clientsUsed,
+              maxClients: cached.maxClients,
+              maxFileSize: cached.maxFileSize,
+              subscriptionDate: cached.subscriptionDate 
+                ? new Date(cached.subscriptionDate) 
+                : undefined,
+              expiryDate: cached.expiryDate 
+                ? new Date(cached.expiryDate) 
+                : undefined
+            });
+            
+            // Load fresh data in background
+            getSubscriptionStatus().then(backendSubscription => {
+              setSubscription({
+                tier: backendSubscription.tier,
+                videoUploadsUsed: backendSubscription.videoUploadsUsed,
+                maxVideoUploads: backendSubscription.maxVideoUploads,
+                clientsUsed: backendSubscription.clientsUsed,
+                maxClients: backendSubscription.maxClients,
+                maxFileSize: backendSubscription.maxFileSize,
+                subscriptionDate: backendSubscription.subscriptionDate 
+                  ? new Date(backendSubscription.subscriptionDate) 
+                  : undefined,
+                expiryDate: backendSubscription.expiryDate 
+                  ? new Date(backendSubscription.expiryDate) 
+                  : undefined
+              });
+            }).catch(console.error);
+            
+            return; // Use cached data immediately
+          }
+
+          // No cache, load from backend
           const backendSubscription = await getSubscriptionStatus();
           setSubscription({
             tier: backendSubscription.tier,
@@ -295,8 +340,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
             clientsUsed: backendSubscription.clientsUsed,
             maxClients: backendSubscription.maxClients,
             maxFileSize: backendSubscription.maxFileSize,
-            subscriptionDate: backendSubscription.subscriptionDate,
-            expiryDate: backendSubscription.expiryDate
+            subscriptionDate: backendSubscription.subscriptionDate 
+              ? new Date(backendSubscription.subscriptionDate) 
+              : undefined,
+            expiryDate: backendSubscription.expiryDate 
+              ? new Date(backendSubscription.expiryDate) 
+              : undefined
           });
         } catch (error) {
           console.error('Error loading subscription from backend:', error);
@@ -304,7 +353,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           try {
             const userSubscription = await getSubscription(currentUser.uid);
             if (userSubscription) {
-              setSubscription({
+              const subscriptionData = {
                 tier: userSubscription.tier,
                 videoUploadsUsed: userSubscription.videoUploadsUsed,
                 maxVideoUploads: userSubscription.maxVideoUploads,
@@ -313,7 +362,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 maxFileSize: userSubscription.maxFileSize,
                 subscriptionDate: userSubscription.subscriptionDate,
                 expiryDate: userSubscription.expiryDate
-              });
+              };
+              setSubscription(subscriptionData);
+              // Cache the fallback data
+              setCachedSubscription(currentUser.uid, subscriptionData);
             } else {
               // Create default free subscription for new users
               const defaultSubscription = {
@@ -327,30 +379,35 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
                 status: 'active' as const
               };
               await saveSubscription(defaultSubscription);
-              setSubscription({
-                tier: 'free',
+              const subscriptionData = {
+                tier: 'free' as const,
                 videoUploadsUsed: 0,
                 maxVideoUploads: 5,
                 clientsUsed: 0,
                 maxClients: 5,
                 maxFileSize: 100
-              });
+              };
+              setSubscription(subscriptionData);
+              setCachedSubscription(currentUser.uid, subscriptionData);
             }
           } catch (fallbackError) {
             console.error('Error with fallback subscription loading:', fallbackError);
             // Final fallback to default free subscription
-            setSubscription({
-              tier: 'free',
+            const defaultSubscriptionData = {
+              tier: 'free' as const,
               videoUploadsUsed: 0,
               maxVideoUploads: 5,
               clientsUsed: 0,
               maxClients: 5,
               maxFileSize: 100
-            });
+            };
+            setSubscription(defaultSubscriptionData);
+            setCachedSubscription(currentUser.uid, defaultSubscriptionData);
           }
         }
       } else {
-        // Reset to default when user logs out
+        // Reset to default when user logs out and clear cache
+        clearCachedSubscription();
         setSubscription({
           tier: 'free',
           videoUploadsUsed: 0,
@@ -367,8 +424,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      setLoading(false);
+      if (user) {
+        // User is signed in, set them as current user
+        setCurrentUser(user);
+        setLoading(false);
+      } else {
+        // User is signed out
+        setCurrentUser(null);
+        setLoading(false);
+      }
     });
 
     return unsubscribe;
@@ -394,5 +458,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setSubscription,
   };
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+    </AuthContext.Provider>
+  );
 };

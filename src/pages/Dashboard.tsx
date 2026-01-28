@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import DashboardLayout from "@/components/dashboard/DashboardLayout";
 import SmartUploadSection from "@/components/dashboard/SmartUploadSection";
 import VideosManagement from "@/components/dashboard/VideosManagement";
@@ -8,13 +8,29 @@ import OverviewSection from "@/components/dashboard/OverviewSection";
 
 const Dashboard = () => {
   const [activeSection, setActiveSection] = useState<string>("overview");
+  const [replaceVideoId, setReplaceVideoId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Check URL parameters for tab and replaceVideoId
+    const urlParams = new URLSearchParams(window.location.search);
+    const tab = urlParams.get('tab');
+    const videoId = urlParams.get('replaceVideoId');
+    
+    if (tab) {
+      setActiveSection(tab);
+    }
+    
+    if (videoId) {
+      setReplaceVideoId(videoId);
+    }
+  }, []);
 
   const renderSection = () => {
     switch (activeSection) {
       case "overview":
         return <OverviewSection onSectionChange={setActiveSection} />;
       case "upload":
-        return <SmartUploadSection />;
+        return <SmartUploadSection replaceVideoId={replaceVideoId} />;
       case "videos":
         return <VideosManagement />;
       case "clients":

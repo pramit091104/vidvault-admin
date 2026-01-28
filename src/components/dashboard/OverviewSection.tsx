@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Users, Video, MessageSquare, TrendingUp, Clock, Star, Activity, BarChart3, HardDrive } from "lucide-react";
+import { Users, Video, MessageSquare, TrendingUp, Clock, Star, Activity, BarChart3, HardDrive, AlertCircle, CheckCircle, Upload, RefreshCw } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,7 +7,7 @@ import { getClients } from "@/integrations/firebase/clientService";
 import { getAllVideosForUser } from "@/integrations/firebase/videoService";
 import { getUserTimestampedComments } from "@/integrations/firebase/commentService";
 import { SubscriptionStatus } from "./SubscriptionStatus";
-import { PaymentStatsCard } from "./PaymentStats";
+import { ApprovalStatusVideos } from "./ApprovalStatusVideos";
 
 interface DashboardStats {
   totalClients: number;
@@ -319,66 +319,75 @@ const OverviewSection = ({ onSectionChange }: OverviewSectionProps) => {
         />
       </div>
 
-      {/* Recent Activity - Better mobile spacing */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader className="pb-4">
-              <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
-                <Clock className="h-5 w-5 md:h-6 md:w-6" />
-                Recent Activity
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-4 md:p-6">
-              {loading ? (
-                <div className="space-y-4">
-                  {[1, 2, 3, 4].map((i) => (
-                    <div key={i} className="flex items-start gap-3">
-                      <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
-                      <div className="flex-1">
-                        <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
-                        <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : recentActivities.length > 0 ? (
-                <div className="space-y-4">
-                  {recentActivities.map((activity) => (
-                    <div key={activity.id} className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${getActivityColor(activity.type)} flex-shrink-0`}>
-                        {getActivityIcon(activity.type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{activity.message}</p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
-                          <span>{activity.timestamp}</span>
-                          {activity.client && (
-                            <>
-                              <span>•</span>
-                              <span className="truncate max-w-[120px]">{activity.client}</span>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
-                  <p className="text-sm">No recent activity</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Payment Stats Sidebar */}
-        <div>
-          <PaymentStatsCard />
-        </div>
+      {/* Approval Status Videos - Show videos that need attention */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <ApprovalStatusVideos
+          status="needs_changes"
+          title="Needs Revision"
+          description="Videos that require changes based on client feedback"
+          icon={<AlertCircle className="h-5 w-5" />}
+          emptyMessage="No videos need revision at the moment."
+        />
+        <ApprovalStatusVideos
+          status="pending_review"
+          title="Pending Review"
+          description="Videos waiting for client approval"
+          icon={<Clock className="h-5 w-5" />}
+          emptyMessage="No videos are pending client review."
+        />
       </div>
+
+      {/* Recent Activity - Full width without payment sidebar */}
+      <Card>
+        <CardHeader className="pb-4">
+          <CardTitle className="flex items-center gap-2 text-lg md:text-xl">
+            <Clock className="h-5 w-5 md:h-6 md:w-6" />
+            Recent Activity
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 md:p-6">
+          {loading ? (
+            <div className="space-y-4">
+              {[1, 2, 3, 4].map((i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <div className="w-8 h-8 bg-gray-200 rounded-lg animate-pulse"></div>
+                  <div className="flex-1">
+                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2 animate-pulse"></div>
+                    <div className="h-3 bg-gray-200 rounded w-1/2 animate-pulse"></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : recentActivities.length > 0 ? (
+            <div className="space-y-4">
+              {recentActivities.map((activity) => (
+                <div key={activity.id} className="flex items-start gap-3">
+                  <div className={`p-2 rounded-lg ${getActivityColor(activity.type)} flex-shrink-0`}>
+                    {getActivityIcon(activity.type)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{activity.message}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground flex-wrap">
+                      <span>{activity.timestamp}</span>
+                      {activity.client && (
+                        <>
+                          <span>•</span>
+                          <span className="truncate max-w-[120px]">{activity.client}</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <Activity className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p className="text-sm">No recent activity</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Quick Actions - Better mobile layout */}
       <Card>

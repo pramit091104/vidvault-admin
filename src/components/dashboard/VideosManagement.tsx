@@ -22,6 +22,7 @@ import {
 } from "@/integrations/firebase/videoService";
 import { getVideoTimestampedComments, TimestampedComment } from "@/integrations/firebase/commentService";
 import { LinkExpirationControl } from "./LinkExpirationControl";
+import { VideoApprovalActions } from "./VideoApprovalActions";
 import { formatDistanceToNow } from "date-fns";
 
 export const VideosManagement = () => {
@@ -184,6 +185,11 @@ export const VideosManagement = () => {
                           <Eye className="h-3 w-3" />
                           {video.viewCount || 0} views
                         </span>
+                        {video.version && video.version > 1 && (
+                          <span className="text-xs bg-muted px-1.5 py-0.5 rounded">
+                            v{video.version}
+                          </span>
+                        )}
                       </div>
                     </div>
                     
@@ -222,6 +228,20 @@ export const VideosManagement = () => {
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
+                  </div>
+
+                  {/* Approval Status and Actions */}
+                  <div className="flex items-center justify-between pt-2 border-t">
+                    <VideoApprovalActions
+                      videoId={video.id}
+                      approvalStatus={video.approvalStatus || 'draft'}
+                      onStatusUpdate={fetchVideos}
+                    />
+                    {video.revisionNotes && video.approvalStatus === 'needs_changes' && (
+                      <div className="text-xs text-orange-700 bg-orange-50 px-2 py-1 rounded border border-orange-200 max-w-xs">
+                        <strong>Revision needed:</strong> {video.revisionNotes}
+                      </div>
+                    )}
                   </div>
 
                   {/* Comments Section (Expandable) */}

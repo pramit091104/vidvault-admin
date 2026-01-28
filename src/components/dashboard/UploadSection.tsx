@@ -229,6 +229,9 @@ const UploadSection = ({ preSelectedFile }: UploadSectionProps = {}) => {
             publicSlug: generatedSlug,
             publicWebsiteUrl: isPublicWebsite ? createPublicUrl(generatedSlug) : '',
             viewCount: 0,
+            // Approval workflow fields - start as draft
+            approvalStatus: 'draft',
+            version: 1
           });
           
           toast.success('Video uploaded and saved successfully!');

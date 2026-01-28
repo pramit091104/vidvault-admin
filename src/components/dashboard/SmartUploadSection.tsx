@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload as UploadIcon, Crown, AlertCircle, CheckCircle2, Pause, Play, X, Zap } from "lucide-react";
+import { Upload as UploadIcon, Crown, AlertCircle, CheckCircle2, Pause, Play, X, Zap, RefreshCw } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
@@ -14,40 +14,102 @@ import { auth } from "@/integrations/firebase/config";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUppyUpload } from "@/hooks/useUppyUpload";
 import { useSimpleUpload } from "@/hooks/useSimpleUpload";
-import { saveGCSVideo } from "@/integrations/firebase/videoService";
+import { saveGCSVideo, getVideoById, updateVideoApprovalStatus } from "@/integrations/firebase/videoService";
 import { validateVideoUploadData, generateSecurityCode } from "@/lib/videoUploadValidator";
 import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
 import { v4 as uuidv4 } from 'uuid';
 import { FEATURES, formatFileSize } from "@/config/features";
 import { getClientByName, createClient } from "@/integrations/firebase/clientService";
 import { validateClientCreation } from "@/services/backendApiService";
+import { applicationService } from "@/services";
 
-const SmartUploadSection = () => {
+interface SmartUploadSectionProps {
+  replaceVideoId?: string | null;
+}
+
+const SmartUploadSection = ({ replaceVideoId }: SmartUploadSectionProps) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [clientName, setClientName] = useState("");
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [currentUser, setCurrentUser] = useState<any>(null);
+  const [originalVideo, setOriginalVideo] = useState<any>(null);
+  const [isReplacingVideo, setIsReplacingVideo] = useState(false);
+  const [canUpload, setCanUpload] = useState<{
+    canUpload: boolean;
+    reason?: string;
+    upgradeRequired?: boolean;
+  }>({ canUpload: true });
 
-  const { subscription, canUploadVideo, incrementVideoUpload } = useAuth();
+  const { subscription, currentUser: authUser, canUploadVideo, incrementVideoUpload } = useAuth();
+
+  // Check upload permissions using application service
+  useEffect(() => {
+    const checkUploadPermissions = async () => {
+      if (!authUser?.uid) {
+        setCanUpload({ canUpload: false, reason: 'Please sign in to upload videos' });
+        return;
+      }
+
+      try {
+        const uploadPermission = await applicationService.canUserUpload(authUser.uid);
+        setCanUpload(uploadPermission);
+      } catch (error) {
+        console.error('Error checking upload permissions:', error);
+        setCanUpload({ 
+          canUpload: false, 
+          reason: 'Error checking upload permissions',
+          upgradeRequired: false 
+        });
+      }
+    };
+
+    checkUploadPermissions();
+  }, [authUser?.uid, subscription]);
+
+  // Load original video data if replacing
+  useEffect(() => {
+    const loadOriginalVideo = async () => {
+      if (replaceVideoId && authUser) {
+        try {
+          const video = await getVideoById(replaceVideoId);
+          if (video && video.userId === authUser.uid) {
+            setOriginalVideo(video);
+            setTitle(video.title);
+            setDescription(video.description || "");
+            setClientName(video.clientName);
+            setIsReplacingVideo(true);
+            toast.info(`Replacing video: "${video.title}". Upload a new file to create version ${(video.version || 1) + 1}.`);
+          } else {
+            toast.error("Video not found or you don't have permission to replace it.");
+          }
+        } catch (error) {
+          console.error("Error loading original video:", error);
+          toast.error("Failed to load original video data.");
+        }
+      }
+    };
+
+    loadOriginalVideo();
+  }, [replaceVideoId, authUser]);
 
   // Function to automatically create client if it doesn't exist
   const ensureClientExists = async (clientNameValue: string, videoTitle: string): Promise<void> => {
-    if (!currentUser || !clientNameValue.trim() || !videoTitle.trim()) {
+    if (!authUser || !clientNameValue.trim() || !videoTitle.trim()) {
       return;
     }
 
     try {
       // Check if client already exists
-      const existingClient = await getClientByName(clientNameValue.trim(), currentUser.uid);
+      const existingClient = await getClientByName(clientNameValue.trim(), authUser.uid);
       
       if (existingClient) {
         console.log(`Client "${clientNameValue}" already exists, skipping creation`);
         return;
       }
 
-      // Validate if user can create a new client
+      // Validate if user can create a new client using application service
       const validation = await validateClientCreation();
       if (!validation.allowed) {
         console.warn(`Cannot auto-create client: ${validation.error}`);
@@ -64,7 +126,7 @@ const SmartUploadSection = () => {
         paidPayment: 0,
         finalPayment: 0,
         duration: "1 week",
-        userId: currentUser.uid
+        userId: authUser.uid
       };
 
       const clientId = await createClient(newClientData);
@@ -147,28 +209,30 @@ const SmartUploadSection = () => {
       return;
     }
 
-    // Check subscription limits
-    if (!canUploadVideo()) {
-      toast.error(`Upload limit reached. You've used ${subscription.videoUploadsUsed}/${subscription.maxVideoUploads} uploads.`);
+    // Check subscription limits using application service
+    if (!canUpload.canUpload) {
+      toast.error(canUpload.reason || "Upload not allowed");
       return;
     }
 
-    // Get file size limits based on subscription
+    // Get file size limits based on subscription and platform constraints
     const maxFileSize = subscription.tier === 'premium' 
       ? FEATURES.RESUMABLE_UPLOAD_MAX_SIZE // 2GB for premium
-      : FEATURES.SIMPLE_UPLOAD_MAX_SIZE;   // 100MB for free
+      : FEATURES.RESUMABLE_UPLOAD_MAX_SIZE; // Also allow resumable for free users for files > 4MB
 
     // Validate file size based on subscription
     if (file.size > maxFileSize) {
       const maxSizeFormatted = formatFileSize(maxFileSize);
       const currentSizeFormatted = formatFileSize(file.size);
       
-      if (subscription.tier === 'free') {
-        toast.error(`File too large (${currentSizeFormatted}). Free users can upload up to ${maxSizeFormatted}. Upgrade to Premium for larger files.`);
-      } else {
-        toast.error(`File too large (${currentSizeFormatted}). Maximum file size is ${maxSizeFormatted}.`);
-      }
+      toast.error(`File too large (${currentSizeFormatted}). Maximum file size is ${maxSizeFormatted}.`);
       return;
+    }
+
+    // Show warning for files that will use resumable upload
+    if (file.size >= FEATURES.SIMPLE_UPLOAD_MAX_SIZE) {
+      const currentSizeFormatted = formatFileSize(file.size);
+      toast.info(`Large file detected (${currentSizeFormatted}). Will use resumable upload for better reliability.`);
     }
 
     setSelectedFile(file);
@@ -183,123 +247,157 @@ const SmartUploadSection = () => {
       return;
     }
 
-    if (!currentUser) {
+    if (!authUser) {
       toast.error("Please sign in to upload videos");
       return;
     }
 
-    if (!canUploadVideo()) {
-      toast.error("Upload limit reached. Please upgrade to continue.");
+    if (!isReplacingVideo && !canUpload.canUpload) {
+      toast.error(canUpload.reason || "Upload limit reached. Please upgrade to continue.");
       return;
     }
 
-    const videoId = uuidv4();
+    const videoId = isReplacingVideo ? replaceVideoId : uuidv4();
     const fileName = `${videoId}.${selectedFile.name.split('.').pop()}`;
 
     const handleUploadSuccess = async (result: any) => {
       try {
         // Ensure user is still authenticated
-        if (!currentUser || !currentUser.uid) {
+        if (!authUser || !authUser.uid) {
           throw new Error('User not authenticated');
         }
         
-        // Auto-create client if it doesn't exist (before saving video)
-        await ensureClientExists(clientName.trim(), title.trim());
-        
-        // Generate security code for the video
-        const securityCode = generateSecurityCode();
-        
-        // Prepare video data with all required fields
-        const videoData = {
-          id: videoId,
-          title: title.trim(),
-          description: description.trim(),
-          clientName: clientName.trim(),
-          userId: currentUser.uid,
-          fileName: selectedFile.name,
-          publicUrl: result.publicUrl || result.signedUrl || `https://storage.googleapis.com/${import.meta.env.VITE_GCS_BUCKET_NAME}/${result.gcsPath || fileName}`,
-          size: selectedFile.size,
-          contentType: selectedFile.type,
-          uploadedAt: new Date(),
-          securityCode: securityCode,
-          isActive: true,
-          accessCount: 0,
-          privacyStatus: 'private' as const,
-          isPubliclyAccessible: false,
-          isPublic: false,
-          viewCount: 0,
-          gcsPath: result.gcsPath || result.fileName || fileName,
-          linkExpirationHours: 24, // Default 24 hours expiration
-          linkExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // 24 hours from now
-        };
+        if (isReplacingVideo && originalVideo) {
+          // Update existing video with new file data
+          const updatedVideoData = {
+            ...originalVideo,
+            title: title.trim(),
+            description: description.trim(),
+            clientName: clientName.trim(),
+            fileName: selectedFile.name,
+            publicUrl: result.publicUrl || result.signedUrl || `https://storage.googleapis.com/${import.meta.env.VITE_GCS_BUCKET_NAME}/${result.gcsPath || fileName}`,
+            size: selectedFile.size,
+            contentType: selectedFile.type,
+            uploadedAt: new Date(),
+            gcsPath: result.gcsPath || result.fileName || fileName,
+            version: (originalVideo.version || 1) + 1,
+            // Reset approval status to draft for new version
+            approvalStatus: 'draft' as const,
+            revisionNotes: undefined // Clear previous revision notes
+          };
 
-        // Validate data before saving
-        const validatedData = validateVideoUploadData(videoData);
-        
-        console.log('Saving video data to Firestore:', {
-          videoId: validatedData.id,
-          userId: validatedData.userId,
-          isActive: validatedData.isActive,
-          hasRequiredFields: !!(validatedData.userId && validatedData.isActive)
-        });
-        
-        console.log('About to save video data:', validatedData);
-        console.log('Current user auth state:', {
-          uid: currentUser.uid,
-          email: currentUser.email,
-          isAuthenticated: !!currentUser
-        });
-        
-        try {
-          await saveGCSVideo(validatedData);
-          console.log('Video data saved successfully to Firestore');
-        } catch (firestoreError) {
-          console.error('Firestore save failed:', firestoreError);
-          throw new Error(`Firestore error: ${firestoreError.message}`);
-        }
-        
-        try {
-          await incrementVideoUpload();
-          console.log('Video upload count incremented');
-        } catch (incrementError) {
-          console.error('Increment upload count failed:', incrementError);
-          throw new Error(`Increment error: ${incrementError.message}`);
+          await saveGCSVideo(updatedVideoData);
+          
+          toast.success(`Video updated successfully! New version ${updatedVideoData.version} uploaded.`);
+          
+          // Navigate back to videos management
+          setTimeout(() => {
+            window.location.href = '/dashboard?tab=videos';
+          }, 2000);
+        } else {
+          // Auto-create client if it doesn't exist (before saving video)
+          await ensureClientExists(clientName.trim(), title.trim());
+          
+          // Generate security code for the video
+          const securityCode = generateSecurityCode();
+          
+          // Prepare video data with all required fields
+          const videoData = {
+            id: videoId,
+            title: title.trim(),
+            description: description.trim(),
+            clientName: clientName.trim(),
+            userId: authUser.uid,
+            fileName: selectedFile.name,
+            publicUrl: result.publicUrl || result.signedUrl || `https://storage.googleapis.com/${import.meta.env.VITE_GCS_BUCKET_NAME}/${result.gcsPath || fileName}`,
+            size: selectedFile.size,
+            contentType: selectedFile.type,
+            uploadedAt: new Date(),
+            securityCode: securityCode,
+            isActive: true,
+            accessCount: 0,
+            privacyStatus: 'private' as const,
+            isPubliclyAccessible: false,
+            isPublic: false,
+            viewCount: 0,
+            gcsPath: result.gcsPath || result.fileName || fileName,
+            linkExpirationHours: 24, // Default 24 hours expiration
+            linkExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+            // Approval workflow fields - start as draft
+            approvalStatus: 'draft' as const,
+            version: 1
+          };
+
+          // Validate data before saving
+          const validatedData = validateVideoUploadData(videoData);
+          
+          console.log('Saving video data to Firestore:', {
+            videoId: validatedData.id,
+            userId: validatedData.userId,
+            isActive: validatedData.isActive,
+            hasRequiredFields: !!(validatedData.userId && validatedData.isActive)
+          });
+          
+          console.log('About to save video data:', validatedData);
+          console.log('Current user auth state:', {
+            uid: authUser.uid,
+            email: authUser.email,
+            isAuthenticated: !!authUser
+          });
+          
+          try {
+            await saveGCSVideo(validatedData);
+            console.log('Video data saved successfully to Firestore');
+          } catch (firestoreError) {
+            console.error('Firestore save failed:', firestoreError);
+            throw new Error(`Firestore error: ${firestoreError.message}`);
+          }
+          
+          try {
+            await incrementVideoUpload();
+            console.log('Video upload count incremented');
+          } catch (incrementError) {
+            console.error('Increment upload count failed:', incrementError);
+            throw new Error(`Increment error: ${incrementError.message}`);
+          }
+
+          // Generate shareable link using video ID
+          const shareUrl = `${window.location.origin}/watch/${videoId}`;
+          
+          // Copy to clipboard and show success message with share option
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+            toast.success("Video uploaded successfully! Share link copied to clipboard.", {
+              action: {
+                label: "Share",
+                onClick: () => {
+                  if (navigator.share) {
+                    navigator.share({
+                      title: title.trim(),
+                      text: `Check out this video: ${title.trim()}`,
+                      url: shareUrl
+                    });
+                  }
+                }
+              }
+            });
+          } catch (err) {
+            toast.success(`Video uploaded successfully! Share link: ${shareUrl}`);
+          }
         }
 
         setUploadSuccess(true);
-        
-        // Generate shareable link using video ID
-        const shareUrl = `${window.location.origin}/watch/${videoId}`;
-        
-        // Copy to clipboard and show success message with share option
-        try {
-          await navigator.clipboard.writeText(shareUrl);
-          toast.success("Video uploaded successfully! Share link copied to clipboard.", {
-            action: {
-              label: "Share",
-              onClick: () => {
-                if (navigator.share) {
-                  navigator.share({
-                    title: title.trim(),
-                    text: `Check out this video: ${title.trim()}`,
-                    url: shareUrl
-                  });
-                }
-              }
-            }
-          });
-        } catch (err) {
-          toast.success(`Video uploaded successfully! Share link: ${shareUrl}`);
-        }
 
         // Dispatch event for other components to refresh
         window.dispatchEvent(new CustomEvent("gcs-video-uploaded"));
 
         // Reset form
         setSelectedFile(null);
-        setTitle("");
-        setDescription("");
-        setClientName("");
+        if (!isReplacingVideo) {
+          setTitle("");
+          setDescription("");
+          setClientName("");
+        }
         resetUppyUpload();
         resetSimpleUpload();
       } catch (error: any) {
@@ -398,6 +496,23 @@ const SmartUploadSection = () => {
 
   return (
     <div className="space-y-6">
+      {/* Video Replacement Notice */}
+      {isReplacingVideo && originalVideo && (
+        <Alert>
+          <RefreshCw className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p><strong>Replacing Video:</strong> {originalVideo.title}</p>
+              <p><strong>Current Version:</strong> {originalVideo.version || 1}</p>
+              <p><strong>New Version:</strong> {(originalVideo.version || 1) + 1}</p>
+              <p className="text-sm text-muted-foreground">
+                The new version will reset the approval status to "Draft" and require client review again.
+              </p>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Subscription Status */}
       <Card>
         <CardContent className="pt-6">
@@ -424,12 +539,21 @@ const SmartUploadSection = () => {
             )}
           </div>
           
-          {!canUploadVideo() && (
+          {!isReplacingVideo && !canUpload.canUpload && (
             <Alert className="mt-4">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                You've reached your upload limit. 
-                {subscription.tier === 'free' ? ' Upgrade to Premium for 50 uploads per month.' : ' Your limit will reset next month.'}
+                {canUpload.reason}
+                {canUpload.upgradeRequired && subscription.tier === 'free' && ' Upgrade to Premium for 50 uploads per month.'}
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {isReplacingVideo && (
+            <Alert className="mt-4">
+              <CheckCircle2 className="h-4 w-4" />
+              <AlertDescription>
+                Video replacement doesn't count against your upload limit.
               </AlertDescription>
             </Alert>
           )}
@@ -440,11 +564,14 @@ const SmartUploadSection = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <UploadIcon className="h-5 w-5" />
-            Smart Video Upload
+            {isReplacingVideo ? <RefreshCw className="h-5 w-5" /> : <UploadIcon className="h-5 w-5" />}
+            {isReplacingVideo ? 'Upload New Version' : 'Smart Video Upload'}
           </CardTitle>
           <CardDescription>
-            Upload videos with automatic optimization and smart method selection
+            {isReplacingVideo 
+              ? `Uploading a new version of "${originalVideo?.title}". This will create version ${(originalVideo?.version || 1) + 1}.`
+              : 'Upload videos with automatic optimization and smart method selection'
+            }
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -457,7 +584,7 @@ const SmartUploadSection = () => {
                 type="file"
                 accept="video/*"
                 onChange={handleFileSelect}
-                disabled={isUploading || !canUploadVideo()}
+                disabled={isUploading || !canUpload.canUpload}
               />
               <p className="text-sm text-muted-foreground">
                 {subscription.tier === 'premium' 
@@ -531,7 +658,6 @@ const SmartUploadSection = () => {
                 
                 {totalChunks > 1 && isLargeFile && (
                   <div className="flex items-center justify-between text-sm text-muted-foreground">
-                    <span>Chunk {currentChunk} of {totalChunks}</span>
                     {uploadSpeed && <span>{uploadSpeed}</span>}
                   </div>
                 )}
@@ -583,10 +709,10 @@ const SmartUploadSection = () => {
               <Button 
                 onClick={handleUpload} 
                 className="w-full"
-                disabled={!title.trim() || !clientName.trim() || !canUploadVideo()}
+                disabled={!title.trim() || !clientName.trim() || (!isReplacingVideo && !canUpload.canUpload)}
               >
-                <UploadIcon className="h-4 w-4 mr-2" />
-                Upload Video
+                {isReplacingVideo ? <RefreshCw className="h-4 w-4 mr-2" /> : <UploadIcon className="h-4 w-4 mr-2" />}
+                {isReplacingVideo ? 'Upload New Version' : 'Upload Video'}
               </Button>
             )}
           </div>

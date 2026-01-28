@@ -21,30 +21,30 @@ const SignUpPage = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="w-full max-w-md space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-8 sm:py-12 px-3 sm:px-4 lg:px-8">
+      <div className="w-full max-w-md space-y-6 sm:space-y-8">
         <div className="text-center">
-          <h1 className="text-3xl font-bold text-gray-900">Create an account</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Create an account</h1>
           <p className="mt-2 text-sm text-gray-600">
             Start managing your video content with VidVault Admin
           </p>
         </div>
 
-          <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
+          <div className="bg-white py-6 sm:py-8 px-4 sm:px-10 shadow rounded-lg">
             <EmailSignUp />
 
             <div className="mt-6">
               <Button
                 type="button"
                 variant="outline"
-                className="w-full flex justify-center items-center"
+                className="w-full flex justify-center items-center h-10 sm:h-auto py-2 sm:py-3 text-sm sm:text-base touch-manipulation"
                 onClick={handleGoogleSignIn}
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Redirecting to Google...
+                    <span className="text-sm sm:text-base">Redirecting to Google...</span>
                   </>
                 ) : (
                   <>
@@ -75,7 +75,7 @@ const SignUpPage = () => {
                         fill="#EA4335"
                       />
                     </svg>
-                    Sign up with Google
+                    <span className="text-sm sm:text-base">Sign up with Google</span>
                   </>
                 )}
               </Button>
@@ -86,7 +86,7 @@ const SignUpPage = () => {
                 Already have an account?{' '}
                 <Link
                   to="/login"
-                  className="font-medium text-indigo-600 hover:text-indigo-500"
+                  className="font-medium text-indigo-600 hover:text-indigo-500 touch-manipulation p-1"
                 >
                   Sign in
                 </Link>

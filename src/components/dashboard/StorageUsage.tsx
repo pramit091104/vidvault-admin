@@ -4,6 +4,7 @@ import { Progress } from "@/components/ui/progress";
 import { HardDrive, AlertTriangle } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { getAllVideosForUser } from "@/integrations/firebase/videoService";
+import { applicationService } from "@/services";
 
 interface StorageUsageProps {
   compact?: boolean;
@@ -12,6 +13,14 @@ interface StorageUsageProps {
 export const StorageUsage = ({ compact = false }: StorageUsageProps) => {
   const [totalStorage, setTotalStorage] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
+  const [usageStats, setUsageStats] = useState<{
+    uploadCount: number;
+    maxUploads: number;
+    clientsUsed: number;
+    maxClients: number;
+    tier: string;
+    isActive: boolean;
+  } | null>(null);
   const { currentUser, subscription } = useAuth();
 
   useEffect(() => {
@@ -20,6 +29,12 @@ export const StorageUsage = ({ compact = false }: StorageUsageProps) => {
       
       try {
         setIsLoading(true);
+        
+        // Load usage stats from application service
+        const stats = await applicationService.getUserUsageStats(currentUser.uid);
+        setUsageStats(stats);
+        
+        // Get videos to calculate actual storage used
         const videos = await getAllVideosForUser(currentUser.uid);
         
         // Calculate total storage used
@@ -48,16 +63,17 @@ export const StorageUsage = ({ compact = false }: StorageUsageProps) => {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
   };
 
-  // Calculate storage limit based on subscription
+  // Calculate storage limit based on subscription using application service data
   // For display purposes - actual limits are enforced per file upload
-  const storageLimit = subscription.tier === 'premium' ? 10 * 1024 * 1024 * 1024 : 1 * 1024 * 1024 * 1024; // 10GB vs 1GB
+  const currentTier = usageStats?.tier || subscription.tier;
+  const storageLimit = currentTier === 'premium' ? 10 * 1024 * 1024 * 1024 : 1 * 1024 * 1024 * 1024; // 10GB vs 1GB
   const usagePercent = (totalStorage / storageLimit) * 100;
   const isNearLimit = usagePercent >= 80;
 
   if (compact) {
     return (
-      <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg border">
-        <HardDrive className="h-5 w-5 text-slate-600" />
+      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border">
+        <HardDrive className="h-5 w-5 text-muted-foreground" />
         <div className="flex-1">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium">Storage Used</span>
@@ -112,7 +128,7 @@ export const StorageUsage = ({ compact = false }: StorageUsageProps) => {
             )}
 
             <div className="text-xs text-muted-foreground">
-              {subscription.tier === 'free' 
+              {currentTier === 'free' 
                 ? 'Upgrade to Premium for more storage'
                 : 'Premium storage limit'
               }

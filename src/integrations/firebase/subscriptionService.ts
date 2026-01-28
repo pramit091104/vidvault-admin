@@ -59,27 +59,50 @@ export const saveSubscription = async (subscriptionData: Omit<SubscriptionRecord
   }
 };
 
-// Get subscription for a user
+// Get subscription for a user (with caching)
 export const getSubscription = async (userId: string): Promise<SubscriptionRecord | null> => {
   try {
-    const docRef = doc(db, SUBSCRIPTIONS_COLLECTION, userId);
-    const docSnap = await getDoc(docRef);
+    const { auth } = await import('./config');
+    const token = await auth.currentUser?.getIdToken();
     
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      return {
-        ...data,
-        subscriptionDate: data.subscriptionDate?.toDate(),
-        expiryDate: data.expiryDate?.toDate(),
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
-      } as SubscriptionRecord;
+    const response = await fetch('/api/subscription/status', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      }
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to get subscription');
     }
-    
-    return null;
+
+    const data = await response.json();
+    return data.subscription;
   } catch (error) {
     console.error('Error getting subscription:', error);
-    throw new Error('Failed to get subscription');
+    
+    // Fallback to direct Firestore query
+    try {
+      const docRef = doc(db, SUBSCRIPTIONS_COLLECTION, userId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        return {
+          ...data,
+          subscriptionDate: data.subscriptionDate?.toDate(),
+          expiryDate: data.expiryDate?.toDate(),
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+        } as SubscriptionRecord;
+      }
+      
+      return null;
+    } catch (fallbackError) {
+      console.error('Fallback subscription query failed:', fallbackError);
+      throw new Error('Failed to get subscription');
+    }
   }
 };
 
@@ -100,16 +123,21 @@ export const updateSubscriptionStatus = async (userId: string, status: 'active' 
 // Increment video upload count
 export const incrementVideoUploadCount = async (userId: string): Promise<void> => {
   try {
-    const subscription = await getSubscription(userId);
-    if (!subscription) {
-      throw new Error('Subscription not found');
-    }
-
-    const docRef = doc(db, SUBSCRIPTIONS_COLLECTION, userId);
-    await updateDoc(docRef, {
-      videoUploadsUsed: subscription.videoUploadsUsed + 1,
-      updatedAt: Timestamp.now(),
+    const { auth } = await import('./config');
+    const token = await auth.currentUser?.getIdToken();
+    
+    const response = await fetch('/api/subscription/increment-video', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ userId })
     });
+
+    if (!response.ok) {
+      throw new Error('Failed to increment video upload count');
+    }
   } catch (error) {
     console.error('Error incrementing video upload count:', error);
     throw new Error('Failed to increment video upload count');
@@ -119,16 +147,21 @@ export const incrementVideoUploadCount = async (userId: string): Promise<void> =
 // Increment client count
 export const incrementClientCount = async (userId: string): Promise<void> => {
   try {
-    const subscription = await getSubscription(userId);
-    if (!subscription) {
-      throw new Error('Subscription not found');
-    }
-
-    const docRef = doc(db, SUBSCRIPTIONS_COLLECTION, userId);
-    await updateDoc(docRef, {
-      clientsUsed: subscription.clientsUsed + 1,
-      updatedAt: Timestamp.now(),
+    const { auth } = await import('./config');
+    const token = await auth.currentUser?.getIdToken();
+    
+    const response = await fetch('/api/subscription/increment-client', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+      },
+      body: JSON.stringify({ userId })
     });
+
+    if (!response.ok) {
+      throw new Error('Failed to increment client count');
+    }
   } catch (error) {
     console.error('Error incrementing client count:', error);
     throw new Error('Failed to increment client count');

@@ -24,6 +24,23 @@ const TimestampedComments = ({ videoId, videoTitle }: TimestampedCommentsProps) 
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'all' | 'grouped'>('all');
 
+  // Safe date formatting function
+  const formatSafeDate = (dateValue: any, formatString: string): string => {
+    try {
+      if (!dateValue) {
+        return 'Invalid date';
+      }
+      const date = new Date(dateValue);
+      if (isNaN(date.getTime())) {
+        return 'Invalid date';
+      }
+      return format(date, formatString);
+    } catch (error) {
+      console.error('Date formatting error:', error);
+      return 'Invalid date';
+    }
+  };
+
   useEffect(() => {
     // Only fetch when dialog is opened to save resources
     if (isOpen) {
@@ -183,7 +200,7 @@ const TimestampedComments = ({ videoId, videoTitle }: TimestampedCommentsProps) 
                               </div>
                               <p className="text-sm text-foreground whitespace-pre-wrap break-words">{comment.comment}</p>
                               <p className="text-xs text-muted-foreground">
-                                {format(new Date(comment.createdAt), 'MMM dd, yyyy HH:mm')}
+                                {formatSafeDate(comment.createdAt, 'MMM dd, yyyy HH:mm')}
                               </p>
                             </div>
                           </CardContent>
@@ -209,7 +226,7 @@ const TimestampedComments = ({ videoId, videoTitle }: TimestampedCommentsProps) 
                                   <span className="text-xs font-mono bg-primary/10 text-primary px-2 py-0.5 rounded">
                                     {formatTimestamp(comment.timestamp)}
                                   </span>
-                                  <span className="text-xs text-muted-foreground">{format(new Date(comment.createdAt), 'MMM dd HH:mm')}</span>
+                                  <span className="text-xs text-muted-foreground">{formatSafeDate(comment.createdAt, 'MMM dd HH:mm')}</span>
                                 </div>
                                 <p className="text-sm text-foreground whitespace-pre-wrap break-words">{comment.comment}</p>
                               </div>
