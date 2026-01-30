@@ -11,6 +11,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import ffmpeg from 'fluent-ffmpeg';
 import ffmpegPath from 'ffmpeg-static';
+import { exec } from 'child_process';
 
 // Set FFmpeg path immediately
 if (ffmpegPath) {
@@ -130,6 +131,11 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
     } else if (process.env.GCS_KEY_FILE && fs.existsSync(process.env.GCS_KEY_FILE)) {
       const keyFileContent = fs.readFileSync(process.env.GCS_KEY_FILE, 'utf8');
       credentials = JSON.parse(keyFileContent);
+    }
+
+    // Fix for private_key newlines if they are escaped as literal '\n' strings
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
     }
 
     if (credentials) {

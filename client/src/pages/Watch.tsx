@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -64,10 +64,69 @@ const Watch = () => {
   const [rateLimitStatus, setRateLimitStatus] = useState<{ allowed: boolean; reason?: string } | null>(null);
   const [accessViolationDetected, setAccessViolationDetected] = useState(false);
 
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<any>(null); // Use any type since Plyr is dynamically imported
+
   // Determine if we should use content protection based on video and subscription
-  // TEMPORARY: Disable content protection to fix access issues
-  const shouldUseContentProtection = false; // video?.id && !video?.publicUrl && !isLoadingSubscription;
-  
+  // Enable protection if video is not public or if we explicitly don't have a public URL
+  const shouldUseContentProtection = (video?.id && (!video?.isPublic || !video?.publicUrl)) && !isLoadingSubscription;
+
+  // Define content protection handlers with useCallback to prevent infinite loops
+  const handleUnauthorizedAccess = useCallback(() => {
+    console.warn('Unauthorized access detected - but allowing fallback to public URL');
+    // Don't immediately show access denied - let it fall back to public URL if available
+    if (!video?.publicUrl) {
+      setVideoError('Unauthorized access detected. Please refresh the page.');
+      setAccessViolationDetected(true);
+      toast.error('Access denied. Please refresh the page.');
+    }
+    if (currentUser) {
+      applicationService.invalidateUserCache(currentUser.uid);
+    }
+  }, [video?.publicUrl, currentUser]);
+
+  const handleProtectionViolation = useCallback((violation: string) => {
+    console.warn(`Protection violation: ${violation}`);
+    setAccessViolationDetected(true);
+    toast.warning('Content protection active');
+  }, []);
+
+  const handleUrlRefresh = useCallback((newUrl: string) => {
+    console.log('Video URL refreshed automatically');
+    if (videoRef.current && !videoRef.current.paused) {
+      const currentTime = videoRef.current.currentTime;
+      const wasPlaying = !videoRef.current.paused;
+
+      videoRef.current.src = newUrl;
+
+      const restoreTimeout = setTimeout(() => {
+        console.warn('Video metadata loading timeout');
+        toast.warning('Video refresh taking longer than expected');
+      }, 10000);
+
+      videoRef.current.addEventListener('loadedmetadata', function restorePlayback() {
+        clearTimeout(restoreTimeout);
+        if (videoRef.current) {
+          videoRef.current.currentTime = currentTime;
+          if (wasPlaying) {
+            videoRef.current.play().catch((error) => {
+              console.error('Error resuming playback:', error);
+              toast.error('Failed to resume playback. Please refresh the page.');
+            });
+          }
+        }
+        videoRef.current?.removeEventListener('loadedmetadata', restorePlayback);
+      });
+
+      videoRef.current.addEventListener('error', function handleRefreshError() {
+        clearTimeout(restoreTimeout);
+        console.error('Error loading refreshed video URL');
+        toast.error('Video refresh failed. Please refresh the page.');
+        videoRef.current?.removeEventListener('error', handleRefreshError);
+      });
+    }
+  }, []);
+
   // Use content protection hook only when needed
   const contentProtection = useContentProtection({
     videoId: shouldUseContentProtection ? (video?.id || '') : '',
@@ -77,58 +136,9 @@ const Watch = () => {
     maxUses: 10,
     videoDuration: videoDuration || undefined,
     gcsPath: undefined,
-    onUnauthorizedAccess: () => {
-      console.warn('Unauthorized access detected - but allowing fallback to public URL');
-      // Don't immediately show access denied - let it fall back to public URL if available
-      if (!video?.publicUrl) {
-        setVideoError('Unauthorized access detected. Please refresh the page.');
-        setAccessViolationDetected(true);
-        toast.error('Access denied. Please refresh the page.');
-      }
-      if (currentUser) {
-        applicationService.invalidateUserCache(currentUser.uid);
-      }
-    },
-    onProtectionViolation: (violation) => {
-      console.warn(`Protection violation: ${violation}`);
-      setAccessViolationDetected(true);
-      toast.warning('Content protection active');
-    },
-    onUrlRefresh: (newUrl) => {
-      console.log('Video URL refreshed automatically');
-      if (videoRef.current && !videoRef.current.paused) {
-        const currentTime = videoRef.current.currentTime;
-        const wasPlaying = !videoRef.current.paused;
-        
-        videoRef.current.src = newUrl;
-        
-        const restoreTimeout = setTimeout(() => {
-          console.warn('Video metadata loading timeout');
-          toast.warning('Video refresh taking longer than expected');
-        }, 10000);
-
-        videoRef.current.addEventListener('loadedmetadata', function restorePlayback() {
-          clearTimeout(restoreTimeout);
-          if (videoRef.current) {
-            videoRef.current.currentTime = currentTime;
-            if (wasPlaying) {
-              videoRef.current.play().catch((error) => {
-                console.error('Error resuming playback:', error);
-                toast.error('Failed to resume playback. Please refresh the page.');
-              });
-            }
-          }
-          videoRef.current?.removeEventListener('loadedmetadata', restorePlayback);
-        });
-
-        videoRef.current.addEventListener('error', function handleRefreshError() {
-          clearTimeout(restoreTimeout);
-          console.error('Error loading refreshed video URL');
-          toast.error('Video refresh failed. Please refresh the page.');
-          videoRef.current?.removeEventListener('error', handleRefreshError);
-        });
-      }
-    }
+    onUnauthorizedAccess: handleUnauthorizedAccess,
+    onProtectionViolation: handleProtectionViolation,
+    onUrlRefresh: handleUrlRefresh
   });
 
   // Debug logging for video playback
@@ -164,8 +174,7 @@ const Watch = () => {
     }
   }, [shouldUseContentProtection, contentProtection.isLoading, video?.publicUrl]);
 
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const playerRef = useRef<any>(null); // Use any type since Plyr is dynamically imported
+
 
   // Load subscription status for authenticated users
   useEffect(() => {
@@ -179,7 +188,7 @@ const Watch = () => {
 
       try {
         setIsLoadingSubscription(true);
-        
+
         // Try to get cached subscription first
         const cachedSubscription = await applicationService.getSubscriptionStatus(currentUser.uid);
         if (cachedSubscription) {
@@ -214,7 +223,7 @@ const Watch = () => {
               tier: result.data.tier,
               expiryDate: result.data.expiryDate
             });
-            
+
             // Show expiry warning if subscription expires soon
             if (result.data.expiryDate) {
               const daysUntilExpiry = Math.ceil((result.data.expiryDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -326,7 +335,7 @@ const Watch = () => {
     const init = async () => {
       // Only initialize if we have a video element and a video URL
       if (!videoRef.current || (!video?.publicUrl && !contentProtection.url) || playerRef.current) return;
-      
+
       try {
         const PlyrModule = await import('plyr');
         const PlyrClass = (PlyrModule as any).default || PlyrModule;
@@ -516,7 +525,7 @@ const Watch = () => {
           localStorage.setItem('anonymousUserId', userId);
         }
       }
-      
+
       // Check rate limits before proceeding
       const rateLimitCheck = await applicationService.getApprovalRateLimit(userId);
       if (!rateLimitCheck.allowed) {
@@ -565,7 +574,7 @@ const Watch = () => {
         } else {
           newStatus = 'draft';
         }
-        
+
         handleApprovalStatusUpdate(newStatus);
 
         // Send notification to video creator
@@ -582,7 +591,7 @@ const Watch = () => {
             feedback: feedback || '',
             videoUrl: window.location.href
           };
-          
+
           await applicationService.sendApprovalNotification(notificationData);
         } catch (notificationError) {
           console.error('Failed to send notification:', notificationError);
@@ -623,7 +632,7 @@ const Watch = () => {
     } catch (error) {
       console.error('Error processing approval:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-      
+
       // Check if it's an authentication error
       if (errorMessage.includes('Access denied') || errorMessage.includes('Insufficient permissions')) {
         toast.error('Authentication required. Please sign in to approve videos.');
@@ -651,7 +660,7 @@ const Watch = () => {
 
       try {
         setIsCheckingPermissions(true);
-        
+
         // Anonymous users are considered clients (can review), authenticated users must not be the creator
         if (!currentUser) {
           setIsClient(true);
@@ -856,7 +865,7 @@ const Watch = () => {
       height: videoElement.videoHeight,
     });
     setVideoDuration(videoElement.duration);
-    
+
     // Debug log for successful video loading
     console.log('Video loaded successfully:', {
       duration: videoElement.duration,
@@ -951,8 +960,8 @@ const Watch = () => {
             <p className="text-xs text-muted-foreground mb-3">
               You're viewing with limited features. Upgrade to premium for HD quality, unlimited views, and advanced features.
             </p>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               onClick={() => navigate('/pricing')}
               className="bg-primary hover:bg-primary/90"
             >
@@ -971,8 +980,8 @@ const Watch = () => {
             <p className="text-xs text-red-700 mt-1">
               Unauthorized access attempt detected. This incident has been logged for security purposes.
             </p>
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant="outline"
               onClick={() => {
                 setAccessViolationDetected(false);
@@ -1013,9 +1022,9 @@ const Watch = () => {
                 </div>
               )}
               {/* Show video if we have any valid URL - Mobile */}
-              {(video.publicUrl || (shouldUseContentProtection && contentProtection.url)) && (
+              {((shouldUseContentProtection ? contentProtection.url : video.publicUrl)) && (
                 <video
-                  key={video.publicUrl || contentProtection.url}
+                  key={shouldUseContentProtection ? contentProtection.url : video.publicUrl}
                   ref={videoRef}
                   className="w-full h-full bg-black"
                   poster={video.thumbnailUrl}
@@ -1026,28 +1035,28 @@ const Watch = () => {
                   onError={handleVideoError}
                   onLoadedMetadata={handleVideoMetadata}
                 >
-                  <source src={video.publicUrl || contentProtection.url} type="video/mp4" />
+                  <source src={shouldUseContentProtection ? contentProtection.url! : video.publicUrl} type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
               )}
-              
+
               {/* Show loading spinner if content protection is loading */}
               {shouldUseContentProtection && contentProtection.isLoading && (
                 <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-white" />
                 </div>
               )}
-              
+
               {/* Show error if content protection failed and no public URL */}
-              {shouldUseContentProtection && contentProtection.error && !video.publicUrl && (
+              {shouldUseContentProtection && contentProtection.error && (!video.publicUrl || !video.isPublic) && (
                 <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center text-white">
                   <AlertTriangle className="h-8 w-8 text-red-400 mb-2" />
                   <p className="text-red-400 font-semibold mb-2">Content Protection Error</p>
                   <p className="text-sm text-gray-300 text-center px-4">{contentProtection.error}</p>
-                  <Button 
-                    onClick={() => window.location.reload()} 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    onClick={() => window.location.reload()}
+                    variant="outline"
+                    size="sm"
                     className="mt-4 text-white border-white hover:bg-white hover:text-black"
                   >
                     Refresh Page
@@ -1257,9 +1266,9 @@ const Watch = () => {
                 </div>
               )}
               {/* Show video - prioritize public URL for reliability (Desktop) */}
-              {(video.publicUrl || (shouldUseContentProtection && contentProtection.url)) && (
+              {((shouldUseContentProtection ? contentProtection.url : video.publicUrl)) && (
                 <video
-                  key={video.publicUrl || contentProtection.url}
+                  key={shouldUseContentProtection ? contentProtection.url : video.publicUrl}
                   ref={videoRef}
                   className="w-full h-full bg-black"
                   poster={video.thumbnailUrl}
@@ -1270,28 +1279,28 @@ const Watch = () => {
                   onError={handleVideoError}
                   onLoadedMetadata={handleVideoMetadata}
                 >
-                  <source src={video.publicUrl || contentProtection.url} type="video/mp4" />
+                  <source src={shouldUseContentProtection ? contentProtection.url! : video.publicUrl} type="video/mp4" />
                   Your browser does not support the video tag.
                 </video>
               )}
-              
+
               {/* Show loading spinner if content protection is loading */}
               {shouldUseContentProtection && contentProtection.isLoading && (
                 <div className="absolute inset-0 bg-black/50 z-10 flex items-center justify-center">
                   <Loader2 className="h-8 w-8 animate-spin text-white" />
                 </div>
               )}
-              
+
               {/* Show error if content protection failed and no public URL */}
-              {shouldUseContentProtection && contentProtection.error && !video.publicUrl && (
+              {shouldUseContentProtection && contentProtection.error && (!video.publicUrl || !video.isPublic) && (
                 <div className="absolute inset-0 bg-black/80 z-20 flex flex-col items-center justify-center text-white">
                   <AlertTriangle className="h-8 w-8 text-red-400 mb-2" />
                   <p className="text-red-400 font-semibold mb-2">Content Protection Error</p>
                   <p className="text-sm text-gray-300 text-center px-4">{contentProtection.error}</p>
-                  <Button 
-                    onClick={() => window.location.reload()} 
-                    variant="outline" 
-                    size="sm" 
+                  <Button
+                    onClick={() => window.location.reload()}
+                    variant="outline"
+                    size="sm"
                     className="mt-4 text-white border-white hover:bg-white hover:text-black"
                   >
                     Refresh Page
