@@ -9,21 +9,31 @@ import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import ffmpeg from 'fluent-ffmpeg';
+import ffmpegPath from 'ffmpeg-static';
+
+// Set FFmpeg path immediately
+if (ffmpegPath) {
+  ffmpeg.setFfmpegPath(ffmpegPath);
+  console.log('✅ FFmpeg static path configured:', ffmpegPath);
+} else {
+  console.warn('⚠️ FFmpeg static path not found!');
+}
 
 // Import critical middleware
-import { 
-  generalLimiter, 
-  uploadLimiter, 
-  apiLimiter, 
+import {
+  generalLimiter,
+  uploadLimiter,
+  apiLimiter,
   commentLimiter,
-  strictLimiter 
+  strictLimiter
 } from './middleware/rateLimiter.js';
 import sessionManager from './middleware/sessionManager.js';
-import { 
-  requestDeduplication, 
-  uploadDeduplication, 
+import {
+  requestDeduplication,
+  uploadDeduplication,
   paymentDeduplication,
-  commentDeduplication 
+  commentDeduplication
 } from './middleware/requestDeduplication.js';
 import cacheManager from './middleware/cacheManager.js';
 import sseManager from './middleware/sseManager.js';
@@ -45,7 +55,7 @@ const PORT = process.env.PORT || 3001;
 const BUCKET_NAME = process.env.GCS_BUCKET_NAME;
 
 // Multer for multipart/form-data (file uploads)
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 2 * 1024 * 1024 * 1024, // 2GB limit
@@ -55,9 +65,36 @@ const upload = multer({
 
 // --- Middleware ---
 app.use(helmet());
-app.use(cors({ 
-  origin: ['http://localhost:8080', 'http://localhost:5173', 'http://localhost:3000', 'https://previu.online'],
-  credentials: true 
+// Allowed origins configuration
+const ALLOWED_ORIGINS = [
+  'http://localhost:8080',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'https://previu.online'
+];
+
+// Add environment-specific origins if provided
+if (process.env.ALLOWED_ORIGINS) {
+  process.env.ALLOWED_ORIGINS.split(',').forEach(origin => {
+    if (origin.trim()) ALLOWED_ORIGINS.push(origin.trim());
+  });
+}
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+
+    if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.warn(`Blocked CORS request from: ${origin}`);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'Content-Length', 'X-Requested-With', 'Accept']
 }));
 
 // Apply rate limiting BEFORE other middleware
@@ -143,25 +180,25 @@ async function getVideoPath(videoId) {
     // This is a simplified version - in your actual implementation,
     // you'll need to query your database to get the video file path
     // and then download it from GCS or serve it directly
-    
+
     // For GCS, you might want to stream directly from GCS
     // or download to temp directory first for watermarking
-    
+
     const tempDir = path.join(__dirname, 'temp');
     await fs.promises.mkdir(tempDir, { recursive: true });
-    
+
     // Example: Download from GCS to temp file
     if (bucket) {
       const gcsFile = bucket.file(`uploads/${videoId}`);
       const [exists] = await gcsFile.exists();
-      
+
       if (exists) {
         const tempPath = path.join(tempDir, `${videoId}_temp.mp4`);
         await gcsFile.download({ destination: tempPath });
         return tempPath;
       }
     }
-    
+
     return null;
   } catch (error) {
     console.error('Error getting video path:', error);
@@ -212,10 +249,10 @@ app.post('/api/stream-only/generate', apiLimiter, async (req, res) => {
 app.get('/api/media/stream/:a/:b/:c/:d/:e/:t/:f/:signature', async (req, res) => {
   try {
     const path = req.path;
-    
+
     // Decode obfuscated URL
     const decodedData = urlObfuscation.decodeObfuscatedUrl(path);
-    
+
     if (!decodedData || !decodedData.isValid) {
       return res.status(403).json({ error: 'Invalid or expired stream URL' });
     }
@@ -224,30 +261,30 @@ app.get('/api/media/stream/:a/:b/:c/:d/:e/:t/:f/:signature', async (req, res) =>
 
     // Import download prevention
     const { downloadPrevention } = await import('./middleware/downloadPrevention.js');
-    
+
     // Validate stream request and detect download attempts
     const validation = await downloadPrevention.validateStreamRequest(req, res, videoId);
-    
+
     if (!validation.valid) {
       return res.status(403).json({ error: validation.error });
     }
 
     // Get video file path
     const videoPath = await getVideoPath(videoId);
-    
+
     if (!videoPath) {
       return res.status(404).json({ error: 'Video not found' });
     }
 
     // Apply network tab protection
     networkProtection.generateDecoyRequests();
-    
+
     // Serve with download prevention and network tab obfuscation
     await downloadPrevention.serveProtectedVideo(
-      req, 
-      res, 
-      videoPath, 
-      validation.session, 
+      req,
+      res,
+      videoPath,
+      validation.session,
       validation.forceWatermark
     );
 
@@ -266,7 +303,7 @@ app.post('/api/log-download-attempt', apiLimiter, async (req, res) => {
     }
 
     const { videoId, timestamp, userAgent } = req.body;
-    
+
     console.warn('🚨 DOWNLOAD ATTEMPT LOGGED:', {
       videoId,
       timestamp,
@@ -276,7 +313,7 @@ app.post('/api/log-download-attempt', apiLimiter, async (req, res) => {
     });
 
     // In production, store in database for analytics and security monitoring
-    
+
     res.json({ success: true, logged: true });
   } catch (error) {
     console.error('Download attempt logging error:', error);
@@ -293,7 +330,7 @@ app.post('/api/log-devtools-attempt', apiLimiter, async (req, res) => {
     }
 
     const { videoId, timestamp } = req.body;
-    
+
     console.warn('🔧 DEVELOPER TOOLS DETECTED:', {
       videoId,
       timestamp,
@@ -330,7 +367,7 @@ app.post('/api/protected/generate-url', apiLimiter, async (req, res) => {
 
     // Import content protection
     const { contentProtection } = await import('./middleware/contentProtection.js');
-    
+
     // Add IP restriction for additional security
     permissions.restrictToIp = req.ip;
     permissions.allowedReferrers = ['localhost', 'previu.online'];
@@ -355,7 +392,7 @@ app.get('/api/protected/stream/:videoId', async (req, res) => {
   try {
     const { videoId } = req.params;
     const { contentProtection } = await import('./middleware/contentProtection.js');
-    
+
     await contentProtection.serveProtectedContent(req, res, videoId);
   } catch (error) {
     console.error('Protected content serving error:', error);
@@ -372,7 +409,7 @@ app.post('/api/protected/log-violation', apiLimiter, async (req, res) => {
     }
 
     const { videoId, violationType, timestamp, userAgent } = req.body;
-    
+
     // Log violation (in production, store in database)
     console.warn('🚨 Content Protection Violation:', {
       videoId,
@@ -397,8 +434,8 @@ app.post('/api/protected/log-violation', apiLimiter, async (req, res) => {
 
 // Health check endpoint (not rate limited)
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'healthy', 
+  res.json({
+    status: 'healthy',
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
     memory: process.memoryUsage(),
@@ -473,7 +510,7 @@ app.post('/api/system/cache/clear', strictLimiter, async (req, res) => {
 app.get('/api/system/sessions', strictLimiter, async (req, res) => {
   try {
     const sessions = await sessionManager.getAllSessions();
-    res.json({ 
+    res.json({
       total: sessions.length,
       sessions: sessions.map(s => ({
         sessionId: s.sessionId,
@@ -516,7 +553,7 @@ app.get('/api/system/queue/stats', strictLimiter, (req, res) => {
 app.post('/api/system/test-email', strictLimiter, async (req, res) => {
   try {
     const { to, subject = 'Test Email', message = 'This is a test email from the queue system.' } = req.body;
-    
+
     if (!to) {
       return res.status(400).json({ error: 'Email address required' });
     }
@@ -528,10 +565,10 @@ app.post('/api/system/test-email', strictLimiter, async (req, res) => {
       message
     );
 
-    res.json({ 
-      success: true, 
+    res.json({
+      success: true,
       message: 'Email queued successfully',
-      jobId 
+      jobId
     });
   } catch (error) {
     console.error('Test email error:', error);
@@ -551,7 +588,7 @@ app.post('/api/video/analyze', upload.single('video'), async (req, res) => {
     // Save uploaded file temporarily
     const tempDir = path.join(__dirname, 'temp');
     await fs.promises.mkdir(tempDir, { recursive: true });
-    
+
     const tempFilePath = path.join(tempDir, `temp_${Date.now()}_${req.file.originalname}`);
     await fs.promises.writeFile(tempFilePath, req.file.buffer);
 
@@ -560,11 +597,11 @@ app.post('/api/video/analyze', upload.single('video'), async (req, res) => {
       const stats = await fs.promises.stat(tempFilePath);
       const size = stats.size;
       const ext = path.extname(req.file.originalname).toLowerCase();
-      
+
       // Estimate properties based on file size (rough approximations)
       const estimatedDuration = Math.max(30, size / (1024 * 1024)); // Rough estimate
       const estimatedBitrate = (size * 8) / (estimatedDuration * 1000); // kbps
-      
+
       const analysis = {
         duration: estimatedDuration,
         resolution: { width: 1920, height: 1080 }, // Assume HD
@@ -580,10 +617,10 @@ app.post('/api/video/analyze', upload.single('video'), async (req, res) => {
         codec: 'libx264',
         quality: 23
       };
-      
+
       // Cleanup temp file
       await fs.promises.unlink(tempFilePath);
-      
+
       res.json({
         success: true,
         analysis,
@@ -593,7 +630,7 @@ app.post('/api/video/analyze', upload.single('video'), async (req, res) => {
       // Cleanup temp file on error
       try {
         await fs.promises.unlink(tempFilePath);
-      } catch {}
+      } catch { }
       throw analysisError;
     }
   } catch (error) {
@@ -602,6 +639,26 @@ app.post('/api/video/analyze', upload.single('video'), async (req, res) => {
   }
 });
 
+// Check for FFmpeg availability on startup (Updated for static binary)
+const checkFFmpeg = () => {
+  // Since we are using ffmpeg-static, it is almost certainly "installed".
+  // verifying the binary works by running version check.
+  if (ffmpegPath) {
+    exec(`"${ffmpegPath}" -version`, (error) => {
+      if (error) {
+        console.warn('⚠️  FFmpeg binary execution failed:', error.message);
+      } else {
+        console.log('✅ FFmpeg binary verified and ready.');
+      }
+    });
+  } else {
+    console.warn('⚠️  ffmpeg-static returned no path. Compression will fail.');
+  }
+};
+
+// Run check after a short delay to not block startup logs
+setTimeout(checkFFmpeg, 2000);
+
 app.post('/api/video/compress', upload.single('video'), async (req, res) => {
   try {
     if (!req.file) {
@@ -609,27 +666,55 @@ app.post('/api/video/compress', upload.single('video'), async (req, res) => {
     }
 
     const { options } = req.body;
-    const compressionOptions = options ? JSON.parse(options) : undefined;
+    const compressionOptions = options ? JSON.parse(options) : {
+      codec: 'libx264',
+      quality: 23, // CRF
+      preset: 'fast'
+    };
 
     // Save uploaded file temporarily
     const tempDir = path.join(__dirname, 'temp');
     await fs.promises.mkdir(tempDir, { recursive: true });
-    
+
     const inputPath = path.join(tempDir, `input_${Date.now()}_${req.file.originalname}`);
     await fs.promises.writeFile(inputPath, req.file.buffer);
 
-    const outputFileName = `compressed_${Date.now()}_${req.file.originalname}`;
+    const outputFileName = `compressed_${Date.now()}_${req.file.originalname.replace(/\.[^/.]+$/, "")}.mp4`;
     const outputPath = path.join(tempDir, outputFileName);
 
     try {
-      // Fallback compression: just copy the file (simulate compression)
-      await fs.promises.copyFile(inputPath, outputPath);
+      console.log(`Starting compression for: ${req.file.originalname}`);
+
+      // Perform actual compression using fluent-ffmpeg
+      await new Promise((resolve, reject) => {
+        ffmpeg(inputPath)
+          .output(outputPath)
+          .videoCodec(compressionOptions.codec || 'libx264')
+          .audioCodec('aac')
+          .outputOptions([
+            `-crf ${compressionOptions.quality || 23}`,
+            `-preset ${compressionOptions.preset || 'fast'}`,
+            '-movflags +faststart' // Optimize for web streaming
+          ])
+          .on('start', (commandLine) => {
+            console.log('Spawned Ffmpeg with command: ' + commandLine);
+          })
+          .on('end', () => {
+            console.log('Compression finished successfully');
+            resolve();
+          })
+          .on('error', (err) => {
+            console.error('An error occurred during compression: ' + err.message);
+            reject(err);
+          })
+          .run();
+      });
 
       // Read compressed file
       const compressedBuffer = await fs.promises.readFile(outputPath);
       const originalStats = await fs.promises.stat(inputPath);
       const compressedStats = await fs.promises.stat(outputPath);
-      
+
       // Cleanup temp files
       await fs.promises.unlink(inputPath);
       await fs.promises.unlink(outputPath);
@@ -639,25 +724,30 @@ app.post('/api/video/compress', upload.single('video'), async (req, res) => {
         success: true,
         result: {
           success: true,
-          outputPath,
+          outputPath, // Note: file is deleted, this is just for ref
           originalSize: originalStats.size,
           compressedSize: compressedStats.size,
-          compressionRatio: 1,
+          compressionRatio: (originalStats.size / compressedStats.size).toFixed(2),
           compressedData: compressedBuffer.toString('base64'),
           fileName: outputFileName,
-          error: 'FFmpeg not available - original file used without compression'
+          info: 'Compressed with FFmpeg'
         }
       });
     } catch (compressionError) {
+      console.error('Compression Logic Error:', compressionError);
+
       // Cleanup temp files on error
       try {
-        await fs.promises.unlink(inputPath);
-        await fs.promises.unlink(outputPath);
-      } catch {}
-      throw compressionError;
+        if (fs.existsSync(inputPath)) await fs.promises.unlink(inputPath);
+        if (fs.existsSync(outputPath)) await fs.promises.unlink(outputPath);
+      } catch (cleanupError) { console.error('Cleanup error:', cleanupError); }
+
+      // Return 500 so client knows it failed, don't fallback silently anymore for explicit compress endpoint?
+      // Or fallback? The prompt asked for it to work. Failing explicitly is better for debugging.
+      throw new Error('Video compression failed: ' + compressionError.message);
     }
   } catch (error) {
-    console.error('Video compression error:', error);
+    console.error('Video compression endpoint error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -672,9 +762,9 @@ app.get('/api/video/compression-status', async (req, res) => {
     });
   } catch (error) {
     console.error('Compression status error:', error);
-    res.status(500).json({ 
-      available: false, 
-      error: error.message 
+    res.status(500).json({
+      available: false,
+      error: error.message
     });
   }
 });
@@ -685,16 +775,16 @@ app.get('/api/video/compression-status', async (req, res) => {
 app.post('/api/gcs/init-chunked-upload', express.json(), async (req, res) => {
   try {
     if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
-    
+
     const { fileName, totalSize, chunkSize, metadata } = req.body;
-    
+
     if (!fileName || !totalSize || !chunkSize) {
       return res.status(400).json({ error: 'Missing required fields: fileName, totalSize, chunkSize' });
     }
 
     const sessionId = crypto.randomUUID();
     const totalChunks = Math.ceil(totalSize / chunkSize);
-    
+
     // Store session info using persistent session manager
     const sessionData = {
       sessionId,
@@ -727,7 +817,7 @@ app.post('/api/gcs/init-chunked-upload', express.json(), async (req, res) => {
 app.post('/api/gcs/upload-chunk', upload.single('chunk'), async (req, res) => {
   try {
     if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
-    
+
     const { sessionId, chunkId, chunkIndex, chunkSize, checksum } = req.body;
     const chunkData = req.file?.buffer;
 
@@ -737,7 +827,7 @@ app.post('/api/gcs/upload-chunk', upload.single('chunk'), async (req, res) => {
 
     // Get session data from persistent storage
     const session = await sessionManager.get(sessionId);
-    
+
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
     }
@@ -756,10 +846,10 @@ app.post('/api/gcs/upload-chunk', upload.single('chunk'), async (req, res) => {
     // Store chunk temporarily
     const tempDir = path.join(__dirname, 'temp', sessionId);
     await fs.promises.mkdir(tempDir, { recursive: true });
-    
+
     const chunkFileName = `chunk_${chunkIndex.toString().padStart(6, '0')}`;
     const chunkPath = path.join(tempDir, chunkFileName);
-    
+
     await fs.promises.writeFile(chunkPath, chunkData);
 
     // Update session with uploaded chunk
@@ -809,9 +899,9 @@ app.post('/api/gcs/upload-chunk', upload.single('chunk'), async (req, res) => {
 app.get('/api/gcs/verify-chunks/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
-    
+
     const session = await sessionManager.get(sessionId);
-    
+
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
     }
@@ -838,7 +928,7 @@ app.get('/api/gcs/verify-chunks/:sessionId', async (req, res) => {
 async function assembleChunks(sessionId) {
   try {
     const session = await sessionManager.get(sessionId);
-    
+
     if (!session) {
       console.error('Session not found for assembly:', sessionId);
       return;
@@ -846,7 +936,7 @@ async function assembleChunks(sessionId) {
 
     const tempDir = path.join(__dirname, 'temp', sessionId);
     const finalFileName = `uploads/${session.fileName}`;
-    
+
     // Create write stream to GCS
     const gcsFile = bucket.file(finalFileName);
     const writeStream = gcsFile.createWriteStream({
@@ -865,7 +955,7 @@ async function assembleChunks(sessionId) {
 
       const chunkPath = path.join(tempDir, chunkInfo.fileName);
       const chunkData = await fs.promises.readFile(chunkPath);
-      
+
       writeStream.write(chunkData);
     }
 
@@ -883,11 +973,11 @@ async function assembleChunks(sessionId) {
     session.status = 'completed';
     session.gcsPath = finalFileName;
     session.completedAt = new Date();
-    
+
     await sessionManager.set(sessionId, session);
 
     console.log(`Successfully assembled file for session ${sessionId}: ${finalFileName}`);
-    
+
     // Send completion notification
     sseManager.completeUpload(sessionId, {
       status: 'completed',
@@ -897,14 +987,14 @@ async function assembleChunks(sessionId) {
     });
   } catch (error) {
     console.error('Error assembling chunks:', error);
-    
+
     // Update session with error
     const session = await sessionManager.get(sessionId);
     if (session) {
       session.status = 'failed';
       session.error = error.message;
       await sessionManager.set(sessionId, session);
-      
+
       // Send error notification
       sseManager.failUpload(sessionId, {
         status: 'failed',
@@ -919,9 +1009,9 @@ async function assembleChunks(sessionId) {
 app.get('/api/gcs/upload-status/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params;
-    
+
     const session = await sessionManager.get(sessionId);
-    
+
     if (!session) {
       return res.status(404).json({ error: 'Upload session not found' });
     }
@@ -969,17 +1059,17 @@ app.post('/api/signed-url', async (req, res) => {
     if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
     const { videoId, service } = req.body;
     console.log('[/api/signed-url] request body:', { videoId, service });
-    
+
     // Clean up the input ID (remove doubles extensions if present)
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
-    
+
     // Check cache first
     const cachedUrl = await cacheManager.getSignedUrl(cleanId);
     if (cachedUrl && cachedUrl.expiresAt && new Date(cachedUrl.expiresAt) > new Date()) {
       console.log(`✅ Cache hit for signed URL: ${cleanId}`);
       return res.json(cachedUrl);
     }
-    
+
     console.log(`\n🔍 Searching for: "${cleanId}"`);
 
     // SEARCH PATHS
@@ -1009,26 +1099,26 @@ app.post('/api/signed-url', async (req, res) => {
     if (!foundFile) {
       console.error('⚠️ File not found. Searched paths:', potentialPaths);
       console.error('⚠️ File not found. Listing files in bucket to help debug...');
-      
+
       // List first 25 files in bucket to see where they actually are
       try {
         const [files] = await bucket.getFiles({ maxResults: 25 });
         console.log('--- ACTUAL BUCKET CONTENT (First 25) ---');
         files.forEach(f => console.log(`- ${f.name}`));
         console.log('----------------------------------------');
-        
+
         // Try to find similar files (partial matches)
-        const similarFiles = files.filter(f => 
+        const similarFiles = files.filter(f =>
           f.name.includes(cleanId.split('_')[0]) || // Match timestamp part
           f.name.includes(cleanId.split('_').slice(1).join('_')) // Match name part
         );
-        
+
         if (similarFiles.length > 0) {
           console.log('🔍 Found similar files:');
           similarFiles.forEach(f => console.log(`  - ${f.name}`));
-          
+
           // Return a more helpful error message
-          return res.status(404).json({ 
+          return res.status(404).json({
             error: 'Video not found in storage',
             searchedFor: cleanId,
             searchedPaths: potentialPaths,
@@ -1040,7 +1130,7 @@ app.post('/api/signed-url', async (req, res) => {
         console.error('Could not list files:', e.message);
       }
 
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Video not found in storage',
         searchedFor: cleanId,
         searchedPaths: potentialPaths
@@ -1055,9 +1145,9 @@ app.post('/api/signed-url', async (req, res) => {
       expires: expiresAt,
     });
 
-    const urlData = { 
-      signedUrl, 
-      expiresAt: new Date(expiresAt).toISOString() 
+    const urlData = {
+      signedUrl,
+      expiresAt: new Date(expiresAt).toISOString()
     };
 
     // Cache the signed URL for 5 minutes (much shorter than expiry)

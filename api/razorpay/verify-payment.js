@@ -3,11 +3,11 @@ import crypto from 'crypto';
 // Validate environment variables with detailed error messages
 const validateEnvironment = () => {
   const missingVars = [];
-  
+
   if (!process.env.RAZORPAY_KEY_SECRET) {
     missingVars.push('RAZORPAY_KEY_SECRET');
   }
-  
+
   if (missingVars.length > 0) {
     const error = new Error(
       `Missing required environment variables: ${missingVars.join(', ')}. ` +
@@ -17,7 +17,7 @@ const validateEnvironment = () => {
     error.name = 'EnvironmentValidationError';
     throw error;
   }
-  
+
   // Validate that the key is not a placeholder value
   if (process.env.RAZORPAY_KEY_SECRET === 'your_razorpay_key_secret_here') {
     throw new Error('RAZORPAY_KEY_SECRET is set to placeholder value. Please set it to your actual Razorpay key secret.');
@@ -42,36 +42,8 @@ export default async function handler(req, res) {
     timestamp: new Date().toISOString()
   });
 
-  // Enable CORS for your domain
-  const allowedOrigins = [
-    'https://previu.online',
-    'http://localhost:8080',
-    'http://localhost:5173',
-    'http://localhost:3000'
-  ];
-  
-  const origin = req.headers.origin;
-  
-  // Allow Vercel preview deployments (they follow the pattern *.vercel.app)
-  const isVercelDomain = origin && origin.match(/^https:\/\/.*\.vercel\.app$/);
-  const isAllowedOrigin = allowedOrigins.includes(origin);
-  
-  if (isAllowedOrigin || isVercelDomain) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    console.log('✅ CORS allowed for origin:', origin);
-  } else {
-    console.log('⚠️ CORS not allowed for origin:', origin);
-  }
-  
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    res.status(200).end();
-    return;
-  }
+  // Check if request is valid (global CORS middleware protects origins)
+  // Logic simplified as server.js handles headers
 
   // Only allow POST requests
   if (req.method !== 'POST') {
@@ -92,13 +64,13 @@ export default async function handler(req, res) {
     const generatedSignature = hmac.digest('hex');
 
     const isValid = generatedSignature === signature;
-    
+
     res.status(200).json({ isValid });
   } catch (error) {
     console.error('Error verifying payment:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Payment verification failed',
-      message: error.message 
+      message: error.message
     });
   }
 }

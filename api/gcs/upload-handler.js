@@ -45,13 +45,6 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 
 export default async function handler(req, res) {
   // CORS headers
-  const origin = req.headers.origin || req.headers.referer;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();

@@ -7,24 +7,11 @@ dotenv.config();
 
 // Initialize Razorpay instance
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_Rx5tnJCOUHefCi',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'gJfWtk2zshP9dKcZQocNPg6T',
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
 export default async function handler(req, res) {
-  // Set CORS headers
-  const origin = req.headers.origin || req.headers.referer;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
 
   if (req.method !== 'POST') {
     res.setHeader('Allow', ['POST']);
@@ -50,7 +37,7 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('❌ Payment API error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       code: 'SERVER_ERROR'
     });
@@ -81,7 +68,7 @@ async function handleVerifyPayment(req, res) {
   try {
     const { orderId, paymentId, signature } = req.body;
 
-    const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'gJfWtk2zshP9dKcZQocNPg6T');
+    const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
     hmac.update(orderId + '|' + paymentId);
     const generatedSignature = hmac.digest('hex');
 
@@ -178,7 +165,7 @@ async function handleWebhook(req, res) {
 
     // Determine if this is a retryable error
     const isRetryable = isRetryableWebhookError(error);
-    
+
     if (isRetryable) {
       // Return 500 to signal Razorpay to retry
       return res.status(500).json({
@@ -248,11 +235,11 @@ function verifyWebhookSignature(payload, signature) {
 async function processSuccessfulPayment(payment) {
   try {
     console.log('✅ Processing successful payment:', payment.id);
-    
+
     // Extract user information from payment notes
     const userId = payment.notes.userId;
     const subscriptionTier = payment.notes.subscriptionTier;
-    
+
     if (!userId || !subscriptionTier) {
       throw new Error('Missing user ID or subscription tier in payment notes');
     }
@@ -262,7 +249,7 @@ async function processSuccessfulPayment(payment) {
     // 2. Update user subscription based on payment
     // 3. Clear subscription cache
     // 4. Send confirmation notifications
-    
+
     console.log('💰 Payment processed successfully:', {
       paymentId: payment.id,
       userId,
@@ -288,7 +275,7 @@ async function processSuccessfulPayment(payment) {
 async function processFailedPayment(payment) {
   try {
     console.log('❌ Processing failed payment:', payment.id);
-    
+
     // Log failure details
     console.log('💸 Payment failure details:', {
       paymentId: payment.id,
@@ -325,9 +312,9 @@ function isRetryableWebhookError(error) {
   ];
 
   const errorMessage = error.message || error.toString();
-  
+
   // Don't retry signature verification failures or malformed requests
-  if (nonRetryableErrors.some(nonRetryable => 
+  if (nonRetryableErrors.some(nonRetryable =>
     errorMessage.toLowerCase().includes(nonRetryable.toLowerCase()))) {
     return false;
   }
@@ -345,8 +332,8 @@ function isRetryableWebhookError(error) {
     'TRANSACTION_ERROR'
   ];
 
-  return retryableErrors.some(retryableError => 
-    errorMessage.includes(retryableError) || 
+  return retryableErrors.some(retryableError =>
+    errorMessage.includes(retryableError) ||
     error.code === retryableError
   );
 }

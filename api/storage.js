@@ -36,19 +36,6 @@ export const config = {
 };
 
 export default async function handler(req, res) {
-  // Set CORS headers
-  const origin = req.headers.origin || req.headers.referer;
-  if (origin) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
-  }
-
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
 
   if (!bucket) {
     return res.status(503).json({ error: 'Storage unavailable' });

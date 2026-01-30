@@ -6,8 +6,8 @@ const router = express.Router();
 
 // Initialize Razorpay instance
 const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_Rx5tnJCOUHefCi',
-  key_secret: process.env.RAZORPAY_KEY_SECRET || 'gJfWtk2zshP9dKcZQocNPg6T',
+  key_id: process.env.RAZORPAY_KEY_ID,
+  key_secret: process.env.RAZORPAY_KEY_SECRET,
 });
 
 // Create order endpoint
@@ -36,7 +36,7 @@ router.post('/verify-payment', (req, res) => {
   try {
     const { orderId, paymentId, signature } = req.body;
 
-    const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET || 'gJfWtk2zshP9dKcZQocNPg6T');
+    const hmac = crypto.createHmac('sha256', process.env.RAZORPAY_KEY_SECRET);
     hmac.update(orderId + '|' + paymentId);
     const generatedSignature = hmac.digest('hex');
 
