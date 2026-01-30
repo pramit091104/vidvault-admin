@@ -11,10 +11,10 @@ export interface EnvironmentConfig {
   // Backend Razorpay configuration
   razorpayKeyId: string;
   razorpayKeySecret: string;
-  
+
   // Frontend Razorpay configuration
   viteRazorpayKeyId: string;
-  
+
   // Optional configurations
   firebaseApiKey?: string;
   gcsProjectId?: string;
@@ -29,21 +29,21 @@ export interface EnvironmentConfig {
  */
 export const validateEnvironmentVariables = (env: Partial<EnvironmentConfig>): void => {
   const missingVars: string[] = [];
-  
+
   // Check required backend variables
   if (!env.razorpayKeyId) {
     missingVars.push('RAZORPAY_KEY_ID');
   }
-  
+
   if (!env.razorpayKeySecret) {
     missingVars.push('RAZORPAY_KEY_SECRET');
   }
-  
+
   // Check required frontend variables
   if (!env.viteRazorpayKeyId) {
     missingVars.push('VITE_RAZORPAY_KEY_ID');
   }
-  
+
   if (missingVars.length > 0) {
     throw new EnvironmentValidationError(
       `Missing required environment variables: ${missingVars.join(', ')}. ` +
@@ -67,9 +67,9 @@ export const loadBackendEnvironment = (): EnvironmentConfig => {
     corsOrigin: process.env.CORS_ORIGIN,
     port: process.env.PORT
   };
-  
+
   validateEnvironmentVariables(env);
-  
+
   return env as EnvironmentConfig;
 };
 
@@ -82,14 +82,14 @@ export const loadFrontendEnvironment = (): Pick<EnvironmentConfig, 'viteRazorpay
   const env = {
     viteRazorpayKeyId: import.meta.env?.VITE_RAZORPAY_KEY_ID
   };
-  
+
   if (!env.viteRazorpayKeyId) {
     throw new EnvironmentValidationError(
       'Missing required environment variable: VITE_RAZORPAY_KEY_ID. ' +
       'Please check your .env file and ensure the variable is set.'
     );
   }
-  
+
   return env;
 };
 
@@ -102,19 +102,19 @@ export const handleNetworkError = (error: Error): Error => {
   if (error instanceof TypeError && error.message.includes('fetch')) {
     return new Error('Network error: Unable to connect to the server. Please check your internet connection.');
   }
-  
+
   if (error.message.includes('ECONNREFUSED')) {
     return new Error('Connection refused: Server is not available. Please try again later.');
   }
-  
+
   if (error.message.includes('timeout')) {
     return new Error('Request timeout: Server did not respond in time. Please try again.');
   }
-  
+
   if (error.message.includes('CORS')) {
     return new Error('CORS error: Cross-origin request blocked. Please ensure the API is properly configured.');
   }
-  
+
   return error;
 };
 
@@ -127,7 +127,7 @@ export const validateApiResponse = (response: any): void => {
   if (response === null || response === undefined) {
     throw new Error('Invalid response: Response is null or undefined');
   }
-  
+
   if (typeof response !== 'object' || Array.isArray(response)) {
     throw new Error('Invalid response: Response must be an object');
   }
@@ -141,13 +141,13 @@ export const validateApiResponse = (response: any): void => {
 export const handleApiError = (response: { status?: number; message?: string; code?: string }): Error => {
   const message = response.message || 'Unknown API error';
   const status = response.status || 500;
-  
+
   if (status >= 400 && status < 500) {
     return new Error(`Client error (${status}): ${message}`);
   } else if (status >= 500) {
     return new Error(`Server error (${status}): ${message}`);
   }
-  
+
   return new Error(`API error: ${message}`);
 };
 
@@ -159,12 +159,12 @@ const getEnvVar = (key: string, fallback: string = ''): string => {
   if (typeof import.meta !== 'undefined' && import.meta.env) {
     return import.meta.env[key] || fallback;
   }
-  
+
   // Try Node.js environment (server/build)
   if (typeof process !== 'undefined' && process.env) {
     return process.env[key] || fallback;
   }
-  
+
   return fallback;
 };
 
@@ -177,19 +177,19 @@ export const isDevelopment = (): boolean => {
   if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
     return true;
   }
-  
+
   // Check for Node.js development mode (server/build)
   if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
     return true;
   }
-  
+
   // Check for browser environment (fallback)
   if (typeof window !== 'undefined') {
-    return window.location.hostname === 'localhost' || 
-           window.location.hostname === '127.0.0.1' ||
-           window.location.hostname.includes('localhost');
+    return window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname.includes('localhost');
   }
-  
+
   return false;
 };
 
@@ -202,12 +202,12 @@ export const isProduction = (): boolean => {
   if (typeof import.meta !== 'undefined' && import.meta.env?.PROD) {
     return true;
   }
-  
+
   // Check for Node.js production mode (server/build)
   if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
     return true;
   }
-  
+
   return false;
 };
 
@@ -220,12 +220,18 @@ export const getApiBaseUrl = (): string => {
   if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
     return '';
   }
-  
+
   // In development, use localhost with correct port
   if (isDevelopment()) {
     return 'http://localhost:3001';
   }
-  
+
+  // Check for environment variable override
+  const envUrl = getEnvVar('VITE_API_BASE_URL');
+  if (envUrl) {
+    return envUrl;
+  }
+
   // In production, use relative URLs (handled by Vercel serverless functions)
   return '';
 };
