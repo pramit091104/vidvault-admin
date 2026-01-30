@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import MobileDownloadPrevention from './MobileDownloadPrevention';
+import { getApiBaseUrl } from '@/config/environment';
 
 interface ProtectedVideoProps {
   videoId: string;
@@ -50,22 +51,22 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
 
       // Monitor for network tab access
       const originalGetEntries = performance.getEntries;
-      performance.getEntries = function() {
+      performance.getEntries = function () {
         console.warn('🚨 Network monitoring detected - access blocked');
         return []; // Return empty array to hide network data
       };
 
       // Override fetch to hide video URLs
       const originalFetch = window.fetch;
-      window.fetch = function(...args) {
+      window.fetch = function (...args) {
         const url = args[0]?.toString() || '';
-        
+
         // Hide video streaming URLs from network tab
         if (url.includes('/api/media/stream/') || url.includes('/stream/') || url.includes('/video/')) {
           console.warn('🚨 Video URL access detected in network tab - blocked');
           return Promise.resolve(new Response('Access Denied', { status: 403 }));
         }
-        
+
         return originalFetch.apply(this, args);
       };
 
@@ -73,7 +74,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
       const generateDecoyRequests = () => {
         const decoys = [
           '/api/analytics/track',
-          '/api/user/preferences', 
+          '/api/user/preferences',
           '/api/content/metadata',
           '/api/session/heartbeat',
           '/api/ads/preroll',
@@ -81,16 +82,16 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
         ];
 
         decoys.forEach(url => {
-          fetch(url, { 
+          fetch(url, {
             method: 'HEAD',
             mode: 'no-cors'
-          }).catch(() => {}); // Ignore errors
+          }).catch(() => { }); // Ignore errors
         });
       };
 
       // Generate decoy requests periodically
       const decoyInterval = setInterval(generateDecoyRequests, 5000);
-      
+
       // Cleanup on unmount
       return () => {
         clearInterval(decoyInterval);
@@ -103,8 +104,8 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
   const generateStreamOnlyUrl = async () => {
     try {
       setIsLoading(true);
-      
-      const response = await fetch('/api/stream-only/generate', {
+
+      const response = await fetch(`${getApiBaseUrl()}/api/stream-only/generate`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -122,7 +123,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
 
       const data = await response.json();
       setVideoUrl(data.streamUrl);
-      
+
     } catch (error) {
       console.error('Error generating stream URL:', error);
       setError('Failed to load video');
@@ -143,9 +144,9 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
       e.stopPropagation();
       setDownloadAttempted(true);
       onDownloadAttempt?.();
-      
+
       // Log download attempt
-      fetch('/api/log-download-attempt', {
+      fetch(`${getApiBaseUrl()}/api/log-download-attempt`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -157,7 +158,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
           userAgent: navigator.userAgent
         })
       }).catch(console.error);
-      
+
       return false;
     };
 
@@ -194,7 +195,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
       // Allow normal seeking but log suspicious patterns
       const currentTime = video.currentTime;
       const duration = video.duration;
-      
+
       // Detect rapid seeking (download manager behavior)
       if (currentTime > duration * 0.9) {
         console.warn('Suspicious seeking detected');
@@ -223,7 +224,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
       video.removeEventListener('selectstart', handleSelectStart);
       video.removeEventListener('loadstart', handleLoadStart);
       video.removeEventListener('seeking', handleSeeking);
-      
+
       if (container) {
         container.removeEventListener('contextmenu', handleContextMenu);
         container.removeEventListener('dragstart', handleDragStart);
@@ -241,7 +242,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
         'F5',  // Refresh (can be used to access network tab)
         'F11', // Fullscreen
       ];
-      
+
       const blockedCombinations = [
         { ctrl: true, key: 's' }, // Save
         { ctrl: true, key: 'u' }, // View source
@@ -283,21 +284,21 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
   // Monitor for developer tools and download managers
   useEffect(() => {
     let devToolsOpen = false;
-    
+
     const detectDevTools = () => {
       const threshold = 160;
-      const isOpen = window.outerHeight - window.innerHeight > threshold || 
-                     window.outerWidth - window.innerWidth > threshold;
-      
+      const isOpen = window.outerHeight - window.innerHeight > threshold ||
+        window.outerWidth - window.innerWidth > threshold;
+
       if (isOpen && !devToolsOpen) {
         devToolsOpen = true;
         console.clear();
         console.log('%c🚨 DOWNLOAD PREVENTION ACTIVE', 'color: red; font-size: 24px; font-weight: bold;');
         console.log('%cThis content is protected. Downloads are monitored and watermarked.', 'color: red; font-size: 16px;');
         console.log('%cUnauthorized downloading may result in account suspension.', 'color: red; font-size: 14px;');
-        
+
         // Log developer tools opening
-        fetch('/api/log-devtools-attempt', {
+        fetch(`${getApiBaseUrl()}/api/log-devtools-attempt`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -324,7 +325,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
 
     // Override video src to prevent blob URL access
     const originalSrc = video.src;
-    
+
     // Monitor for src changes (download managers often change src)
     const observer = new MutationObserver((mutations) => {
       mutations.forEach((mutation) => {
@@ -341,7 +342,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
     });
 
     observer.observe(video, { attributes: true });
-    
+
     return () => observer.disconnect();
   }, [videoUrl, onDownloadAttempt]);
 
@@ -362,7 +363,7 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
         <div className="text-center">
           <p className="text-red-600 font-medium">Content Protection Error</p>
           <p className="text-red-500 text-sm mt-1">{error}</p>
-          <button 
+          <button
             onClick={generateStreamOnlyUrl}
             className="mt-3 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
           >
@@ -374,10 +375,10 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className="relative bg-black rounded-lg overflow-hidden select-none"
-      style={{ 
+      style={{
         userSelect: 'none',
         WebkitUserSelect: 'none',
         MozUserSelect: 'none',
@@ -436,15 +437,15 @@ export const ProtectedVideo: React.FC<ProtectedVideoProps> = ({
       </div>
 
       {/* Mobile Download Prevention */}
-      <MobileDownloadPrevention 
-        videoRef={videoRef} 
+      <MobileDownloadPrevention
+        videoRef={videoRef}
         onDownloadAttempt={onDownloadAttempt}
       />
 
       {/* Invisible overlay to prevent interactions */}
-      <div 
+      <div
         className="absolute inset-0 bg-transparent"
-        style={{ 
+        style={{
           zIndex: 1,
           pointerEvents: 'none' // Allow video controls but prevent other interactions
         }}

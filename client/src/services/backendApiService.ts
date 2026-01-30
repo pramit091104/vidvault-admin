@@ -1,5 +1,6 @@
 import { auth } from '@/integrations/firebase/config';
 import { getCachedSubscription, setCachedSubscription, clearCachedSubscription } from '@/lib/subscriptionCache';
+import { getApiBaseUrl } from '@/config/environment';
 
 export interface BackendSubscription {
   tier: 'free' | 'premium' | 'enterprise';
@@ -60,8 +61,8 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
     }
 
     const headers = await getAuthHeaders();
-    
-    const response = await fetch('/api/subscription/status', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/subscription/status`, {
       method: 'GET',
       headers,
       credentials: 'include'
@@ -73,10 +74,10 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
     }
 
     const data: SubscriptionStatusResponse = await response.json();
-    
+
     // Cache the successful response
     setCachedSubscription(user.uid, data.subscription);
-    
+
     return data.subscription;
   } catch (error) {
     console.error('Error getting subscription status:', error);
@@ -105,8 +106,8 @@ export async function updateSubscription(subscriptionData: {
     }
 
     const headers = await getAuthHeaders();
-    
-    const response = await fetch('/api/subscription/update', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/subscription/update`, {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -123,10 +124,10 @@ export async function updateSubscription(subscriptionData: {
     }
 
     const data = await response.json();
-    
+
     // Update cache with new subscription data
     setCachedSubscription(user.uid, data.subscription);
-    
+
     return data.subscription;
   } catch (error) {
     console.error('Error updating subscription:', error);
@@ -140,8 +141,8 @@ export async function updateSubscription(subscriptionData: {
 export async function validateFileUpload(fileSize: number): Promise<ValidationResponse> {
   try {
     const headers = await getAuthHeaders();
-    
-    const response = await fetch('/api/upload/validate', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/upload/validate`, {
       method: 'POST',
       headers,
       credentials: 'include',
@@ -174,8 +175,8 @@ export async function validateFileUpload(fileSize: number): Promise<ValidationRe
 export async function validateClientCreation(): Promise<ValidationResponse> {
   try {
     const headers = await getAuthHeaders();
-    
-    const response = await fetch('/api/clients/validate', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/clients/validate`, {
       method: 'GET',
       headers,
       credentials: 'include'
@@ -205,7 +206,7 @@ export async function validateClientCreation(): Promise<ValidationResponse> {
  * Upload file with backend validation
  */
 export async function uploadFileWithValidation(
-  file: File, 
+  file: File,
   metadata?: { title?: string; description?: string; clientName?: string }
 ): Promise<any> {
   try {
@@ -215,7 +216,7 @@ export async function uploadFileWithValidation(
     }
 
     const token = await user.getIdToken();
-    
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('fileName', file.name);
@@ -223,7 +224,7 @@ export async function uploadFileWithValidation(
       formData.append('metadata', JSON.stringify(metadata));
     }
 
-    const response = await fetch('/api/upload/simple', {
+    const response = await fetch(`${getApiBaseUrl()}/api/upload/simple`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`

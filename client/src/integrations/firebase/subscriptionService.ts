@@ -1,12 +1,13 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  updateDoc, 
-  Timestamp 
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  updateDoc,
+  Timestamp
 } from 'firebase/firestore';
 import { db } from './config';
+import { getApiBaseUrl } from '../../config/environment';
 
 export const SUBSCRIPTIONS_COLLECTION = 'subscriptions';
 
@@ -33,7 +34,7 @@ export const saveSubscription = async (subscriptionData: Omit<SubscriptionRecord
   try {
     const docRef = doc(db, SUBSCRIPTIONS_COLLECTION, subscriptionData.userId);
     const now = Timestamp.now();
-    
+
     const firestoreData = {
       ...subscriptionData,
       subscriptionDate: subscriptionData.subscriptionDate ? Timestamp.fromDate(subscriptionData.subscriptionDate) : null,
@@ -64,8 +65,8 @@ export const getSubscription = async (userId: string): Promise<SubscriptionRecor
   try {
     const { auth } = await import('./config');
     const token = await auth.currentUser?.getIdToken();
-    
-    const response = await fetch('/api/subscription/status', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/subscription/status`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -81,12 +82,12 @@ export const getSubscription = async (userId: string): Promise<SubscriptionRecor
     return data.subscription;
   } catch (error) {
     console.error('Error getting subscription:', error);
-    
+
     // Fallback to direct Firestore query
     try {
       const docRef = doc(db, SUBSCRIPTIONS_COLLECTION, userId);
       const docSnap = await getDoc(docRef);
-      
+
       if (docSnap.exists()) {
         const data = docSnap.data();
         return {
@@ -97,7 +98,7 @@ export const getSubscription = async (userId: string): Promise<SubscriptionRecor
           updatedAt: data.updatedAt?.toDate(),
         } as SubscriptionRecord;
       }
-      
+
       return null;
     } catch (fallbackError) {
       console.error('Fallback subscription query failed:', fallbackError);
@@ -125,8 +126,8 @@ export const incrementVideoUploadCount = async (userId: string): Promise<void> =
   try {
     const { auth } = await import('./config');
     const token = await auth.currentUser?.getIdToken();
-    
-    const response = await fetch('/api/subscription/increment-video', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/subscription/increment-video`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -149,8 +150,8 @@ export const incrementClientCount = async (userId: string): Promise<void> => {
   try {
     const { auth } = await import('./config');
     const token = await auth.currentUser?.getIdToken();
-    
-    const response = await fetch('/api/subscription/increment-client', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/subscription/increment-client`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

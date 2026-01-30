@@ -1,11 +1,12 @@
 import { auth } from '@/integrations/firebase/config';
 import { getVideoBySlugOrId } from '@/integrations/firebase/videoService';
 import { getUserById } from '@/integrations/firebase/userService';
+import { getApiBaseUrl } from '@/config/environment';
 
 /**
  * Notification types supported by the system
  */
-export type NotificationType = 
+export type NotificationType =
   | 'approval_status_change'
   | 'revision_request'
   | 'subscription_reminder'
@@ -185,7 +186,7 @@ export class NotificationManager {
    * Convenience method that fetches user and subscription data
    */
   public async sendSubscriptionReminderByUserId(
-    userId: string, 
+    userId: string,
     daysUntilExpiry: number,
     subscriptionTier: string = 'premium',
     expiryDate: Date
@@ -224,11 +225,11 @@ export class NotificationManager {
     }
 
     this.isProcessingQueue = true;
-    
+
     try {
       const now = new Date();
       const failedNotifications = Array.from(this.notificationQueue.values())
-        .filter(notification => 
+        .filter(notification =>
           (notification.status === 'failed' || notification.status === 'retry') &&
           notification.attempts < notification.maxAttempts &&
           notification.scheduledAt <= now
@@ -253,7 +254,7 @@ export class NotificationManager {
    */
   private async createApprovalNotification(data: ApprovalNotificationData): Promise<BaseNotification> {
     const notificationId = `approval_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     let subject: string;
     let content: string;
     let htmlContent: string;
@@ -264,19 +265,19 @@ export class NotificationManager {
         content = this.generateApprovedTextContent(data);
         htmlContent = this.generateApprovedHtmlContent(data);
         break;
-      
+
       case 'rejected':
         subject = `❌ Your video "${data.videoTitle}" needs changes`;
         content = this.generateRejectedTextContent(data);
         htmlContent = this.generateRejectedHtmlContent(data);
         break;
-      
+
       case 'revision_requested':
         subject = `📝 Revision requested for "${data.videoTitle}"`;
         content = this.generateRevisionTextContent(data);
         htmlContent = this.generateRevisionHtmlContent(data);
         break;
-      
+
       default:
         throw new Error(`Unsupported approval status: ${data.approvalStatus}`);
     }
@@ -312,7 +313,7 @@ export class NotificationManager {
    */
   private async createSubscriptionReminderNotification(data: SubscriptionReminderData): Promise<BaseNotification> {
     const notificationId = `subscription_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     const subject = `⏰ Your ${data.subscriptionTier} subscription expires in ${data.daysUntilExpiry} days`;
     const content = this.generateSubscriptionReminderTextContent(data);
     const htmlContent = this.generateSubscriptionReminderHtmlContent(data);
@@ -346,15 +347,15 @@ export class NotificationManager {
   private async queueNotification(notification: BaseNotification): Promise<boolean> {
     try {
       this.notificationQueue.set(notification.id, notification);
-      
+
       // Try to send immediately
       const success = await this.processNotification(notification);
-      
+
       if (!success) {
         // Schedule for retry
         this.scheduleRetry(notification);
       }
-      
+
       return success;
     } catch (error) {
       console.error('Error queuing notification:', error);
@@ -372,7 +373,7 @@ export class NotificationManager {
       notification.status = 'pending';
 
       const success = await this.sendEmail(notification);
-      
+
       if (success) {
         notification.status = 'sent';
         notification.sentAt = new Date();
@@ -381,23 +382,23 @@ export class NotificationManager {
       } else {
         notification.status = 'failed';
         notification.errorMessage = 'Email delivery failed';
-        
+
         if (notification.attempts < notification.maxAttempts) {
           this.scheduleRetry(notification);
         } else {
           console.error(`Notification ${notification.id} failed permanently after ${notification.attempts} attempts`);
         }
-        
+
         return false;
       }
     } catch (error) {
       notification.status = 'failed';
       notification.errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      
+
       if (notification.attempts < notification.maxAttempts) {
         this.scheduleRetry(notification);
       }
-      
+
       console.error(`Error processing notification ${notification.id}:`, error);
       return false;
     }
@@ -411,10 +412,10 @@ export class NotificationManager {
       this.retryConfig.baseDelay * Math.pow(this.retryConfig.backoffMultiplier, notification.attempts - 1),
       this.retryConfig.maxDelay
     );
-    
+
     notification.scheduledAt = new Date(Date.now() + delay);
     notification.status = 'retry';
-    
+
     console.log(`Notification ${notification.id} scheduled for retry in ${delay}ms (attempt ${notification.attempts}/${notification.maxAttempts})`);
   }
 
@@ -424,7 +425,7 @@ export class NotificationManager {
   private async sendEmail(notification: BaseNotification): Promise<boolean> {
     try {
       // Try to use the backend API first
-      const response = await fetch('/api/notifications/send', {
+      const response = await fetch(`${getApiBaseUrl()}/api/notifications/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -466,7 +467,7 @@ export class NotificationManager {
       metadata: notification.metadata,
       timestamp: new Date().toISOString()
     });
-    
+
     // In development, we'll consider this successful
     // In production, this should queue the notification for retry when the API is available
     return true;
@@ -670,7 +671,7 @@ Thank you for being a valued member!
     sent: number;
   } {
     const notifications = Array.from(this.notificationQueue.values());
-    
+
     return {
       total: notifications.length,
       pending: notifications.filter(n => n.status === 'pending').length,
@@ -685,7 +686,7 @@ Thank you for being a valued member!
    */
   public clearOldNotifications(daysOld: number = 7): void {
     const cutoffDate = new Date(Date.now() - daysOld * 24 * 60 * 60 * 1000);
-    
+
     for (const [id, notification] of this.notificationQueue.entries()) {
       if (notification.status === 'sent' && notification.sentAt && notification.sentAt < cutoffDate) {
         this.notificationQueue.delete(id);

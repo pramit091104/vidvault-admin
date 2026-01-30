@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { 
+import {
   Table,
   TableBody,
   TableCell,
@@ -11,10 +11,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { 
-  Search, 
-  Plus, 
-  Filter, 
+import {
+  Search,
+  Plus,
+  Filter,
   Edit,
   Trash2,
   Share2,
@@ -25,15 +25,16 @@ import {
   Loader2
 } from "lucide-react";
 import { toast } from "sonner";
-import { 
-  getClients, 
-  updateClient, 
-  deleteClient, 
+import {
+  getClients,
+  updateClient,
+  deleteClient,
   createClient,
-  ClientRecord 
+  ClientRecord
 } from "@/integrations/firebase/clientService";
 import { useAuth } from "@/contexts/AuthContext";
 import { validateClientCreation } from "@/services/backendApiService";
+import { getApiBaseUrl } from "@/config/environment";
 import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
 import { Progress } from "@/components/ui/progress";
 
@@ -75,8 +76,8 @@ const Clients = () => {
   };
 
   const handleEditClient = (clientId: string) => {
-    setClients(prev => prev.map(client => 
-      client.id === clientId 
+    setClients(prev => prev.map(client =>
+      client.id === clientId
         ? { ...client, isEditing: true }
         : client
     ));
@@ -92,14 +93,14 @@ const Clients = () => {
 
     try {
       await updateClient(clientId, editingClient);
-      
+
       // Update local state
-      setClients(prev => prev.map(c => 
-        c.id === clientId 
+      setClients(prev => prev.map(c =>
+        c.id === clientId
           ? { ...editingClient, id: clientId, isEditing: false }
           : c
       ));
-      
+
       setEditingClient(null);
       toast.success('Client updated successfully');
     } catch (error) {
@@ -109,8 +110,8 @@ const Clients = () => {
   };
 
   const handleCancelEdit = (clientId: string) => {
-    setClients(prev => prev.map(client => 
-      client.id === clientId 
+    setClients(prev => prev.map(client =>
+      client.id === clientId
         ? { ...client, isEditing: false }
         : client
     ));
@@ -132,7 +133,7 @@ const Clients = () => {
 
   const handleAddNewClient = async () => {
     const now = Date.now();
-    
+
     // Prevent multiple rapid clicks (debounce with 1 second)
     if (isCreatingClient || (now - lastClickTime < 1000)) {
       return;
@@ -160,8 +161,8 @@ const Clients = () => {
       }
 
       const token = await user.getIdToken();
-      
-      const response = await fetch('/api/clients/create', {
+
+      const response = await fetch(`${getApiBaseUrl()}/api/clients/create`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +189,7 @@ const Clients = () => {
       const newClient = { ...newClientData, id: newClientId, isEditing: true };
       setClients(prev => [newClient, ...prev]);
       setEditingClient(newClient);
-      
+
       // Update local subscription state with backend result
       if (backendResult.subscription) {
         setSubscription(prev => ({
@@ -196,7 +197,7 @@ const Clients = () => {
           clientsUsed: backendResult.subscription.clientsUsed
         }));
       }
-      
+
       toast.success('New client added');
     } catch (error) {
       console.error('Error adding client:', error);
@@ -213,7 +214,7 @@ const Clients = () => {
       status: client.status,
       duration: client.duration
     };
-    
+
     if (navigator.share) {
       navigator.share({
         title: `Client: ${client.clientName}`,
@@ -233,7 +234,7 @@ const Clients = () => {
         id, clientName, work, status, duration
       }))
     };
-    
+
     navigator.clipboard.writeText(JSON.stringify(allClientsData, null, 2));
     toast.success('All client data copied to clipboard');
   };
@@ -247,7 +248,7 @@ const Clients = () => {
 
   const filteredClients = clients.filter(client => {
     const matchesSearch = client.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         client.work.toLowerCase().includes(searchTerm.toLowerCase());
+      client.work.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || client.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
@@ -268,7 +269,7 @@ const Clients = () => {
       <nav className="sticky top-0 z-50 bg-card/95 border-b border-border backdrop-blur-sm">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 flex items-center justify-between">
           <h2 className="text-base sm:text-lg font-semibold text-foreground">Personal Client Management</h2>
-          
+
           <div className="flex items-center gap-2 sm:gap-3">
             {subscription.tier === 'free' && clients.length >= subscription.maxClients && (
               <PremiumPaymentModal>
@@ -282,7 +283,7 @@ const Clients = () => {
                 </Button>
               </PremiumPaymentModal>
             )}
-            
+
             <Button
               onClick={handleAddNewClient}
               size="sm"
@@ -320,8 +321,8 @@ const Clients = () => {
             </div>
             {subscription.tier === 'free' && (
               <PremiumPaymentModal>
-                <Button 
-                  size="sm" 
+                <Button
+                  size="sm"
                   className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white px-2 sm:px-3 py-1 sm:py-1.5 text-xs touch-manipulation"
                 >
                   <Crown className="h-3 w-3 mr-1" />
@@ -351,7 +352,7 @@ const Clients = () => {
                 className="pl-10 bg-background border-border text-foreground placeholder-muted-foreground focus:border-primary focus:ring-primary/20 h-10 sm:h-auto text-base sm:text-sm touch-manipulation"
               />
             </div>
-            
+
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <select

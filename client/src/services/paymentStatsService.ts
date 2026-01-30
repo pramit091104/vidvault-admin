@@ -1,4 +1,5 @@
 import { auth } from '@/integrations/firebase/config';
+import { getApiBaseUrl } from '@/config/environment';
 
 export interface PaymentStats {
   totalPayments: number;
@@ -43,8 +44,8 @@ async function getAuthHeaders(): Promise<HeadersInit> {
 export async function getPaymentStats(): Promise<PaymentStats> {
   try {
     const headers = await getAuthHeaders();
-    
-    const response = await fetch('/api/payment-stats', {
+
+    const response = await fetch(`${getApiBaseUrl()}/api/payment-stats`, {
       method: 'GET',
       headers,
       credentials: 'include'
@@ -56,7 +57,7 @@ export async function getPaymentStats(): Promise<PaymentStats> {
     }
 
     const data = await response.json();
-    
+
     // Convert date strings back to Date objects
     const stats = {
       ...data.stats,

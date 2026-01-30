@@ -1,4 +1,5 @@
 import { auth } from '@/integrations/firebase/config';
+import { getApiBaseUrl } from '@/config/environment';
 
 export interface CommentNotificationRequest {
   videoId: string;
@@ -26,14 +27,14 @@ class NotificationService {
     try {
       const user = auth.currentUser;
       const headers = await this.getAuthHeaders();
-      
+
       // Add anonymous flag if user is not authenticated
       const requestData = {
         ...data,
         isAnonymous: !user
       };
-      
-      const response = await fetch('/api/notifications/comment', {
+
+      const response = await fetch(`${getApiBaseUrl()}/api/notifications/comment`, {
         method: 'POST',
         headers,
         credentials: 'include',
