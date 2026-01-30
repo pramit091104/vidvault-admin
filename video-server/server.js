@@ -139,6 +139,16 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
     }
 
     if (credentials) {
+      console.log('🔑 Credential Check:');
+      console.log('   - project_id:', credentials.project_id);
+      console.log('   - client_email:', credentials.client_email);
+      console.log('   - private_key exists:', !!credentials.private_key);
+      if (credentials.private_key) {
+        console.log('   - private_key length:', credentials.private_key.length);
+        console.log('   - private_key starts with:', credentials.private_key.substring(0, 27)); // Should be "-----BEGIN PRIVATE KEY-----"
+        console.log('   - private_key contains newlines:', credentials.private_key.includes('\n'));
+      }
+
       const storage = new Storage({ projectId: process.env.GCS_PROJECT_ID, credentials });
       bucket = storage.bucket(BUCKET_NAME);
       console.log('✅ Google Cloud Storage initialized');

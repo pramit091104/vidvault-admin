@@ -18,7 +18,8 @@ if (getApps().length === 0) {
   }
 }
 
-const db = getFirestore();
+// Initialized lazily inside the handler to prevent crash on startup if credentials missing
+// const db = getFirestore();
 
 export default async function handler(req, res) {
   // CORS headers
@@ -37,7 +38,7 @@ export default async function handler(req, res) {
     const authHeader = req.headers.authorization;
     let decodedToken = null;
     let isAuthenticated = false;
-    
+
     if (authHeader && authHeader.startsWith('Bearer ')) {
       const idToken = authHeader.split('Bearer ')[1];
       try {
@@ -49,32 +50,34 @@ export default async function handler(req, res) {
       }
     }
 
-    const { 
-      videoId, 
-      commentText, 
-      commenterName, 
+    const {
+      videoId,
+      commentText,
+      commenterName,
       commenterEmail,
       isAnonymous = false
     } = req.body;
 
     // Validation
     if (!videoId || !commentText) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: videoId, commentText' 
+      return res.status(400).json({
+        error: 'Missing required fields: videoId, commentText'
       });
     }
 
     // Send email notifications for both authenticated and anonymous users
 
     // Get video details from Firestore
+    // Lazily initialize db
+    const db = getFirestore();
     const videoDoc = await db.collection('gcsClientCodes').doc(videoId).get();
-    
+
     if (!videoDoc.exists) {
       return res.status(404).json({ error: 'Video not found' });
     }
 
     const videoData = videoDoc.data();
-    
+
     // Get video owner's email
     if (!videoData.userId) {
       return res.status(400).json({ error: 'Video owner not found' });
@@ -83,7 +86,7 @@ export default async function handler(req, res) {
     // Get owner's user data
     let ownerEmail = null;
     let ownerName = null;
-    
+
     try {
       const ownerUser = await getAuth().getUser(videoData.userId);
       ownerEmail = ownerUser.email;
@@ -99,9 +102,9 @@ export default async function handler(req, res) {
 
     // Don't send email if commenter is the video owner (only check for authenticated users)
     if (decodedToken && decodedToken.email === ownerEmail) {
-      return res.status(200).json({ 
-        success: true, 
-        message: 'No email sent - commenter is video owner' 
+      return res.status(200).json({
+        success: true,
+        message: 'No email sent - commenter is video owner'
       });
     }
 
@@ -123,20 +126,20 @@ export default async function handler(req, res) {
     const emailSent = await queueCommentNotification(emailData);
 
     if (emailSent) {
-      res.status(200).json({ 
-        success: true, 
-        message: 'Comment notification queued successfully' 
+      res.status(200).json({
+        success: true,
+        message: 'Comment notification queued successfully'
       });
     } else {
-      res.status(500).json({ 
-        success: false, 
-        error: 'Failed to queue email notification' 
+      res.status(500).json({
+        success: false,
+        error: 'Failed to queue email notification'
       });
     }
 
   } catch (error) {
     console.error('Comment notification error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
@@ -147,10 +150,10 @@ async function queueCommentNotification(data) {
   try {
     // Import message queue dynamically
     const { queueEmail } = await import('../../middleware/messageQueue.js');
-    
+
     const htmlTemplate = generateCommentEmailTemplate(data);
     const textTemplate = generatePlainTextEmail(data);
-    
+
     const jobId = await queueEmail(
       data.ownerEmail,
       `New comment on your video: ${data.videoTitle}`,
@@ -158,7 +161,7 @@ async function queueCommentNotification(data) {
       textTemplate,
       { priority: 1 } // High priority for notifications
     );
-    
+
     console.log(`✅ Comment notification queued with job ID: ${jobId}`);
     return true;
   } catch (error) {
@@ -212,10 +215,10 @@ async function sendCommentNotification(data) {
 
     const result = await transporter.sendMail(mailOptions);
     console.log('Email sent successfully:', result.messageId);
-    
+
     // Close the transporter
     transporter.close();
-    
+
     return true;
   } catch (error) {
     console.error('Error sending email:', error);
@@ -231,10 +234,10 @@ async function sendCommentNotification(data) {
 
 function generateCommentEmailTemplate(data) {
   // Handle anonymous users properly
-  const commenterInfo = data.isAnonymousComment 
-    ? 'Anonymous viewer' 
+  const commenterInfo = data.isAnonymousComment
+    ? 'Anonymous viewer'
     : (data.commenterName || data.commenterEmail || 'Unknown user');
-    
+
   return `
     <!DOCTYPE html>
     <html>
@@ -292,10 +295,10 @@ function generateCommentEmailTemplate(data) {
 
 function generatePlainTextEmail(data) {
   // Handle anonymous users properly
-  const commenterInfo = data.isAnonymousComment 
-    ? 'Anonymous viewer' 
+  const commenterInfo = data.isAnonymousComment
+    ? 'Anonymous viewer'
     : (data.commenterName || data.commenterEmail || 'Unknown user');
-    
+
   return `
 New Comment on Your Video - Previu
 
