@@ -62,15 +62,26 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
 
     const headers = await getAuthHeaders();
 
-    const response = await fetch(`${getApiBaseUrl()}/api/subscription/status`, {
+    const url = `${getApiBaseUrl()}/api/subscription/status`;
+
+    const response = await fetch(url, {
       method: 'GET',
       headers,
       credentials: 'include'
     });
 
+    const contentType = response.headers.get('content-type');
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Failed to get subscription status' }));
       throw new Error(error.error || `HTTP ${response.status}`);
+    }
+
+    // Check for JSON content type
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('[getSubscriptionStatus] Received non-JSON response:', text.substring(0, 200));
+      throw new Error(`Received non-JSON response from ${url}: ${text.substring(0, 50)}...`);
     }
 
     const data: SubscriptionStatusResponse = await response.json();

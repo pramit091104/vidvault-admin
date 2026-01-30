@@ -232,6 +232,18 @@ export const getApiBaseUrl = (): string => {
     return envUrl;
   }
 
-  // In production, use relative URLs (handled by Vercel serverless functions)
+  // In production, if VITE_API_BASE_URL is not set, we default to '', 
+  // which means relative paths. This works if the backend is on the same domain 
+  // or proxied (e.g. Next.js rewrites).
+  // However, for a separate backend (e.g. Railway), this causes requests to hit the frontend
+  // and return HTML (Unexpected token <).
+  if (isProduction()) {
+    console.warn(
+      '⚠️ VITE_API_BASE_URL is not set in production. ' +
+      'API requests will use relative paths, which may fail if the backend is on a separate domain. ' +
+      'Please set VITE_API_BASE_URL to your backend URL (e.g., https://your-backend.up.railway.app).'
+    );
+  }
+
   return '';
 };
