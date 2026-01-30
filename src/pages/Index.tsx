@@ -1,367 +1,174 @@
-import { useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Play, Shield, Users, Zap, Upload, MessageSquare, Lock, BarChart3, CheckCircle, Star, TrendingUp, AlertCircle, Menu, X, IndianRupee, Crown } from "lucide-react";
-import { PremiumPaymentModal } from "@/components/payment/PremiumPaymentModal";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Upload, 
+  Share2, 
+  MessageSquare, 
+  CheckCircle, 
+  Shield, 
+  Users, 
+  Clock, 
+  Star,
+  Play,
+  Zap,
+  Target,
+  TrendingUp,
+  FileVideo,
+  Lock,
+  Eye,
+  BarChart3,
+  Smartphone,
+  Globe,
+  ArrowRight,
+  Check,
+  Mail,
+  AlertTriangle,
+  Download,
+  Timer,
+  UserCheck,
+  Settings,
+  UploadCloud,
+  Link as LinkIcon,
+  ThumbsUp
+} from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const Index = () => {
-  const navigate = useNavigate();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
 
-  const scrollToSection = (id: string) => {
-    const element = document.getElementById(id);
-    element?.scrollIntoView({ behavior: "smooth" });
-  };
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 50);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Navigation Header - Mobile Optimized */}
-      <nav className="sticky top-0 z-50 bg-background/95 border-b border-border backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg sm:text-xl font-bold text-foreground">Previu</h2>
-          </div>
-          
-          {/* Desktop Navigation */}
-          <ul className="hidden md:flex items-center gap-6 lg:gap-8">
-            <li>
-              <button
-                onClick={() => scrollToSection("home")}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm lg:text-base"
-              >
-                HOME
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => scrollToSection("about")}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm lg:text-base"
-              >
-                ABOUT
-              </button>
-            </li>
-            <li>
-              <button
-                onClick={() => scrollToSection("pricing")}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm lg:text-base"
-              >
-                PRICING
-              </button>
-            </li>
-            <li>
-              <Button
-                onClick={() => navigate("/auth")}
-                size="sm"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold px-3 py-2 text-sm"
-              >
-                LOG IN
-              </Button>
-            </li>
-            <li>
-              <button
-                onClick={() => scrollToSection("contact")}
-                className="text-muted-foreground hover:text-foreground transition-colors font-medium text-sm lg:text-base"
-              >
-                CONTACT
-              </button>
-            </li>
-          </ul>
+    <div className="min-h-screen bg-white">
+      {/* Navigation */}
+      <nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
+        isScrolled ? 'bg-white/95 backdrop-blur-sm border-b border-gray-200 shadow-sm' : 'bg-transparent'
+      }`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center space-x-2">
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+                <FileVideo className="h-5 w-5 text-white" />
+              </div>
+              <span className="text-xl font-bold text-gray-900">Previu</span>
+            </div>
+            
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">Features</a>
+              <a href="#how-it-works" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">How it Works</a>
+              <a href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">Pricing</a>
+              <a href="#testimonials" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">Testimonials</a>
+              <a href="#contact" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">Contact</a>
+              <Link to="/auth" className="text-gray-600 hover:text-gray-900 transition-colors font-medium">Log in</Link>
+              <Link to="/auth">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-all duration-200 hover:shadow-lg">
+                  Get Started
+                </Button>
+              </Link>
+            </div>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className="md:hidden p-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors touch-manipulation"
-            aria-label="Toggle menu"
-          >
-            {isMobileMenuOpen ? <X className="h-5 w-5 sm:h-6 sm:w-6" /> : <Menu className="h-5 w-5 sm:h-6 sm:w-6" />}
-          </button>
-        </div>
-
-        {/* Mobile Menu - Improved */}
-        {isMobileMenuOpen && (
-          <div className="md:hidden bg-background/95 border-t border-border backdrop-blur-sm">
-            <div className="px-3 sm:px-4 py-3 sm:py-4 space-y-3">
-              <button
-                onClick={() => {
-                  scrollToSection("home");
-                  setIsMobileMenuOpen(false);
-                }}
-                className="block w-full text-left text-muted-foreground hover:text-foreground transition-colors font-medium py-3 px-2 rounded-lg hover:bg-muted/50 touch-manipulation"
-              >
-                HOME
-              </button>
-              <button
-                onClick={() => {
-                  scrollToSection("about");
-                  setIsMobileMenuOpen(false);
-                }}
-                className="block w-full text-left text-muted-foreground hover:text-foreground transition-colors font-medium py-3 px-2 rounded-lg hover:bg-muted/50 touch-manipulation"
-              >
-                ABOUT
-              </button>
-              <button
-                onClick={() => {
-                  scrollToSection("pricing");
-                  setIsMobileMenuOpen(false);
-                }}
-                className="block w-full text-left text-muted-foreground hover:text-foreground transition-colors font-medium py-3 px-2 rounded-lg hover:bg-muted/50 touch-manipulation"
-              >
-                PRICING
-              </button>
-              <Button
-                onClick={() => {
-                  navigate("/auth");
-                  setIsMobileMenuOpen(false);
-                }}
-                size="sm"
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base touch-manipulation"
-              >
-                LOG IN
+            {/* Mobile menu button */}
+            <div className="md:hidden">
+              <Button variant="ghost" size="sm">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
               </Button>
-              <button
-                onClick={() => {
-                  scrollToSection("contact");
-                  setIsMobileMenuOpen(false);
-                }}
-                className="block w-full text-left text-muted-foreground hover:text-foreground transition-colors font-medium py-3 px-2 rounded-lg hover:bg-muted/50 touch-manipulation"
-              >
-                CONTACT
-              </button>
             </div>
           </div>
-        )}
+        </div>
       </nav>
 
-      {/* Hero Section - Mobile Optimized */}
-      <section id="home" className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 relative overflow-hidden px-3 sm:px-4">
-        {/* Colorful background elements */}
-        <div className="absolute inset-0">
-          <div className="absolute top-0 left-0 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-blue-400/20 to-indigo-500/20 rounded-full blur-3xl"></div>
-          <div className="absolute top-0 right-0 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-purple-400/20 to-pink-500/20 rounded-full blur-3xl"></div>
-          <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-64 sm:w-96 h-64 sm:h-96 bg-gradient-to-br from-indigo-400/15 to-blue-500/15 rounded-full blur-3xl"></div>
-        </div>
-        
-        <div className="relative z-10 text-center space-y-6 sm:space-y-8 max-w-6xl w-full">          
-          <div className="space-y-4 sm:space-y-6">
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-8xl font-bold leading-tight">
-              <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                Previu
-              </span>
-            </h1>
-            <p className="text-base sm:text-lg md:text-xl lg:text-2xl xl:text-3xl text-gray-700 max-w-4xl mx-auto leading-relaxed font-light px-2 sm:px-4">
-              Professional video sharing platform for creators and agencies. 
-              <span className="text-gray-900 font-semibold"> Upload, share securely, and get precise timestamp feedback</span> 
-              from clients on your video projects.
-            </p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6 pt-6 sm:pt-8">
-            <Button
-              onClick={() => navigate("/auth")}
-              size="lg"
-              className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-bold group px-8 sm:px-10 py-3 sm:py-4 text-base sm:text-lg shadow-lg transition-all duration-300 transform hover:scale-105 glow-primary w-full sm:w-auto touch-manipulation"
-            >
-              Start Free Trial
-              <ArrowRight className="ml-2 sm:ml-3 h-4 w-4 sm:h-5 sm:w-5 group-hover:translate-x-2 transition-transform" />
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Problem Section - Mobile Optimized */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-red-50 to-orange-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4">
-          <div className="text-center mb-12 sm:mb-16 lg:mb-20">
-            <div className="inline-flex items-center gap-2 px-3 sm:px-4 py-2 bg-red-100 border border-red-200 rounded-full text-xs sm:text-sm text-red-700 font-medium mb-4 sm:mb-6">
-              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4" />
-              The Problem We're Solving
-            </div>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-6 sm:mb-8 text-gray-900 px-2">
-              Video Collaboration is
-              <span className="bg-gradient-to-r from-red-600 to-orange-600 bg-clip-text text-transparent"> Broken</span>
-            </h2>
-            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed px-2 sm:px-4">
-              Video creators and agencies struggle with secure sharing, vague feedback, and managing client access to video drafts
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 sm:gap-8">
-            <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-red-100 hover:border-red-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-              <div className="relative z-10">
-                <div className="w-16 sm:w-20 h-16 sm:h-20 bg-gradient-to-br from-red-100 to-red-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <MessageSquare className="h-8 sm:h-10 w-8 sm:w-10 text-red-600" />
-                </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Endless Revision Cycles</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  "Change that part" or "make it pop" - vague feedback leads to countless revisions, frustrated clients, and wasted hours.
-                </p>
-                <div className="flex items-center gap-2 text-red-600 font-medium text-sm sm:text-base">
-                  <span>→</span>
-                  <span>Average 5+ revision rounds per project</span>
-                </div>
+      {/* Hero Section */}
+      <section className="pt-24 pb-16 lg:pt-32 lg:pb-24 bg-gradient-to-br from-gray-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+            <div className="text-center lg:text-left">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                Get client approval
+                <span className="bg-gradient-to-r from-blue-600 to-blue-700 bg-clip-text text-transparent"> without the chaos</span>
+              </h1>
+              <p className="text-xl text-gray-600 mb-8 leading-relaxed max-w-2xl">
+                Share video previews securely, collect precise timestamped feedback, and get approvals faster. 
+                No more WhatsApp confusion or scattered comments.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
+                <Link to="/auth">
+                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 text-lg font-semibold rounded-lg transition-all duration-200 hover:shadow-xl hover:scale-105">
+                    Start Free Trial
+                  </Button>
+                </Link>
+                <Button 
+                  size="lg" 
+                  variant="outline" 
+                  className="border-2 border-gray-300 text-gray-700 hover:bg-gray-50 px-8 py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+                  onClick={() => {
+                    // You can replace this with actual demo functionality
+                    alert("Demo video coming soon! Sign up for early access.");
+                  }}
+                >
+                  <Play className="w-5 h-5 mr-2" />
+                  Watch Demo
+                </Button>
               </div>
+              <p className="text-sm text-gray-500">
+                No credit card required • 14-day free trial • Cancel anytime
+              </p>
             </div>
             
-            <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-red-100 hover:border-red-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-              <div className="relative z-10">
-                <div className="w-16 sm:w-20 h-16 sm:h-20 bg-gradient-to-br from-red-100 to-red-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Lock className="h-8 sm:h-10 w-8 sm:w-10 text-red-600" />
-                </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Insecure File Sharing</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Sharing video drafts via email, Dropbox, or public links risks content leaks, unauthorized downloads, and loss of control over your work.
-                </p>
-                <div className="flex items-center gap-2 text-red-600 font-medium text-sm sm:text-base">
-                  <span>→</span>
-                  <span>78% of creators fear content leaks</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-red-100 hover:border-red-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-              <div className="relative z-10">
-                <div className="w-16 sm:w-20 h-16 sm:h-20 bg-gradient-to-br from-red-100 to-red-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <BarChart3 className="h-8 sm:h-10 w-8 sm:w-10 text-red-600" />
-                </div>
-                <h3 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Client Access Management</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Tracking which clients have access to which videos, managing permissions, and organizing feedback becomes chaotic across multiple projects.
-                </p>
-                <div className="flex items-center gap-2 text-red-600 font-medium text-sm sm:text-base">
-                  <span>→</span>
-                  <span>Hours wasted on client coordination</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Solution Section */}
-      <section className="py-24 bg-gradient-to-br from-green-50 via-emerald-50 to-teal-50">
-        
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-20">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-green-100 border border-green-200 rounded-full text-sm text-green-700 font-medium mb-6">
-              <CheckCircle className="h-4 w-4" />
-              Our Solution
-            </div>
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-8 text-gray-900">
-              The Future of
-              <span className="bg-gradient-to-r from-green-600 to-teal-600 bg-clip-text text-transparent"> Video Collaboration</span>
-            </h2>
-            <p className="text-lg sm:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed px-4">
-              A secure video sharing platform that gives you control over access, precise feedback collection, and professional client management
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-            <div className="space-y-8">
-              <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-green-100 hover:border-green-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-gray-900">Secure Video Sharing</h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      Upload videos to Google Cloud Storage with unique access codes for each client. Control who sees what and when.
-                    </p>
-                    <div className="flex items-center gap-2 text-green-600 font-medium">
-                      <span>✓</span>
-                      <span>Unique access codes per client</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-green-100 hover:border-green-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-gray-900">Timestamp Comments</h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      Clients leave feedback at exact moments in your videos. Get precise, actionable comments instead of vague "change this" requests.
-                    </p>
-                    <div className="flex items-center gap-2 text-green-600 font-medium">
-                      <span>✓</span>
-                      <span>Precise feedback at exact timestamps</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-8 border border-green-100 hover:border-green-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <CheckCircle className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-gray-900">Client & Project Management</h3>
-                    <p className="text-gray-600 leading-relaxed">
-                      Organize clients, track video access, manage permissions, and monitor engagement. All your video projects in one dashboard.
-                    </p>
-                    <div className="flex items-center gap-2 text-green-600 font-medium">
-                      <span>✓</span>
-                      <span>Centralized project management</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
+            {/* Hero Visual - Dashboard Mockup */}
             <div className="relative">
-              <div className="bg-white/90 backdrop-blur-sm rounded-3xl p-8 border border-green-100 shadow-2xl">
-                <div className="space-y-6">
-                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
-                        <span className="text-gray-900 font-medium">Live Collaboration Session</span>
+              <div className="bg-white rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
+                <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-3 h-3 bg-red-400 rounded-full"></div>
+                    <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
+                    <div className="w-3 h-3 bg-green-400 rounded-full"></div>
+                  </div>
+                  <div className="text-sm text-gray-600 font-medium">Project: Brand Video v3</div>
+                </div>
+                <div className="p-6">
+                  <div className="bg-black rounded-lg aspect-video mb-4 flex items-center justify-center relative">
+                    <Play className="w-16 h-16 text-white opacity-80" />
+                    <div className="absolute bottom-4 left-4 right-4">
+                      <div className="bg-white/90 rounded-lg p-2 text-xs">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-medium">2:34</span>
+                          <span className="text-gray-600">5:12</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-1">
+                          <div className="bg-blue-600 h-1 rounded-full" style={{width: '45%'}}></div>
+                        </div>
                       </div>
-                      <span className="text-green-600 text-sm font-medium bg-green-100 px-2 py-1 rounded-full">Active</span>
-                    </div>
-                    <div className="space-y-3">
-                      <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
-                        <div className="h-3 bg-gradient-to-r from-green-500 to-teal-500 rounded-full" style={{width: '75%'}}></div>
-                      </div>
-                      <p className="text-gray-600 text-sm">Project completion: 75%</p>
                     </div>
                   </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border border-blue-100">
-                      <Users className="h-8 w-8 text-blue-600 mb-3" />
-                      <p className="text-3xl font-bold text-gray-900">12</p>
-                      <p className="text-sm text-gray-600">Active Clients</p>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border border-purple-100">
-                      <MessageSquare className="h-8 w-8 text-purple-600 mb-3" />
-                      <p className="text-3xl font-bold text-gray-900">48</p>
-                      <p className="text-sm text-gray-600">Comments Today</p>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gradient-to-br from-gray-50 to-slate-50 rounded-2xl p-6 border border-gray-100">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-gray-600">Recent Activity</span>
-                      <span className="text-green-600 text-sm bg-green-100 px-2 py-1 rounded-full">Live</span>
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                        <span className="text-gray-700 text-sm">New comment at 02:45</span>
+                  <div className="space-y-3">
+                    <div className="flex items-start space-x-3 bg-blue-50 rounded-lg p-3">
+                      <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                        JD
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                        <span className="text-gray-700 text-sm">Client joined review</span>
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-1">
+                          <span className="font-medium text-sm">John Doe</span>
+                          <span className="text-xs text-gray-500">at 2:34</span>
+                        </div>
+                        <p className="text-sm text-gray-700">Can we make the logo bigger here?</p>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
-                        <span className="text-gray-700 text-sm">Version 3 uploaded</span>
+                    </div>
+                    <div className="flex items-center justify-between bg-green-50 rounded-lg p-3">
+                      <div className="flex items-center space-x-2">
+                        <CheckCircle className="w-5 h-5 text-green-600" />
+                        <span className="font-medium text-green-800">Project Approved</span>
                       </div>
+                      <Badge className="bg-green-100 text-green-800">85% Complete</Badge>
                     </div>
                   </div>
                 </div>
@@ -370,518 +177,781 @@ const Index = () => {
           </div>
         </div>
       </section>
-
-      {/* Features Section - Mobile Optimized */}
-      <section className="py-16 sm:py-20 lg:py-24 bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4">
-          <div className="text-center mb-12 sm:mb-16 lg:mb-20">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-6 sm:mb-8 text-gray-900 px-2">
-              Powerful Features That
-              <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent"> Actually Matter</span>
+      {/* Pain Points Section */}
+      <section className="py-16 lg:py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Tired of This Feedback Nightmare?
             </h2>
-            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-4xl mx-auto leading-relaxed px-2">
-              Everything you need to transform your video collaboration workflow, nothing you don't
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Every video editor knows these pain points. It's time to fix them.
             </p>
           </div>
           
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8">
-            <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-purple-100 hover:border-purple-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-              <div className="relative z-10">
-                <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-purple-100 to-purple-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Upload className="h-6 sm:h-8 w-6 sm:w-8 text-purple-600" />
-                </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Smart Video Upload</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Upload videos up to 2GB with automatic method selection. Small files use direct upload, large files use resumable chunked upload with pause/resume.
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center group">
+              <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Mail className="w-8 h-8 text-red-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">WhatsApp Chaos</h3>
+              <p className="text-gray-600 mb-4 leading-relaxed">
+                Scattered feedback across WhatsApp, email, and calls. Vague comments like "change that part at 2:30" leave you guessing.
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-red-800 font-semibold text-sm">
+                  "Can you make it more... you know, punchy?"
                 </p>
-                <div className="flex items-center gap-2 text-purple-600 font-medium text-sm">
-                  <span>⚡</span>
-                  <span>Auto-optimized upload method</span>
+              </div>
+            </div>
+            
+            <div className="text-center group">
+              <div className="w-16 h-16 bg-orange-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <Download className="w-8 h-8 text-orange-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Unsafe File Sharing</h3>
+              <p className="text-gray-600 mb-4 leading-relaxed">
+                Dropbox and Google Drive links with no control. Clients download, share, and leak your work before approval.
+              </p>
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                <p className="text-orange-800 font-semibold text-sm">
+                  Your video is now on 5 different devices
+                </p>
+              </div>
+            </div>
+            
+            <div className="text-center group">
+              <div className="w-16 h-16 bg-yellow-100 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+                <AlertTriangle className="w-8 h-8 text-yellow-600" />
+              </div>
+              <h3 className="text-xl font-bold text-gray-900 mb-4">Unprofessional Workflow</h3>
+              <p className="text-gray-600 mb-4 leading-relaxed">
+                Messy communication makes you look disorganized. Clients lose confidence in your professional process.
+              </p>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <p className="text-yellow-800 font-semibold text-sm">
+                  "This feels very unorganized..."
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* Solution Section */}
+      <section className="py-16 lg:py-24 bg-gradient-to-br from-blue-50 to-indigo-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              One Platform. Clear Feedback. Fast Approval.
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Previu streamlines your entire client review process with professional tools designed for video creators.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8 mb-12">
+            <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Shield className="w-8 h-8 text-blue-600" />
+                </div>
+                <CardTitle className="text-xl text-gray-900">Secure Preview Links</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 leading-relaxed">
+                  Unique access codes, no downloads, controlled access. Your work stays protected until final approval.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Timer className="w-8 h-8 text-green-600" />
+                </div>
+                <CardTitle className="text-xl text-gray-900">Timestamped Feedback</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 leading-relaxed">
+                  Clients click exactly where they want changes. No more guessing what "that part" means.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-white border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader className="text-center pb-4">
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <CheckCircle className="w-8 h-8 text-purple-600" />
+                </div>
+                <CardTitle className="text-xl text-gray-900">Clear Approval System</CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                <p className="text-gray-600 leading-relaxed">
+                  Track every revision and see approval status in real-time. Professional dashboard for organized workflow.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Metrics Panel */}
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-200 p-8 max-w-4xl mx-auto">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
+              <div>
+                <div className="text-3xl font-bold text-blue-600 mb-2">3</div>
+                <div className="text-sm text-gray-600">Active Clients</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-green-600 mb-2">12</div>
+                <div className="text-sm text-gray-600">Precise Comments</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-purple-600 mb-2">85%</div>
+                <div className="text-sm text-gray-600">Project Approval</div>
+              </div>
+              <div>
+                <div className="text-3xl font-bold text-orange-600 mb-2">2.3x</div>
+                <div className="text-sm text-gray-600">Faster Delivery</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      {/* Features Grid */}
+      <section id="features" className="py-16 lg:py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Everything You Need for Smooth Client Reviews
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Professional tools designed specifically for video creators and their clients.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <LinkIcon className="w-6 h-6 text-blue-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Secure Preview Links</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Password-protected sharing with unique access codes. Links expire when you want them to.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <MessageSquare className="w-6 h-6 text-green-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Timestamped Comments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Comments tied to exact moments in your video timeline. Crystal clear feedback every time.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <TrendingUp className="w-6 h-6 text-purple-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Revision Tracking</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  See every version and change request in one place. Never lose track of project progress.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Lock className="w-6 h-6 text-red-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Access Control</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Control who can view, comment, and download. Secure sharing that protects your work.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-6 h-6 text-orange-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Client Management</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Organize all your clients and projects in one dashboard. Simple and professional.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <BarChart3 className="w-6 h-6 text-indigo-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Project Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Track views, engagement, and comment activity. Monitor project progress and client interaction.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+      {/* How It Works */}
+      <section id="how-it-works" className="py-16 lg:py-24 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              From Upload to Approval in 3 Simple Steps
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Get started in minutes. No complex setup, no learning curve.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-12">
+            <div className="text-center group">
+              <div className="relative mb-8">
+                <div className="w-20 h-20 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <UploadCloud className="w-10 h-10 text-white" />
+                </div>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 font-bold text-sm">1</span>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Upload Your Video</h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Drag and drop your video file. We handle compression, hosting, and security automatically.
+              </p>
+              <div className="bg-white rounded-lg p-4 border-2 border-dashed border-gray-300 max-w-sm mx-auto">
+                <div className="text-center">
+                  <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                  <p className="text-sm text-gray-500">Drop video here or click to browse</p>
                 </div>
               </div>
             </div>
             
-            <div className="group bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-emerald-100 hover:border-emerald-200 transition-all duration-300 shadow-lg hover:shadow-xl">
-              <div className="relative z-10">
-                <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-emerald-100 to-emerald-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Shield className="h-6 sm:h-8 w-6 sm:w-8 text-emerald-600" />
+            <div className="text-center group">
+              <div className="relative mb-8">
+                <div className="w-20 h-20 bg-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Share2 className="w-10 h-10 text-white" />
                 </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Access Control</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Generate unique security codes for each video and client. Control access with granular permissions and track who viewed what when.
-                </p>
-                <div className="flex items-center gap-2 text-emerald-600 font-medium text-sm">
-                  <span>🔒</span>
-                  <span>Secure access management</span>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                  <span className="text-green-600 font-bold text-sm">2</span>
+                </div>
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Share Preview Link</h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Send one secure link with access code to your client via email or message. That's it.
+              </p>
+              <div className="bg-white rounded-lg p-4 border border-gray-200 max-w-sm mx-auto">
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 bg-gray-100 rounded px-3 py-2 text-sm text-gray-600">
+                    previu.online/v/abc123
+                  </div>
+                  <Button size="sm" className="bg-green-600 hover:bg-green-700">
+                    Copy
+                  </Button>
                 </div>
               </div>
             </div>
             
-            <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-blue-100 hover:border-blue-200 transition-all duration-300 hover:transform hover:scale-105 shadow-lg hover:shadow-xl">
-              <div className="absolute inset-0 bg-gradient-to-br from-blue-50/50 to-cyan-50/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative z-10">
-                <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-blue-100 to-blue-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <MessageSquare className="h-6 sm:h-8 w-6 sm:w-8 text-blue-600" />
+            <div className="text-center group">
+              <div className="relative mb-8">
+                <div className="w-20 h-20 bg-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <ThumbsUp className="w-10 h-10 text-white" />
                 </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Timestamp Comments</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Clients leave precise feedback at exact moments. No more vague comments - get specific, actionable feedback every time.
-                </p>
-                <div className="flex items-center gap-2 text-blue-600 font-medium text-sm">
-                  <span>🎯</span>
-                  <span>Precision feedback</span>
+                <div className="absolute -top-2 -right-2 w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-600 font-bold text-sm">3</span>
                 </div>
               </div>
-            </div>
-            
-            <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-orange-100 hover:border-orange-200 transition-all duration-300 hover:transform hover:scale-105 shadow-lg hover:shadow-xl">
-              <div className="absolute inset-0 bg-gradient-to-br from-orange-50/50 to-red-50/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative z-10">
-                <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-orange-100 to-orange-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Play className="h-6 sm:h-8 w-6 sm:w-8 text-orange-600" />
-                </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Secure Cloud Storage</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Store videos on Google Cloud Storage with automatic method selection. Small files use direct upload, large files use resumable chunked upload with pause/resume.
-                </p>
-                <div className="flex items-center gap-2 text-orange-600 font-medium text-sm">
-                  <span>🔄</span>
-                  <span>GCS integration</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-pink-100 hover:border-pink-200 transition-all duration-300 hover:transform hover:scale-105 shadow-lg hover:shadow-xl">
-              <div className="absolute inset-0 bg-gradient-to-br from-pink-50/50 to-rose-50/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative z-10">
-                <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-pink-100 to-pink-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Users className="h-6 sm:h-8 w-6 sm:w-8 text-pink-600" />
-                </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Client Management</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Organize clients, projects, and permissions effortlessly. Keep track of who has access to what content.
-                </p>
-                <div className="flex items-center gap-2 text-pink-600 font-medium text-sm">
-                  <span>👥</span>
-                  <span>Granular control</span>
-                </div>
-              </div>
-            </div>
-            
-            <div className="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 sm:p-8 border border-teal-100 hover:border-teal-200 transition-all duration-300 hover:transform hover:scale-105 shadow-lg hover:shadow-xl">
-              <div className="absolute inset-0 bg-gradient-to-br from-teal-50/50 to-cyan-50/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <div className="relative z-10">
-                <div className="w-12 sm:w-16 h-12 sm:h-16 bg-gradient-to-br from-teal-100 to-teal-200 rounded-2xl flex items-center justify-center mb-4 sm:mb-6 group-hover:scale-110 transition-transform duration-300">
-                  <Zap className="h-6 sm:h-8 w-6 sm:w-8 text-teal-600" />
-                </div>
-                <h3 className="text-lg sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Analytics & Tracking</h3>
-                <p className="text-gray-600 leading-relaxed mb-4 sm:mb-6 text-sm sm:text-base">
-                  Track video views, client engagement, access patterns, and comment activity. Monitor project progress and client interaction.
-                </p>
-                <div className="flex items-center gap-2 text-teal-600 font-medium text-sm">
-                  <span>⚡</span>
-                  <span>Real-time analytics</span>
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">Get Feedback & Approval</h3>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Client leaves timestamped feedback and clicks "Approve". All organized in your dashboard.
+              </p>
+              <div className="bg-white rounded-lg p-4 border border-gray-200 max-w-sm mx-auto">
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2 text-sm">
+                    <MessageSquare className="w-4 h-4 text-blue-600" />
+                    <span className="text-gray-600">2 comments at 1:23</span>
+                  </div>
+                  <Button size="sm" className="w-full bg-green-600 hover:bg-green-700">
+                    <CheckCircle className="w-4 h-4 mr-2" />
+                    Approve Project
+                  </Button>
                 </div>
               </div>
             </div>
           </div>
         </div>
       </section>
-
-      {/* Pricing Section - Mobile Optimized */}
-      <section id="pricing" className="py-16 sm:py-20 lg:py-24 bg-background">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4">
-          <div className="text-center mb-12 sm:mb-16 lg:mb-20">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-6 sm:mb-8 text-foreground px-2">
-              Simple, Transparent
-              <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent"> Pricing</span>
+      {/* Who It's For */}
+      <section className="py-16 lg:py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Built for Creative Professionals
             </h2>
-            <p className="text-base sm:text-lg md:text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed px-2">
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Whether you're a solo creator or part of a team, Previu scales with your needs.
+            </p>
+          </div>
+          
+          <div className="grid md:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-blue-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Target className="w-8 h-8 text-blue-600" />
+                </div>
+                <CardTitle className="text-2xl text-gray-900">Freelancers</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 leading-relaxed">
+                  Streamline client communication and look more professional. Impress clients with organized workflows and secure sharing.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Users className="w-8 h-8 text-green-600" />
+                </div>
+                <CardTitle className="text-2xl text-gray-900">Agencies</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 leading-relaxed">
+                  Manage multiple client projects without the chaos. Professional client portals and organized feedback systems.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader className="pb-4">
+                <div className="w-16 h-16 bg-purple-100 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Zap className="w-8 h-8 text-purple-600" />
+                </div>
+                <CardTitle className="text-2xl text-gray-900">Creative Teams</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600 leading-relaxed">
+                  Collaborate with stakeholders and streamline approval processes. Perfect for in-house creative teams.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+      {/* Pricing Section */}
+      <section id="pricing" className="py-16 lg:py-24 bg-gradient-to-br from-gray-50 to-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Simple, Transparent Pricing
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
               Start free, upgrade when you're ready. No hidden fees, no surprises.
             </p>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 sm:gap-8 max-w-5xl mx-auto">
+          <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
             {/* Free Plan */}
-            <div className="group bg-card/50 rounded-3xl p-6 sm:p-8 border border-border hover:border-muted-foreground/30 transition-all duration-300">
-              <div className="text-center mb-6 sm:mb-8">
-                <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-3 sm:mb-4">Free</h3>
-                <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
-                  <span className="text-3xl sm:text-5xl font-bold text-foreground">₹0</span>
-                  <span className="text-muted-foreground text-sm sm:text-base">/month</span>
+            <Card className="border-2 border-gray-200 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-2xl text-gray-900 mb-2">Free</CardTitle>
+                <div className="text-4xl font-bold text-gray-900 mb-2">₹0</div>
+                <p className="text-gray-600">per month</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Up to 5 video uploads/month</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Up to 5 clients</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Basic timestamp comments</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Secure access codes</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">100MB file size limit</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Basic client management</span>
+                  </div>
                 </div>
-                <p className="text-muted-foreground text-sm sm:text-base">Perfect for getting started</p>
-              </div>
-              
-              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Up to 5 video uploads per month</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Up to 5 clients</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Basic timestamp comments</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Secure client access codes</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">100MB file size limit</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Basic client management</span>
-                </div>
-              </div>
-              
-              <Button
-                onClick={() => navigate("/auth")}
-                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground font-bold py-3 text-base sm:text-lg transition-all duration-300 touch-manipulation"
-              >
-                Start Free
-              </Button>
-            </div>
-
+                <Link to="/auth" className="block">
+                  <Button className="w-full bg-gray-900 hover:bg-gray-800 text-white py-3 text-lg font-semibold">
+                    Start Free
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
+            
             {/* Premium Plan */}
-            <div className="group relative bg-gradient-to-br from-primary/5 to-muted-foreground/5 rounded-3xl p-6 sm:p-8 border-2 border-primary/30 hover:border-primary/50 transition-all duration-300 transform hover:scale-105">
-              <div className="absolute -top-3 sm:-top-4 left-1/2 transform -translate-x-1/2">
-                <div className="bg-gradient-to-r from-primary to-muted-foreground text-primary-foreground px-4 sm:px-6 py-1.5 sm:py-2 rounded-full text-xs sm:text-sm font-bold flex items-center gap-1 sm:gap-2">
-                  <Crown className="h-3 w-3 sm:h-4 sm:w-4" />
-                  MOST POPULAR
-                </div>
+            <Card className="border-2 border-blue-600 shadow-xl hover:shadow-2xl transition-all duration-300 relative">
+              <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
+                <Badge className="bg-blue-600 text-white px-4 py-1 text-sm font-semibold">
+                  Most Popular
+                </Badge>
               </div>
-              
-              <div className="text-center mb-6 sm:mb-8 pt-3 sm:pt-4">
-                <h3 className="text-2xl sm:text-3xl font-bold text-foreground mb-3 sm:mb-4">Premium</h3>
-                <div className="flex items-center justify-center gap-2 mb-3 sm:mb-4">
-                  <IndianRupee className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
-                  <span className="text-3xl sm:text-5xl font-bold text-foreground">149</span>
-                  <span className="text-muted-foreground text-sm sm:text-base">/month</span>
+              <CardHeader className="text-center pb-4">
+                <CardTitle className="text-2xl text-gray-900 mb-2">Premium</CardTitle>
+                <div className="text-4xl font-bold text-blue-600 mb-2">₹149</div>
+                <p className="text-gray-600">per month</p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Up to 50 uploads/month</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Up to 50 clients</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Advanced timestamp comments</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Resumable uploads</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">2GB file size limit</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Advanced client management</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Public sharing with custom URLs</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Priority support</span>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <Check className="w-5 h-5 text-green-600" />
+                    <span className="text-gray-700">Analytics & insights</span>
+                  </div>
                 </div>
-                <p className="text-muted-foreground text-sm sm:text-base">Everything you need to scale</p>
-              </div>
-              
-              <div className="space-y-3 sm:space-y-4 mb-6 sm:mb-8">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Up to 50 video uploads per month</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Up to 50 clients</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Advanced timestamp comments</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Resumable uploads (pause/resume)</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">2GB file size limit</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Advanced client management</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Public video sharing with custom URLs</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Priority support</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0" />
-                  <span className="text-foreground text-sm sm:text-base">Analytics & insights</span>
-                </div>
-              </div>
-              
-              <PremiumPaymentModal>
-                <Button
-                  className="w-full bg-gradient-to-r from-primary to-muted-foreground hover:from-primary/90 hover:to-muted-foreground/90 text-primary-foreground font-bold py-3 text-base sm:text-lg transition-all duration-300 shadow-lg touch-manipulation"
-                >
-                  <Crown className="mr-2 h-4 w-4" />
-                  Upgrade to Premium
-                </Button>
-              </PremiumPaymentModal>
-            </div>
+                <Link to="/auth" className="block">
+                  <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 text-lg font-semibold">
+                    Start Free Trial
+                  </Button>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
           
-          <div className="text-center mt-12 sm:mt-16">
-            <p className="text-muted-foreground mb-4 sm:mb-6 text-sm sm:text-base px-2">
-              All plans include: secure video sharing, unique access codes, timestamp comments, and client management
+          <div className="text-center mt-8">
+            <p className="text-gray-600">
+              14-day free trial • No setup fees • Cancel anytime
             </p>
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-6">
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span className="text-sm sm:text-base">14-day free trial</span>
-              </div>
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span className="text-sm sm:text-base">No setup fees</span>
-              </div>
-              <div className="flex items-center gap-2 text-green-600">
-                <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
-                <span className="text-sm sm:text-base">Cancel anytime</span>
-              </div>
-            </div>
           </div>
         </div>
       </section>
-
-      {/* Benefits Section */}
-      <section id="about" className="py-24 bg-muted/30">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="text-center mb-20">
-            <h2 className="text-5xl md:text-6xl font-bold mb-8 text-foreground">
-              Why Creators Choose
-              <span className="bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent"> Previu</span>
+      {/* Social Proof & Benefits */}
+      <section className="py-16 lg:py-24 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl lg:text-4xl font-bold text-gray-900 mb-4">
+              Why Creators Choose Previu
             </h2>
-            <p className="text-xl text-muted-foreground max-w-4xl mx-auto leading-relaxed">
-              Join hundreds of professionals who've transformed their video collaboration workflow
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              Join thousands of video creators who've transformed their client workflow.
             </p>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-            <div className="space-y-8">
-              <div className="group bg-card/50 rounded-2xl p-8 border border-border hover:border-muted-foreground/30 transition-all duration-300">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-green-500/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <TrendingUp className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-foreground">Faster Project Delivery</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Eliminate back-and-forth emails and vague feedback. Timestamp comments provide precise feedback that reduces revision cycles.
-                    </p>
-                    <div className="flex items-center gap-2 text-green-600 font-medium">
-                      <span>⚡</span>
-                      <span>Reduce revision rounds significantly</span>
-                    </div>
-                  </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 mb-16">
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Clock className="w-6 h-6 text-green-600" />
                 </div>
-              </div>
-              
-              <div className="group bg-card/50 backdrop-blur-sm rounded-2xl p-8 border border-border hover:border-blue-500/50 transition-all duration-300">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-blue-500/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <Shield className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-foreground">Professional Security</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Your videos are protected with unique access codes, secure cloud storage, and controlled permissions for each client.
-                    </p>
-                    <div className="flex items-center gap-2 text-blue-600 font-medium">
-                      <span>🔒</span>
-                      <span>Secure by design</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="group bg-card/50 backdrop-blur-sm rounded-2xl p-8 border border-border hover:border-primary/50 transition-all duration-300">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-primary/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <Users className="h-6 w-6 text-primary" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-foreground">Better Client Experience</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Clients get easy access to videos with simple codes, can leave precise feedback, and enjoy a professional review experience.
-                    </p>
-                    <div className="flex items-center gap-2 text-primary font-medium">
-                      <span>😊</span>
-                      <span>Professional client portal</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
+                <CardTitle className="text-lg text-gray-900">Faster Project Delivery</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Complete projects 2.3x faster with organized feedback and clear approval workflows.
+                </p>
+              </CardContent>
+            </Card>
             
-            <div className="space-y-8">
-              <div className="group bg-card/50 backdrop-blur-sm rounded-2xl p-8 border border-border hover:border-orange-500/50 transition-all duration-300">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-orange-500/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <Zap className="h-6 w-6 text-orange-600" />
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Shield className="w-6 h-6 text-blue-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Professional Security</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Protect your work with secure links, access codes, and controlled sharing permissions.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Star className="w-6 h-6 text-purple-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Better Client Experience</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Impress clients with professional review portals and seamless feedback collection.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Settings className="w-6 h-6 text-orange-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Organized Workflow</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Keep all projects, clients, and feedback organized in one professional dashboard.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <BarChart3 className="w-6 h-6 text-indigo-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Project Analytics</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Track engagement, monitor progress, and understand client behavior with detailed insights.
+                </p>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 text-center group">
+              <CardHeader>
+                <div className="w-12 h-12 bg-red-100 rounded-xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform duration-300">
+                  <Target className="w-6 h-6 text-red-600" />
+                </div>
+                <CardTitle className="text-lg text-gray-900">Professional Brand</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-gray-600">
+                  Build trust and credibility with clients through professional presentation and workflows.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+          {/* Testimonials */}
+          <div id="testimonials" className="grid md:grid-cols-3 gap-8">
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-50 to-blue-100">
+              <CardContent className="p-6">
+                <div className="flex items-center mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-700 mb-4 italic">
+                  "Previu completely changed how I work with clients. No more WhatsApp chaos, just clean, professional feedback."
+                </p>
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
+                    RK
                   </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-foreground">Organized Workflow</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Manage all your video projects, client access, and feedback from one dashboard. Track engagement and monitor project progress.
-                    </p>
-                    <div className="flex items-center gap-2 text-orange-600 font-medium">
-                      <span>🚀</span>
-                      <span>Centralized management</span>
-                    </div>
-                  </div>
-                  <div className="w-12 h-12 bg-cyan-500/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <BarChart3 className="h-6 w-6 text-cyan-600" />
-                  </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-foreground">Project Analytics</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Track video views, client engagement, comment activity, and access patterns. Get insights into your project performance.
-                    </p>
-                    <div className="flex items-center gap-2 text-cyan-600 font-medium">
-                      <span>📊</span>
-                      <span>Engagement tracking</span>
-                    </div>
+                  <div>
+                    <div className="font-semibold text-gray-900">Rahul Kumar</div>
+                    <div className="text-sm text-gray-600">Freelance Video Editor</div>
                   </div>
                 </div>
-              </div>
-              
-              <div className="group bg-card/50 backdrop-blur-sm rounded-2xl p-8 border border-border hover:border-pink-500/50 transition-all duration-300">
-                <div className="flex items-start gap-4">
-                  <div className="w-12 h-12 bg-pink-500/10 rounded-xl flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                    <Star className="h-6 w-6 text-pink-600" />
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-green-50 to-green-100">
+              <CardContent className="p-6">
+                <div className="flex items-center mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-700 mb-4 italic">
+                  "Our agency now handles 3x more projects with the same team. The organized workflow is a game-changer."
+                </p>
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-green-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
+                    PS
                   </div>
-                  <div className="space-y-3">
-                    <h3 className="text-2xl font-bold text-foreground">Professional Brand</h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      Present a polished, secure video sharing experience that sets you apart. Custom access codes and professional interface impress clients.
-                    </p>
-                    <div className="flex items-center gap-2 text-pink-600 font-medium">
-                      <span>⭐</span>
-                      <span>Professional presentation</span>
-                    </div>
+                  <div>
+                    <div className="font-semibold text-gray-900">Priya Sharma</div>
+                    <div className="text-sm text-gray-600">Creative Director</div>
                   </div>
                 </div>
-              </div>
-            </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-50 to-purple-100">
+              <CardContent className="p-6">
+                <div className="flex items-center mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
+                  ))}
+                </div>
+                <p className="text-gray-700 mb-4 italic">
+                  "Clients love the professional experience. Timestamped feedback means no more guessing what they want."
+                </p>
+                <div className="flex items-center">
+                  <div className="w-10 h-10 bg-purple-600 rounded-full flex items-center justify-center text-white font-bold text-sm mr-3">
+                    AM
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900">Arjun Mehta</div>
+                    <div className="text-sm text-gray-600">Motion Graphics Artist</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
-      
-      {/* CTA Section */}
-      <section id="contact" className="py-24 bg-background">
-        
-        <div className="max-w-5xl mx-auto px-4 text-center">
-          <div className="bg-card/50 rounded-3xl p-16 border border-border shadow-xl">
-            <div className="mb-8">
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-primary/10 to-muted-foreground/10 border border-primary/30 rounded-full text-sm text-primary font-medium">
-                <Zap className="h-4 w-4" />
-                Limited Time Offer
-              </div>
-            </div>
-            <h2 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
-              Ready to Streamline Your
-              <span className="bg-gradient-to-r from-primary to-muted-foreground bg-clip-text text-transparent"> Video Sharing</span>?
-            </h2>
-            <p className="text-xl text-muted-foreground mb-12 leading-relaxed">
-              Join creators who've simplified their video collaboration workflow with secure sharing and precise feedback
-            </p>
-            
-            <div className="flex flex-col sm:flex-row items-center justify-center gap-6 mb-12">
-              <Button
-                onClick={() => navigate("/auth")}
-                size="lg"
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold group px-12 py-4 text-lg shadow-lg transition-all duration-300 transform hover:scale-105"
-              >
+      {/* Final CTA Section */}
+      <section className="py-16 lg:py-24 bg-gradient-to-br from-blue-600 to-blue-700 text-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl lg:text-5xl font-bold mb-6">
+            Ready to Streamline Your Video Reviews?
+          </h2>
+          <p className="text-xl text-blue-100 mb-8 leading-relaxed max-w-2xl mx-auto">
+            Join thousands of creators who've ditched the feedback chaos. Get precise comments, 
+            secure sharing, and professional approval workflows.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+            <Link to="/auth">
+              <Button size="lg" className="bg-white text-blue-600 hover:bg-gray-100 px-8 py-4 text-lg font-semibold rounded-lg transition-all duration-200 hover:shadow-xl hover:scale-105">
                 Start Free Trial
-                <ArrowRight className="ml-3 h-5 w-5 group-hover:translate-x-2 transition-transform" />
+                <ArrowRight className="w-5 h-5 ml-2" />
               </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                className="border-2 border-border hover:border-muted-foreground/50 text-foreground hover:bg-muted/50 px-12 py-4 text-lg transition-all duration-300"
-              >
-                Schedule Demo
-              </Button>
+            </Link>
+            <Button 
+              size="lg" 
+              variant="outline" 
+              className="border-2 border-white text-white hover:bg-white hover:text-blue-600 px-8 py-4 text-lg font-semibold rounded-lg transition-all duration-200"
+              onClick={() => {
+                // You can replace this with actual scheduling functionality
+                alert("Schedule a demo by emailing us at demo@previu.online");
+              }}
+            >
+              Schedule Demo
+            </Button>
+          </div>
+          
+          <div className="flex flex-wrap justify-center gap-6 text-blue-100">
+            <div className="flex items-center space-x-2">
+              <Check className="w-5 h-5" />
+              <span>2GB max file size</span>
             </div>
-            
-            <div className="space-y-4">
-              <p className="text-sm text-muted-foreground">
-                <span className="text-green-600 font-medium">✓</span> No credit card required 
-                <span className="mx-2">•</span>
-                <span className="text-green-600 font-medium">✓</span> 14-day free trial 
-                <span className="mx-2">•</span>
-                <span className="text-green-600 font-medium">✓</span> Cancel anytime
-              </p>
-              
-              <div className="flex items-center justify-center gap-8 pt-6">
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-foreground mb-1">2GB</p>
-                  <p className="text-sm text-muted-foreground">Max File Size</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-foreground mb-1">Secure</p>
-                  <p className="text-sm text-muted-foreground">Access Codes</p>
-                </div>
-                <div className="text-center">
-                  <p className="text-3xl font-bold text-foreground mb-1">Precise</p>
-                  <p className="text-sm text-muted-foreground">Timestamp Feedback</p>
-                </div>
-              </div>
+            <div className="flex items-center space-x-2">
+              <Check className="w-5 h-5" />
+              <span>Secure access codes</span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Check className="w-5 h-5" />
+              <span>Precise timestamp feedback</span>
             </div>
           </div>
         </div>
       </section>
-
       {/* Footer */}
-      <footer className="bg-muted/30 border-t border-border py-12">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
-            <div className="space-y-4">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-gradient-to-br from-primary to-muted-foreground rounded-lg"></div>
-                <h3 className="text-xl font-bold text-foreground">Previu</h3>
+      <footer id="contact" className="bg-gray-900 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8 mb-8">
+            <div>
+              <div className="flex items-center space-x-2 mb-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-blue-700 rounded-lg flex items-center justify-center">
+                  <FileVideo className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-xl font-bold">Previu</span>
               </div>
-              <p className="text-muted-foreground leading-relaxed">
-                Professional video sharing platform for creators and agencies. Upload, share securely, and collect precise feedback from clients.
+              <p className="text-gray-400 leading-relaxed">
+                Professional video review and approval platform for creators and their clients.
               </p>
             </div>
             
-            <div className="space-y-4">
-              <h4 className="text-foreground font-semibold">Product</h4>
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Product</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Features</a></li>
-                <li><a href="#pricing" onClick={() => scrollToSection("pricing")} className="text-muted-foreground hover:text-foreground transition-colors">Pricing</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Security</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Roadmap</a></li>
+                <li><a href="#features" className="text-gray-400 hover:text-white transition-colors">Features</a></li>
+                <li><a href="#pricing" className="text-gray-400 hover:text-white transition-colors">Pricing</a></li>
+                <li><a href="#how-it-works" className="text-gray-400 hover:text-white transition-colors">How it Works</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">API</a></li>
               </ul>
             </div>
             
-            <div className="space-y-4">
-              <h4 className="text-foreground font-semibold">Company</h4>
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Company</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">About</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Blog</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Careers</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Contact</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">About</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Blog</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Careers</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Press</a></li>
               </ul>
             </div>
             
-            <div className="space-y-4">
-              <h4 className="text-foreground font-semibold">Support</h4>
+            <div>
+              <h3 className="text-lg font-semibold mb-4">Support</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Help Center</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">API Docs</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Status</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-foreground transition-colors">Community</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Help Center</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Contact</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Status</a></li>
+                <li><a href="#" className="text-gray-400 hover:text-white transition-colors">Security</a></li>
               </ul>
             </div>
           </div>
           
-          <div className="border-t border-border pt-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <p className="text-muted-foreground text-sm">
-                &copy; 2025 Previu. All rights reserved.
+          <div className="border-t border-gray-800 pt-8">
+            <div className="flex flex-col md:flex-row justify-between items-center">
+              <p className="text-gray-400 text-sm">
+                © 2025 Previu. All rights reserved.
               </p>
-              <div className="flex items-center gap-6">
-                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors text-sm">Privacy Policy</a>
-                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors text-sm">Terms of Service</a>
-                <a href="#" className="text-muted-foreground hover:text-foreground transition-colors text-sm">Cookie Policy</a>
+              <div className="flex space-x-6 mt-4 md:mt-0">
+                <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Privacy Policy</a>
+                <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Terms of Service</a>
+                <a href="#" className="text-gray-400 hover:text-white transition-colors text-sm">Cookie Policy</a>
               </div>
             </div>
           </div>

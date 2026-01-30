@@ -67,7 +67,22 @@ export class AuditSystem {
     };
 
     // In production, this should come from secure environment variables
-    this.secretKey = process.env.AUDIT_SECRET_KEY || 'default-audit-key-change-in-production';
+    // Use a safe environment variable getter that works in both browser and Node.js
+    const getSecretKey = (): string => {
+      // Try Vite environment first (browser)
+      if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_AUDIT_SECRET_KEY) {
+        return import.meta.env.VITE_AUDIT_SECRET_KEY;
+      }
+      
+      // Try Node.js environment (server/build)
+      if (typeof process !== 'undefined' && process.env?.AUDIT_SECRET_KEY) {
+        return process.env.AUDIT_SECRET_KEY;
+      }
+      
+      return 'default-audit-key-change-in-production';
+    };
+    
+    this.secretKey = getSecretKey();
     
     if (this.secretKey === 'default-audit-key-change-in-production') {
       console.warn('⚠️ Using default audit secret key. Change AUDIT_SECRET_KEY in production!');

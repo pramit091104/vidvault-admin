@@ -152,16 +152,38 @@ export const handleApiError = (response: { status?: number; message?: string; co
 };
 
 /**
+ * Safely gets environment variables that work in both browser and Node.js
+ */
+const getEnvVar = (key: string, fallback: string = ''): string => {
+  // Try Vite environment first (browser)
+  if (typeof import.meta !== 'undefined' && import.meta.env) {
+    return import.meta.env[key] || fallback;
+  }
+  
+  // Try Node.js environment (server/build)
+  if (typeof process !== 'undefined' && process.env) {
+    return process.env[key] || fallback;
+  }
+  
+  return fallback;
+};
+
+/**
  * Checks if the application is running in development mode
  * @returns true if in development mode
  */
 export const isDevelopment = (): boolean => {
-  // Check for Node.js environment
-  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'development') {
+  // Check for Vite development mode (browser)
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
     return true;
   }
   
-  // Check for browser environment
+  // Check for Node.js development mode (server/build)
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development') {
+    return true;
+  }
+  
+  // Check for browser environment (fallback)
   if (typeof window !== 'undefined') {
     return window.location.hostname === 'localhost' || 
            window.location.hostname === '127.0.0.1' ||
@@ -176,7 +198,17 @@ export const isDevelopment = (): boolean => {
  * @returns true if in production mode
  */
 export const isProduction = (): boolean => {
-  return process.env.NODE_ENV === 'production';
+  // Check for Vite production mode (browser)
+  if (typeof import.meta !== 'undefined' && import.meta.env?.PROD) {
+    return true;
+  }
+  
+  // Check for Node.js production mode (server/build)
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'production') {
+    return true;
+  }
+  
+  return false;
 };
 
 /**
@@ -185,7 +217,7 @@ export const isProduction = (): boolean => {
  */
 export const getApiBaseUrl = (): string => {
   // Check if we're in a test environment
-  if (typeof process !== 'undefined' && process.env.NODE_ENV === 'test') {
+  if (typeof process !== 'undefined' && process.env?.NODE_ENV === 'test') {
     return '';
   }
   

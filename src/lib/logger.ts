@@ -12,7 +12,11 @@ export const logger = {
   warn: (message: string, data?: any) => log(LogLevel.WARN, message, data),
   error: (message: string, error?: any) => log(LogLevel.ERROR, message, error),
   debug: (message: string, data?: any) => {
-    if (process.env.NODE_ENV === 'development') {
+    // Check for development mode in both browser and Node.js environments
+    const isDev = (typeof import.meta !== 'undefined' && import.meta.env?.DEV) ||
+                  (typeof process !== 'undefined' && process.env?.NODE_ENV === 'development');
+    
+    if (isDev) {
       log(LogLevel.DEBUG, message, data);
     }
   }

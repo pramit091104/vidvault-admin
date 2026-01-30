@@ -71,7 +71,18 @@ export class PaymentManager {
       maxDelay: 16000, // 16 seconds
       backoffMultiplier: 2
     };
-    this.webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || '';
+    // Webhook secret should ONLY be used on the server side for security
+    // Frontend should never have access to webhook secrets
+    const getWebhookSecret = (): string => {
+      // Only try Node.js environment (server/build) - never expose to browser
+      if (typeof process !== 'undefined' && process.env?.RAZORPAY_WEBHOOK_SECRET) {
+        return process.env.RAZORPAY_WEBHOOK_SECRET;
+      }
+      
+      return '';
+    };
+    
+    this.webhookSecret = getWebhookSecret();
     
     if (!this.webhookSecret) {
       console.warn('⚠️ RAZORPAY_WEBHOOK_SECRET not configured. Webhook verification will fail.');
