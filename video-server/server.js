@@ -43,7 +43,6 @@ import { PaginationHelper, paginationMiddleware, sendPaginatedResponse } from '.
 import { messageQueue, queueEmail, queueNotification } from './middleware/messageQueue.js';
 import urlObfuscation from './middleware/urlObfuscation.js';
 import networkProtection from './middleware/networkTabProtection.js';
-import subscriptionHandler from './api/subscription.js';
 
 // ES module compatibility
 const __filename = fileURLToPath(import.meta.url);
@@ -604,9 +603,6 @@ app.get('/api/system/queue/stats', strictLimiter, (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-
-// Subscription Management Endpoints
-app.use('/api/subscription', subscriptionHandler);
 
 // Test email queue
 app.post('/api/system/test-email', strictLimiter, async (req, res) => {
