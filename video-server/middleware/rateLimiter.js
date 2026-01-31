@@ -8,15 +8,37 @@ const cache = new NodeCache({ stdTTL: 900 }); // 15 minutes TTL
 let redisClient = null;
 
 // Try to initialize Redis if available
-try {
-  if (process.env.REDIS_URL) {
-    const { Redis } = await import('ioredis');
-    redisClient = new Redis(process.env.REDIS_URL);
-    console.log('✅ Redis connected for rate limiting');
+(async () => {
+  try {
+    if (process.env.REDIS_URL) {
+      const { default: Redis } = await import('ioredis');
+      const client = new Redis(process.env.REDIS_URL, {
+        maxRetriesPerRequest: 0,
+        enableReadyCheck: false,
+        retryStrategy: () => null,
+        lazyConnect: true
+      });
+
+      client.on('error', (err) => {
+        console.warn('⚠️ Redis connection error (rate limiting uses in-memory):', err.message);
+        redisClient = null;
+      });
+
+      client.on('connect', () => {
+        console.log('✅ Redis connected for rate limiting');
+      });
+
+      try {
+        await client.connect();
+        redisClient = client;
+      } catch (connectError) {
+        console.warn('⚠️ Redis not available, using in-memory rate limiting');
+      }
+    }
+  } catch (error) {
+    console.warn('⚠️ Redis initialization failed, using in-memory rate limiting:', error.message);
   }
-} catch (error) {
-  console.warn('⚠️ Redis not available, using in-memory rate limiting:', error.message);
-}
+})();
 
 // Custom store for rate limiting
 class CustomRateLimitStore {
@@ -27,7 +49,7 @@ class CustomRateLimitStore {
   async increment(key) {
     const now = Date.now();
     const windowStart = now - (15 * 60 * 1000); // 15 minutes window
-    
+
     if (redisClient) {
       try {
         const multi = redisClient.multi();
@@ -35,10 +57,10 @@ class CustomRateLimitStore {
         multi.zremrangebyscore(key, 0, windowStart);
         multi.zcard(key);
         multi.expire(key, 900); // 15 minutes
-        
+
         const results = await multi.exec();
         const count = results[2][1];
-        
+
         return {
           totalHits: count,
           timeToExpire: new Date(now + (15 * 60 * 1000))
@@ -73,7 +95,7 @@ class CustomRateLimitStore {
         console.warn('Redis error during reset:', error.message);
       }
     }
-    
+
     this.hits.delete(key);
   }
 }

@@ -4,24 +4,24 @@ import NodeCache from 'node-cache';
 class CacheManager {
   constructor() {
     // Different cache instances for different data types with unified 3-minute TTL
-    this.subscriptionCache = new NodeCache({ 
+    this.subscriptionCache = new NodeCache({
       stdTTL: 180, // 3 minutes for subscription data (unified TTL)
-      checkperiod: 60 
+      checkperiod: 60
     });
-    
-    this.signedUrlCache = new NodeCache({ 
+
+    this.signedUrlCache = new NodeCache({
       stdTTL: 180, // 3 minutes for signed URLs (unified TTL)
-      checkperiod: 60 
+      checkperiod: 60
     });
-    
-    this.clientCountCache = new NodeCache({ 
+
+    this.clientCountCache = new NodeCache({
       stdTTL: 180, // 3 minutes for client counts (unified TTL)
-      checkperiod: 60 
+      checkperiod: 60
     });
-    
-    this.videoMetadataCache = new NodeCache({ 
+
+    this.videoMetadataCache = new NodeCache({
       stdTTL: 180, // 3 minutes for video metadata (unified TTL)
-      checkperiod: 60 
+      checkperiod: 60
     });
 
     // Redis client (optional)
@@ -32,12 +32,39 @@ class CacheManager {
   async initializeRedis() {
     try {
       if (process.env.REDIS_URL) {
-        const { Redis } = await import('ioredis');
-        this.redisClient = new Redis(process.env.REDIS_URL);
-        console.log('✅ Redis connected for caching');
+        const { default: Redis } = await import('ioredis');
+        this.redisClient = new Redis(process.env.REDIS_URL, {
+          maxRetriesPerRequest: 0, // Don't retry requests
+          enableReadyCheck: false,
+          retryStrategy: () => null, // Disable automatic reconnection
+          lazyConnect: true // Don't connect immediately
+        });
+
+        // Add error handlers to prevent crash and log spam
+        this.redisClient.on('error', (err) => {
+          console.warn('⚠️ Redis connection error (caching disabled):', err.message);
+          this.redisClient = null; // Disable Redis on error
+        });
+
+        this.redisClient.on('connect', () => {
+          console.log('✅ Redis connected for caching');
+        });
+
+        this.redisClient.on('ready', () => {
+          console.log('✅ Redis ready for caching');
+        });
+
+        // Try to connect
+        try {
+          await this.redisClient.connect();
+        } catch (connectError) {
+          console.warn('⚠️ Redis not available, using in-memory caching only');
+          this.redisClient = null;
+        }
       }
     } catch (error) {
-      console.warn('⚠️ Redis not available for caching, using in-memory only:', error.message);
+      console.warn('⚠️ Redis initialization failed, using in-memory caching only:', error.message);
+      this.redisClient = null;
     }
   }
 
@@ -45,7 +72,7 @@ class CacheManager {
   async get(cacheType, key) {
     try {
       const cache = this.getCacheInstance(cacheType);
-      
+
       // Check memory cache first
       let data = cache.get(key);
       if (data) {
@@ -78,7 +105,7 @@ class CacheManager {
   async set(cacheType, key, data, ttl) {
     try {
       const cache = this.getCacheInstance(cacheType);
-      
+
       // Set in memory cache
       if (ttl) {
         cache.set(key, data, ttl);
@@ -104,7 +131,7 @@ class CacheManager {
   async delete(cacheType, key) {
     try {
       const cache = this.getCacheInstance(cacheType);
-      
+
       // Delete from memory cache
       cache.del(key);
 
@@ -125,7 +152,7 @@ class CacheManager {
   async invalidatePattern(cacheType, pattern) {
     try {
       const cache = this.getCacheInstance(cacheType);
-      
+
       // Invalidate memory cache
       const keys = cache.keys();
       const matchingKeys = keys.filter(key => key.includes(pattern));

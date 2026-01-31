@@ -232,16 +232,14 @@ export const getApiBaseUrl = (): string => {
     return envUrl;
   }
 
-  // In production, if VITE_API_BASE_URL is not set, we default to '', 
-  // which means relative paths. This works if the backend is on the same domain 
-  // or proxied (e.g. Next.js rewrites).
-  // However, for a separate backend (e.g. Railway), this causes requests to hit the frontend
-  // and return HTML (Unexpected token <).
+  // In production, VITE_API_BASE_URL MUST be set
+  // If not set, throw an error instead of silently failing
   if (isProduction()) {
-    console.warn(
-      '⚠️ VITE_API_BASE_URL is not set in production. ' +
-      'API requests will use relative paths, which may fail if the backend is on a separate domain. ' +
-      'Please set VITE_API_BASE_URL to your backend URL (e.g., https://your-backend.up.railway.app).'
+    throw new EnvironmentValidationError(
+      'VITE_API_BASE_URL is not configured in production. ' +
+      'API requests cannot be made without knowing the backend URL. ' +
+      'Please set VITE_API_BASE_URL environment variable to your backend URL ' +
+      '(e.g., https://your-backend.up.railway.app) in your deployment platform (Vercel/Netlify/etc.).'
     );
   }
 

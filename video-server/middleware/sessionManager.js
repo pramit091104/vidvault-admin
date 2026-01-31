@@ -10,15 +10,15 @@ const __dirname = path.dirname(__filename);
 class PersistentSessionManager {
   constructor() {
     // In-memory cache with 24-hour TTL
-    this.cache = new NodeCache({ 
+    this.cache = new NodeCache({
       stdTTL: 24 * 60 * 60, // 24 hours
       checkperiod: 60 * 10 // Check for expired keys every 10 minutes
     });
-    
+
     // File-based persistence directory
     this.persistDir = path.join(__dirname, '..', 'temp', 'sessions');
     this.initializePersistence();
-    
+
     // Redis client (optional)
     this.redisClient = null;
     this.initializeRedis();
@@ -36,12 +36,33 @@ class PersistentSessionManager {
   async initializeRedis() {
     try {
       if (process.env.REDIS_URL) {
-        const { Redis } = await import('ioredis');
-        this.redisClient = new Redis(process.env.REDIS_URL);
-        console.log('✅ Redis connected for session management');
+        const { default: Redis } = await import('ioredis');
+        this.redisClient = new Redis(process.env.REDIS_URL, {
+          maxRetriesPerRequest: 0,
+          enableReadyCheck: false,
+          retryStrategy: () => null,
+          lazyConnect: true
+        });
+
+        this.redisClient.on('error', (err) => {
+          console.warn('⚠️ Redis connection error (sessions use file storage):', err.message);
+          this.redisClient = null;
+        });
+
+        this.redisClient.on('connect', () => {
+          console.log('✅ Redis connected for session management');
+        });
+
+        try {
+          await this.redisClient.connect();
+        } catch (connectError) {
+          console.warn('⚠️ Redis not available, using file-based session storage');
+          this.redisClient = null;
+        }
       }
     } catch (error) {
-      console.warn('⚠️ Redis not available for sessions, using file persistence:', error.message);
+      console.warn('⚠️ Redis initialization failed, using file-based session storage:', error.message);
+      this.redisClient = null;
     }
   }
 
@@ -59,7 +80,7 @@ class PersistentSessionManager {
       if (this.redisClient) {
         try {
           await this.redisClient.setex(
-            `session:${sessionId}`, 
+            `session:${sessionId}`,
             24 * 60 * 60, // 24 hours
             JSON.stringify(sessionData)
           );
@@ -72,7 +93,7 @@ class PersistentSessionManager {
       // Fallback to file persistence
       const filePath = path.join(this.persistDir, `${sessionId}.json`);
       await fs.writeFile(filePath, JSON.stringify(sessionData, null, 2));
-      
+
     } catch (error) {
       console.error('Session storage error:', error);
       throw new Error('Failed to store session data');
@@ -107,13 +128,13 @@ class PersistentSessionManager {
       try {
         const fileData = await fs.readFile(filePath, 'utf8');
         sessionData = JSON.parse(fileData);
-        
+
         // Check if session is expired
         if (sessionData.expiresAt && new Date(sessionData.expiresAt) < new Date()) {
           await this.delete(sessionId);
           return null;
         }
-        
+
         // Update memory cache
         this.cache.set(sessionId, sessionData);
         return sessionData;
@@ -121,7 +142,7 @@ class PersistentSessionManager {
         // Session not found
         return null;
       }
-      
+
     } catch (error) {
       console.error('Session retrieval error:', error);
       return null;
@@ -157,7 +178,7 @@ class PersistentSessionManager {
       } catch (cleanupError) {
         // Directory might not exist, that's okay
       }
-      
+
     } catch (error) {
       console.error('Session deletion error:', error);
     }
@@ -168,14 +189,14 @@ class PersistentSessionManager {
       // Clean up expired sessions from file system
       const files = await fs.readdir(this.persistDir);
       const now = new Date();
-      
+
       for (const file of files) {
         if (!file.endsWith('.json')) continue;
-        
+
         try {
           const filePath = path.join(this.persistDir, file);
           const data = JSON.parse(await fs.readFile(filePath, 'utf8'));
-          
+
           if (data.expiresAt && new Date(data.expiresAt) < now) {
             const sessionId = file.replace('.json', '');
             await this.delete(sessionId);
@@ -184,10 +205,10 @@ class PersistentSessionManager {
           // If we can't read the file, delete it
           try {
             await fs.unlink(path.join(this.persistDir, file));
-          } catch {}
+          } catch { }
         }
       }
-      
+
       console.log('✅ Session cleanup completed');
     } catch (error) {
       console.warn('Session cleanup error:', error.message);
@@ -197,7 +218,7 @@ class PersistentSessionManager {
   // Get all active sessions (for monitoring)
   async getAllSessions() {
     const sessions = [];
-    
+
     try {
       // Get from memory cache
       const cacheKeys = this.cache.keys();
@@ -207,7 +228,7 @@ class PersistentSessionManager {
           sessions.push({ sessionId: key, ...data });
         }
       }
-      
+
       // If Redis is available, get additional sessions
       if (this.redisClient) {
         try {
@@ -225,11 +246,11 @@ class PersistentSessionManager {
           console.warn('Redis session listing failed:', redisError.message);
         }
       }
-      
+
     } catch (error) {
       console.error('Error getting all sessions:', error);
     }
-    
+
     return sessions;
   }
 }
