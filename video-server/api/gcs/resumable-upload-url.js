@@ -28,20 +28,20 @@ let bucket = null;
 if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   try {
     let credentials = null;
-    
+
     if (process.env.GCS_CREDENTIALS) {
       credentials = JSON.parse(process.env.GCS_CREDENTIALS);
       if (credentials.private_key) {
         credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
       }
     }
-    
-    const storage = new Storage({ 
+
+    const storage = new Storage({
       projectId: process.env.GCS_PROJECT_ID,
       credentials: credentials
     });
     bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
-    
+
     console.log('✅ GCS initialized for resumable upload URL generation');
   } catch (error) {
     console.error('❌ Failed to initialize GCS:', error.message);
@@ -73,7 +73,7 @@ export default async function handler(req, res) {
 
     const idToken = authHeader.split('Bearer ')[1];
     let decodedToken;
-    
+
     try {
       decodedToken = await getAuth().verifyIdToken(idToken);
     } catch (authError) {
@@ -90,23 +90,23 @@ export default async function handler(req, res) {
       userSubscription = await getUserSubscription(userId);
     } catch (error) {
       console.error('❌ Error getting user subscription:', error);
-      return res.status(500).json({ 
-        error: 'Failed to validate subscription status' 
+      return res.status(500).json({
+        error: 'Failed to validate subscription status'
       });
     }
 
     // Extract request data
-    const { 
-      fileName, 
-      fileSize, 
+    const {
+      fileName,
+      fileSize,
       contentType,
       metadata = {}
     } = req.body;
 
     // Validation
     if (!fileName || !fileSize || !contentType) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: fileName, fileSize, contentType' 
+      return res.status(400).json({
+        error: 'Missing required fields: fileName, fileSize, contentType'
       });
     }
 
@@ -122,20 +122,20 @@ export default async function handler(req, res) {
     ];
 
     if (!allowedTypes.includes(contentType)) {
-      return res.status(400).json({ 
-        error: 'Invalid file type. Only video files are allowed.' 
+      return res.status(400).json({
+        error: 'Invalid file type. Only video files are allowed.'
       });
     }
 
     // Enforce subscription-based file size limits
     const maxFileSizeBytes = userSubscription.maxFileSize * 1024 * 1024; // Convert MB to bytes
-    
+
     if (fileSize > maxFileSizeBytes) {
       const maxFileSizeMB = userSubscription.maxFileSize;
       const fileSizeMB = Math.round(fileSize / (1024 * 1024));
-      
+
       if (userSubscription.tier === 'free') {
-        return res.status(413).json({ 
+        return res.status(413).json({
           error: `File size (${fileSizeMB}MB) exceeds the ${maxFileSizeMB}MB limit for free users. Upgrade to Premium for larger file uploads.`,
           code: 'FILE_SIZE_EXCEEDED',
           maxFileSize: maxFileSizeMB,
@@ -144,7 +144,7 @@ export default async function handler(req, res) {
           upgradeRequired: true
         });
       } else {
-        return res.status(413).json({ 
+        return res.status(413).json({
           error: `File size (${fileSizeMB}MB) exceeds the ${maxFileSizeMB}MB limit for ${userSubscription.tier} users. Please compress your video first.`,
           code: 'FILE_SIZE_EXCEEDED',
           maxFileSize: maxFileSizeMB,
@@ -158,7 +158,7 @@ export default async function handler(req, res) {
     // Additional absolute maximum file size check (2GB for all users)
     const ABSOLUTE_MAX_FILE_SIZE = 2 * 1024 * 1024 * 1024; // 2GB
     if (fileSize > ABSOLUTE_MAX_FILE_SIZE) {
-      return res.status(413).json({ 
+      return res.status(413).json({
         error: 'File size exceeds the absolute maximum limit of 2GB',
         code: 'FILE_TOO_LARGE'
       });
@@ -176,7 +176,7 @@ export default async function handler(req, res) {
 
     // Generate resumable upload URL (valid for 1 hour)
     const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
-    
+
     const [uploadUrl] = await file.createResumableUpload({
       metadata: {
         contentType: contentType,
@@ -189,7 +189,7 @@ export default async function handler(req, res) {
           uploadType: 'resumable'
         }
       },
-      origin: origin || 'https://previu.online'
+      origin: req.headers.origin || 'https://previu.online'
     });
 
     console.log(`✅ Resumable upload URL generated successfully`);
@@ -209,7 +209,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Error generating resumable upload URL:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
