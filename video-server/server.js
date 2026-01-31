@@ -71,7 +71,9 @@ const ALLOWED_ORIGINS = [
   'http://localhost:8080',
   'http://localhost:5173',
   'http://localhost:3000',
-  'https://previu.online'
+  'https://previu.online',
+  'https://previuproject.vercel.app', // Vercel production
+  'https://previuproject-43ae004pp-pramit-sils-projects.vercel.app' // Vercel deployment
 ];
 
 // Add environment-specific origins if provided
@@ -86,12 +88,20 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
+    // Check exact match first
     if (ALLOWED_ORIGINS.indexOf(origin) !== -1) {
       callback(null, true);
-    } else {
-      console.warn(`Blocked CORS request from: ${origin}`);
-      callback(new Error('Not allowed by CORS'));
+      return;
     }
+
+    // Allow all Vercel preview deployments (*.vercel.app)
+    if (origin.endsWith('.vercel.app')) {
+      callback(null, true);
+      return;
+    }
+
+    console.warn(`Blocked CORS request from: ${origin}`);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
