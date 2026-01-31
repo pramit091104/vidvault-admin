@@ -173,45 +173,44 @@ export async function getUserSubscription(userId) {
       return cached;
     }
 
-    // Ensure Firebase Admin is initialized
-    const database = db || initializeFirebaseAdmin();
+    // Try to initialize Firebase Admin and get subscription
+    try {
+      const database = db || initializeFirebaseAdmin();
 
-    const docRef = database.collection(SUBSCRIPTIONS_COLLECTION).doc(userId);
-    const doc = await docRef.get();
+      const docRef = database.collection(SUBSCRIPTIONS_COLLECTION).doc(userId);
+      const doc = await docRef.get();
 
-    let subscription;
-    if (!doc.exists) {
-      // Return default free subscription
-      subscription = {
-        userId,
-        tier: 'free',
-        videoUploadsUsed: 0,
-        maxVideoUploads: 5,
-        clientsUsed: 0,
-        maxClients: 5,
-        maxFileSize: 100, // 100MB
-        status: 'active'
-      };
-    } else {
-      const data = doc.data();
-      subscription = {
-        ...data,
-        subscriptionDate: data.subscriptionDate?.toDate(),
-        expiryDate: data.expiryDate?.toDate(),
-        createdAt: data.createdAt?.toDate(),
-        updatedAt: data.updatedAt?.toDate(),
-      };
-    }
+      let subscription;
+      if (!doc.exists) {
+        // Return default free subscription
+        subscription = {
+          userId,
+          tier: 'free',
+          videoUploadsUsed: 0,
+          maxVideoUploads: 5,
+          clientsUsed: 0,
+          maxClients: 5,
+          maxFileSize: 100, // 100MB
+          status: 'active'
+        };
+      } else {
+        const data = doc.data();
+        subscription = {
+          ...data,
+          subscriptionDate: data.subscriptionDate?.toDate(),
+          expiryDate: data.expiryDate?.toDate(),
+          createdAt: data.createdAt?.toDate(),
+          updatedAt: data.updatedAt?.toDate(),
+        };
+      }
 
-    // Cache the result
-    setCachedSubscription(userId, subscription);
-    return subscription;
-  } catch (error) {
-    console.error('❌ Error getting user subscription:', error);
+      // Cache the result
+      setCachedSubscription(userId, subscription);
+      return subscription;
+    } catch (firestoreError) {
+      // If Firebase/Firestore fails, return default subscription
+      console.warn('⚠️ Firebase/Firestore error, returning default subscription:', firestoreError.message);
 
-    // Handle permission errors gracefully by returning default subscription
-    if (error.code === 7 || error.message?.includes('PERMISSION_DENIED')) {
-      console.warn('⚠️ Firestore permission denied, returning default subscription');
       const defaultSubscription = {
         userId,
         tier: 'free',
@@ -222,11 +221,27 @@ export async function getUserSubscription(userId) {
         maxFileSize: 100, // 100MB
         status: 'active'
       };
+
+      // Cache the default subscription
       setCachedSubscription(userId, defaultSubscription);
       return defaultSubscription;
     }
+  } catch (error) {
+    console.error('❌ Critical error getting user subscription:', error);
 
-    throw error;
+    // Last resort: return default subscription
+    const defaultSubscription = {
+      userId,
+      tier: 'free',
+      videoUploadsUsed: 0,
+      maxVideoUploads: 5,
+      clientsUsed: 0,
+      maxClients: 5,
+      maxFileSize: 100, // 100MB
+      status: 'active'
+    };
+
+    return defaultSubscription;
   }
 }
 
