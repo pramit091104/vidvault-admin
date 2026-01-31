@@ -1,7 +1,7 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 
-// Validate environment variables with detailed error messages
+// Validate environment variables with detailed error messages (non-blocking)
 const validateEnvironment = () => {
   const missingVars = [];
 
@@ -14,40 +14,31 @@ const validateEnvironment = () => {
   }
 
   if (missingVars.length > 0) {
-    const error = new Error(
-      `Missing required environment variables: ${missingVars.join(', ')}. ` +
-      `Please check your .env file and ensure all required variables are set. ` +
-      `Refer to .env.example for the required format.`
-    );
-    error.name = 'EnvironmentValidationError';
-    throw error;
+    console.warn(`⚠️ Missing Razorpay env vars: ${missingVars.join(', ')}`);
+    return false;
   }
-
-  // Validate that the keys are not placeholder values
-  if (process.env.RAZORPAY_KEY_ID === 'your_razorpay_key_id_here') {
-    throw new Error('RAZORPAY_KEY_ID is set to placeholder value. Please set it to your actual Razorpay key ID.');
-  }
-
-  if (process.env.RAZORPAY_KEY_SECRET === 'your_razorpay_key_secret_here') {
-    throw new Error('RAZORPAY_KEY_SECRET is set to placeholder value. Please set it to your actual Razorpay key secret.');
-  }
+  return true;
 };
 
-// Validate environment on module load
+// Validate environment on module load (log only)
 try {
-  validateEnvironment();
-  console.log('✓ Razorpay create-order endpoint: Environment validation successful');
+  if (validateEnvironment()) {
+    console.log('✓ Razorpay create-order endpoint: Environment looks good');
+  }
 } catch (error) {
-  console.error('❌ Razorpay create-order endpoint: Environment validation failed');
-  console.error(error.message);
-  // Don't exit here as this is a serverless function, let it fail at runtime
+  console.error('❌ Razorpay create-order endpoint: Environment validation failed', error.message);
 }
 
-// Initialize Razorpay instance
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Initialize Razorpay instance lazily
+const getRazorpay = () => {
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error('Razorpay credentials missing');
+  }
+  return new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+};
 
 export default async function handler(req, res) {
   console.log('🔍 Create Order Handler - Request received:', {
@@ -82,6 +73,7 @@ export default async function handler(req, res) {
       payment_capture: 1, // Auto capture payment
     };
 
+    const razorpay = getRazorpay();
     const order = await razorpay.orders.create(options);
     res.status(200).json(order);
   } catch (error) {

@@ -5,11 +5,22 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-// Initialize Razorpay instance
-const razorpay = new Razorpay({
-  key_id: process.env.RAZORPAY_KEY_ID,
-  key_secret: process.env.RAZORPAY_KEY_SECRET,
-});
+// Initialize Razorpay instance lazily
+let razorpayInstance = null;
+
+const getRazorpay = () => {
+  if (razorpayInstance) return razorpayInstance;
+
+  if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
+    throw new Error('Razorpay credentials missing');
+  }
+
+  razorpayInstance = new Razorpay({
+    key_id: process.env.RAZORPAY_KEY_ID,
+    key_secret: process.env.RAZORPAY_KEY_SECRET,
+  });
+  return razorpayInstance;
+};
 
 export default async function handler(req, res) {
 
@@ -56,11 +67,12 @@ async function handleCreateOrder(req, res) {
       payment_capture: 1, // Auto capture payment
     };
 
+    const razorpay = getRazorpay();
     const order = await razorpay.orders.create(options);
     res.json(order);
   } catch (error) {
     console.error('Error creating Razorpay order:', error);
-    res.status(500).json({ error: 'Failed to create payment order' });
+    res.status(500).json({ error: 'Failed to create payment order: ' + error.message });
   }
 }
 

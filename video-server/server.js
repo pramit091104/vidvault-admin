@@ -120,39 +120,72 @@ app.use(express.urlencoded({ limit: '2gb', extended: true }));
 // --- Initialize Google Cloud Storage ---
 let bucket = null;
 
-if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
+// Helper to safely parse JSON credentials
+const parseCredentials = (content, source) => {
   try {
-    let credentials;
-    if (process.env.GCS_CREDENTIALS) {
-      credentials = JSON.parse(process.env.GCS_CREDENTIALS);
-    } else if (process.env.GCS_CREDENTIALS_BASE64) {
+    return JSON.parse(content);
+  } catch (error) {
+    console.warn(`⚠️ Failed to parse credentials from ${source}: ${error.message}`);
+    return null;
+  }
+};
+
+const initGCS = () => {
+  if (!BUCKET_NAME) {
+    console.warn('⚠️ GCS_BUCKET_NAME not set. Storage features will be disabled.');
+    return;
+  }
+
+  // Try to load credentials from various sources
+  let credentials = null;
+
+  // 1. Try Base64 encoded credentials (RAILWAY often uses this)
+  if (process.env.GCS_CREDENTIALS_BASE64) {
+    try {
       const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
-      credentials = JSON.parse(decoded);
-    } else if (process.env.GCS_KEY_FILE && fs.existsSync(process.env.GCS_KEY_FILE)) {
-      const keyFileContent = fs.readFileSync(process.env.GCS_KEY_FILE, 'utf8');
-      credentials = JSON.parse(keyFileContent);
+      credentials = parseCredentials(decoded, 'GCS_CREDENTIALS_BASE64');
+    } catch (e) {
+      console.warn('⚠️ Failed to decode GCS_CREDENTIALS_BASE64:', e.message);
     }
+  }
 
-    // Fix for private_key newlines if they are escaped as literal '\n' strings
-    if (credentials && credentials.private_key) {
-      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  // 2. Try direct JSON string
+  if (!credentials && process.env.GCS_CREDENTIALS) {
+    credentials = parseCredentials(process.env.GCS_CREDENTIALS, 'GCS_CREDENTIALS');
+  }
+
+  // 3. Try File Path (useful for local dev or volume mounts)
+  if (!credentials && process.env.GCS_KEY_FILE) {
+    if (fs.existsSync(process.env.GCS_KEY_FILE)) {
+      try {
+        const keyFileContent = fs.readFileSync(process.env.GCS_KEY_FILE, 'utf8');
+        credentials = parseCredentials(keyFileContent, 'GCS_KEY_FILE');
+      } catch (e) {
+        console.warn('⚠️ Failed to read GCS_KEY_FILE:', e.message);
+      }
+    } else {
+      console.warn(`⚠️ GCS_KEY_FILE defined but file not found at: ${process.env.GCS_KEY_FILE}`);
     }
+  }
 
-    if (credentials) {
+  // Fix for private_key newlines if they are escaped as literal '\n' strings
+  if (credentials && credentials.private_key) {
+    credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  }
+
+  const projectId = process.env.GCS_PROJECT_ID || (credentials && credentials.project_id);
+
+  if (credentials && projectId) {
+    try {
       console.log('🔑 Credential Check:');
       console.log('   - project_id:', credentials.project_id);
       console.log('   - client_email:', credentials.client_email);
-      console.log('   - private_key exists:', !!credentials.private_key);
-      if (credentials.private_key) {
-        console.log('   - private_key length:', credentials.private_key.length);
-        console.log('   - private_key starts with:', credentials.private_key.substring(0, 27)); // Should be "-----BEGIN PRIVATE KEY-----"
-        console.log('   - private_key contains newlines:', credentials.private_key.includes('\n'));
-      }
 
-      const storage = new Storage({ projectId: process.env.GCS_PROJECT_ID, credentials });
+      const storage = new Storage({ projectId, credentials });
       bucket = storage.bucket(BUCKET_NAME);
       console.log('✅ Google Cloud Storage initialized');
-      // Optionally auto-configure CORS on startup to allow browser video playback
+
+      // Optionally auto-configure CORS on startup
       if (process.env.AUTO_CONFIGURE_GCS_CORS === 'true') {
         (async () => {
           try {
@@ -174,11 +207,16 @@ if (BUCKET_NAME && process.env.GCS_PROJECT_ID) {
           }
         })();
       }
+    } catch (error) {
+      console.warn('❌ Failed to initialize GCS client:', error.message);
     }
-  } catch (error) {
-    console.warn('❌ Failed to initialize GCS:', error.message);
+  } else {
+    console.warn('⚠️ GCS credentials or Project ID missing. Storage features disabled.');
   }
-}
+};
+
+// Run initialization
+initGCS();
 
 // --- Real-time Upload Progress Endpoints ---
 
