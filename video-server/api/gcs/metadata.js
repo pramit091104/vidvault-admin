@@ -5,13 +5,29 @@ let bucket = null;
 
 if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   try {
-    const storage = new Storage({ 
-      projectId: process.env.GCS_PROJECT_ID,
-      credentials: process.env.GCS_CREDENTIALS ? JSON.parse(process.env.GCS_CREDENTIALS) : undefined
-    });
-    bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+    let credentials;
+    if (process.env.GCS_CREDENTIALS) {
+      credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+    } else if (process.env.GCS_CREDENTIALS_BASE64) {
+      const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      credentials = JSON.parse(decoded);
+    }
+
+    // Fix private_key newlines if they are escaped as literal '\n' strings
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
+    if (credentials) {
+      const storage = new Storage({
+        projectId: process.env.GCS_PROJECT_ID,
+        credentials
+      });
+      bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+      console.log('✅ GCS initialized for metadata API');
+    }
   } catch (error) {
-    console.warn('Failed to initialize GCS:', error.message);
+    console.error('❌ Failed to initialize GCS:', error.message);
   }
 }
 
@@ -28,14 +44,14 @@ export default async function handler(req, res) {
     }
 
     const fileName = String(req.query.fileName || '');
-    
+
     if (!fileName) {
       return res.status(400).json({ error: 'fileName query required' });
     }
 
     // Get file metadata from GCS
     const [metadata] = await bucket.file(fileName).getMetadata();
-    
+
     res.json({
       name: metadata.name,
       size: metadata.size,

@@ -14,10 +14,15 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
       credentials = JSON.parse(decoded);
     }
 
+    // Fix private_key newlines if they are escaped as literal '\n' strings
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
     if (credentials) {
-      const storage = new Storage({ 
-        projectId: process.env.GCS_PROJECT_ID, 
-        credentials 
+      const storage = new Storage({
+        projectId: process.env.GCS_PROJECT_ID,
+        credentials
       });
       bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
       console.log('✅ GCS initialized for storage API');
@@ -79,7 +84,7 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('❌ Storage API error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       code: 'SERVER_ERROR'
     });
@@ -167,7 +172,7 @@ async function handleSignedUrl(req, res) {
   try {
     const { videoId, service } = req.body;
     console.log('[/api/storage/signed-url] request body:', { videoId, service });
-    
+
     // Clean up the input ID
     const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
     console.log(`🔍 Searching for: "${cleanId}"`);
@@ -197,7 +202,7 @@ async function handleSignedUrl(req, res) {
 
     if (!foundFile) {
       console.error('⚠️ File not found. Searched paths:', potentialPaths);
-      return res.status(404).json({ 
+      return res.status(404).json({
         error: 'Video not found in storage',
         searchedFor: cleanId,
         searchedPaths: potentialPaths

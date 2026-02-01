@@ -6,18 +6,34 @@ let bucket = null;
 
 if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   try {
-    const storage = new Storage({ 
-      projectId: process.env.GCS_PROJECT_ID,
-      credentials: process.env.GCS_CREDENTIALS ? JSON.parse(process.env.GCS_CREDENTIALS) : undefined
-    });
-    bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+    let credentials;
+    if (process.env.GCS_CREDENTIALS) {
+      credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+    } else if (process.env.GCS_CREDENTIALS_BASE64) {
+      const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      credentials = JSON.parse(decoded);
+    }
+
+    // Fix private_key newlines if they are escaped as literal '\n' strings
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
+    if (credentials) {
+      const storage = new Storage({
+        projectId: process.env.GCS_PROJECT_ID,
+        credentials
+      });
+      bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+      console.log('✅ GCS initialized for gcs/upload API');
+    }
   } catch (error) {
-    console.warn('Failed to initialize GCS:', error.message);
+    console.error('❌ Failed to initialize GCS:', error.message);
   }
 }
 
 // Multer for handling file uploads in serverless environment
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 100 * 1024 * 1024, // 100MB limit
@@ -83,16 +99,16 @@ export default async function handler(req, res) {
               expires: expiresAt,
             });
 
-            res.status(201).json({ 
-              success: true, 
+            res.status(201).json({
+              success: true,
               fileName,
-              signedUrl 
+              signedUrl
             });
           } catch (urlError) {
             console.warn('Could not generate signed URL:', urlError.message);
-            res.status(201).json({ 
-              success: true, 
-              fileName 
+            res.status(201).json({
+              success: true,
+              fileName
             });
           }
         });

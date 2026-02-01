@@ -5,22 +5,29 @@ let bucket = null;
 
 if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
   try {
-    let credentials = null;
-    
+    let credentials;
+
     if (process.env.GCS_CREDENTIALS) {
       credentials = JSON.parse(process.env.GCS_CREDENTIALS);
-      if (credentials.private_key) {
-        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-      }
+    } else if (process.env.GCS_CREDENTIALS_BASE64) {
+      const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      credentials = JSON.parse(decoded);
     }
-    
-    const storage = new Storage({ 
-      projectId: process.env.GCS_PROJECT_ID,
-      credentials: credentials
-    });
-    bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
-    
-    console.log('✅ GCS initialized for lifecycle configuration');
+
+    // Fix private_key newlines if they are escaped as literal '\n' strings
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
+    if (credentials) {
+      const storage = new Storage({
+        projectId: process.env.GCS_PROJECT_ID,
+        credentials
+      });
+      bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+
+      console.log('✅ GCS initialized for lifecycle configuration');
+    }
   } catch (error) {
     console.error('❌ Failed to initialize GCS:', error.message);
   }
@@ -80,7 +87,7 @@ export default async function handler(req, res) {
 
   } catch (error) {
     console.error('❌ Error configuring lifecycle rules:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: error.message,
       details: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
