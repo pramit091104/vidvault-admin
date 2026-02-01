@@ -1,6 +1,8 @@
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import dotenv from 'dotenv';
+import fs from 'fs';
+import path from 'path';
 
 // Load environment variables
 dotenv.config();
