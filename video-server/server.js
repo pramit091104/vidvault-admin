@@ -1252,6 +1252,70 @@ app.post('/api/notifications/comment', commentNotificationHandler);
 app.use('/api/payment', paymentHandler);
 app.use('/api/razorpay', paymentHandler);
 
+// --- Debug Endpoint for GCS Credentials ---
+app.get('/api/debug/gcs-check', async (req, res) => {
+  const info = {
+    env: {
+      GCS_PROJECT_ID: process.env.GCS_PROJECT_ID,
+      GCS_BUCKET_NAME: process.env.GCS_BUCKET_NAME,
+      GCS_CREDENTIALS_SET: !!process.env.GCS_CREDENTIALS,
+      GCS_CREDENTIALS_LEN: process.env.GCS_CREDENTIALS ? process.env.GCS_CREDENTIALS.length : 0,
+      GCS_CREDENTIALS_BASE64_SET: !!process.env.GCS_CREDENTIALS_BASE64,
+      GCS_CREDENTIALS_BASE64_LEN: process.env.GCS_CREDENTIALS_BASE64 ? process.env.GCS_CREDENTIALS_BASE64.length : 0,
+    },
+    credentialsParsed: false,
+    privateKeyInfo: null,
+  };
+
+  try {
+    let creds = null;
+    let source = 'none';
+
+    if (process.env.GCS_CREDENTIALS) {
+      try {
+        creds = JSON.parse(process.env.GCS_CREDENTIALS);
+        source = 'GCS_CREDENTIALS';
+      } catch (e) { info.parseError = 'GCS_CREDENTIALS json parse failed'; }
+    }
+
+    if (!creds && process.env.GCS_CREDENTIALS_BASE64) {
+      try {
+        const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+        creds = JSON.parse(decoded);
+        source = 'GCS_CREDENTIALS_BASE64';
+      } catch (e) { info.parseError = 'GCS_CREDENTIALS_BASE64 decode/parse failed'; }
+    }
+
+    if (creds) {
+      info.credentialsParsed = true;
+      info.source = source;
+      info.projectId = creds.project_id;
+      info.clientEmail = creds.client_email;
+
+      if (creds.private_key) {
+        const key = creds.private_key;
+        // Check if we need to fix newlines
+        const fixedKey = key.replace(/\\n/g, '\n');
+
+        info.privateKeyInfo = {
+          length: key.length,
+          hasHeader: key.includes('-----BEGIN PRIVATE KEY-----'),
+          hasFooter: key.includes('-----END PRIVATE KEY-----'),
+          newlineCount: (key.match(/\n/g) || []).length,
+          escapedNewlineCount: (key.match(/\\n/g) || []).length,
+          fixedNewlineCount: (fixedKey.match(/\n/g) || []).length,
+          isFixedSameAsOriginal: key === fixedKey,
+          first30Chars: key.substring(0, 30).replace(/\n/g, '[NL]'),
+        };
+      }
+    }
+  } catch (e) {
+    info.error = e.message;
+  }
+
+  res.json(info);
+});
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n🚀 Debug Server running on http://localhost:${PORT}`);
 });
