@@ -16,10 +16,15 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
       credentials = JSON.parse(decoded);
     }
 
+    // Fix private_key newlines if they are escaped as literal '\n' strings
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
     if (credentials) {
-      const storage = new Storage({ 
-        projectId: process.env.GCS_PROJECT_ID, 
-        credentials 
+      const storage = new Storage({
+        projectId: process.env.GCS_PROJECT_ID,
+        credentials
       });
       bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
       console.log('✅ GCS initialized for upload API');
@@ -30,7 +35,7 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 }
 
 // Multer for handling file uploads - Limited by Vercel's 4.5MB body size limit
-const upload = multer({ 
+const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
     fileSize: 4 * 1024 * 1024, // 4MB max (under Vercel's 4.5MB limit)
@@ -69,7 +74,7 @@ export default async function handler(req, res) {
     }
   } catch (error) {
     console.error('❌ Upload API error:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Internal server error',
       code: 'SERVER_ERROR'
     });
@@ -81,7 +86,7 @@ async function handleUploadValidation(req, res) {
     const { fileSize } = req.body;
 
     if (!fileSize || typeof fileSize !== 'number') {
-      return res.status(400).json({ 
+      return res.status(400).json({
         error: 'File size is required and must be a number',
         code: 'INVALID_INPUT'
       });
@@ -90,7 +95,7 @@ async function handleUploadValidation(req, res) {
     // Get user ID from Authorization header
     const userId = await getUserIdFromToken(req.headers.authorization);
     if (!userId) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Authentication required. Please sign in to validate upload.',
         code: 'AUTH_REQUIRED'
       });
@@ -98,9 +103,9 @@ async function handleUploadValidation(req, res) {
 
     // Validate upload permissions and limits
     const validation = await validateFileUpload(userId, fileSize);
-    
+
     if (!validation.allowed) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: validation.error,
         code: validation.code,
         allowed: false
@@ -113,7 +118,7 @@ async function handleUploadValidation(req, res) {
     });
   } catch (error) {
     console.error('❌ Error validating upload:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       error: 'Failed to validate upload permissions',
       code: 'VALIDATION_ERROR'
     });
@@ -130,7 +135,7 @@ async function handleSimpleUpload(req, res) {
     if (err) {
       console.error('❌ Multer error:', err);
       if (err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(413).json({ 
+        return res.status(413).json({
           error: 'File too large for simple upload. Files over 4MB must use resumable upload.',
           code: 'FILE_TOO_LARGE_FOR_SIMPLE_UPLOAD',
           maxSize: 4 * 1024 * 1024,
@@ -145,15 +150,15 @@ async function handleSimpleUpload(req, res) {
     const metadata = req.body.metadata ? JSON.parse(req.body.metadata) : {};
 
     if (!fileData || !fileName) {
-      return res.status(400).json({ 
-        error: 'Missing required fields: file and fileName' 
+      return res.status(400).json({
+        error: 'Missing required fields: file and fileName'
       });
     }
 
     // Get user ID from Authorization header
     const userId = await getUserIdFromToken(req.headers.authorization);
     if (!userId) {
-      return res.status(401).json({ 
+      return res.status(401).json({
         error: 'Authentication required. Please sign in to upload files.',
         code: 'AUTH_REQUIRED'
       });
@@ -162,7 +167,7 @@ async function handleSimpleUpload(req, res) {
     // Validate upload permissions and limits
     const validation = await validateFileUpload(userId, fileData.length);
     if (!validation.allowed) {
-      return res.status(403).json({ 
+      return res.status(403).json({
         error: validation.error,
         code: validation.code
       });

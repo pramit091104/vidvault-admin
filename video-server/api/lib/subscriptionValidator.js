@@ -84,6 +84,10 @@ function initializeFirebaseAdmin() {
         try {
           const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
           credentials = JSON.parse(decoded);
+          // Fix private key newlines
+          if (credentials.private_key) {
+            credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+          }
           console.log('✅ Using GCS_CREDENTIALS_BASE64');
         } catch (e) {
           console.error('❌ Invalid base64 or JSON in GCS_CREDENTIALS_BASE64:', e.message);
@@ -92,6 +96,10 @@ function initializeFirebaseAdmin() {
       } else if (process.env.FIREBASE_SERVICE_ACCOUNT_KEY) {
         try {
           credentials = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY);
+          // Fix private key newlines
+          if (credentials.private_key) {
+            credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+          }
           console.log('✅ Using FIREBASE_SERVICE_ACCOUNT_KEY');
         } catch (e) {
           console.error('❌ Invalid JSON in FIREBASE_SERVICE_ACCOUNT_KEY:', e.message);
