@@ -950,25 +950,7 @@ const Watch = () => {
           </div>
         )}
 
-        {/* Subscription Upgrade Prompt */}
-        {subscriptionStatus && !subscriptionStatus.isActive && subscriptionStatus.tier === 'free' && (
-          <div className="mb-4 p-4 bg-gradient-to-r from-primary/10 to-secondary/10 border border-primary/20 rounded-lg">
-            <div className="flex items-center gap-2 text-primary mb-2">
-              <AlertTriangle className="h-4 w-4" />
-              <span className="text-sm font-medium">Upgrade Your Experience</span>
-            </div>
-            <p className="text-xs text-muted-foreground mb-3">
-              You're viewing with limited features. Upgrade to premium for HD quality, unlimited views, and advanced features.
-            </p>
-            <Button
-              size="sm"
-              onClick={() => navigate('/pricing')}
-              className="bg-primary hover:bg-primary/90"
-            >
-              Upgrade Now
-            </Button>
-          </div>
-        )}
+
 
         {/* Access Violation Warning */}
         {accessViolationDetected && (

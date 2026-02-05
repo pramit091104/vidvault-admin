@@ -281,6 +281,9 @@ All colors MUST be HSL.
     writing-mode: bt-lr; /* IE */
     -webkit-appearance: slider-vertical; /* WebKit */
     appearance: slider-vertical;
+    /* Transformation for browsers that don't support slider-vertical properly */
+    transform: rotate(-90deg);
+    transform-origin: center;
   }
 
   /* Show volume slider on hover or focus */
