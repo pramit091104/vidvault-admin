@@ -122,7 +122,7 @@ app.use('/api/notifications/comment', commentLimiter);
 app.use('/api/upload', uploadDeduplication);
 app.use('/api/payment', paymentDeduplication);
 app.use('/api/notifications/comment', commentDeduplication);
-app.use('/api/subscription', strictLimiter); // Apply strict limits to subscription/billing
+app.use('/api/subscription', apiLimiter); // Use standard API limits for subscription status checks
 
 // Increase body size limits for large file uploads
 app.use(express.json({ limit: '2gb' }));
