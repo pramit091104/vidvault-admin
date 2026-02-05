@@ -10,7 +10,19 @@ dotenv.config();
 // Initialize Firebase Admin (only once)
 if (getApps().length === 0) {
   try {
-    const credentials = process.env.GCS_CREDENTIALS ? JSON.parse(process.env.GCS_CREDENTIALS) : null;
+    let credentials;
+    if (process.env.GCS_CREDENTIALS) {
+      credentials = JSON.parse(process.env.GCS_CREDENTIALS);
+    } else if (process.env.GCS_CREDENTIALS_BASE64) {
+      const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      credentials = JSON.parse(decoded);
+    }
+
+    // Fix private_key newlines
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+    }
+
     if (credentials) {
       initializeApp({
         credential: cert(credentials),
@@ -31,9 +43,13 @@ if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
 
     if (process.env.GCS_CREDENTIALS) {
       credentials = JSON.parse(process.env.GCS_CREDENTIALS);
-      if (credentials.private_key) {
-        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
-      }
+    } else if (process.env.GCS_CREDENTIALS_BASE64) {
+      const decoded = Buffer.from(process.env.GCS_CREDENTIALS_BASE64, 'base64').toString('utf-8');
+      credentials = JSON.parse(decoded);
+    }
+
+    if (credentials && credentials.private_key) {
+      credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
     }
 
     const storage = new Storage({
