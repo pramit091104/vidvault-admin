@@ -43,14 +43,16 @@ class MessageQueue {
         // SAFETY: Always attach error listener to prevent unhandled exceptions
         this.redisClient.on('error', (err) => {
           // Only log if we expected it might work, or verbose logging
-          // Suppress the huge stack trace for common connection refused
           if (err.message.includes('ECONNREFUSED')) {
-            console.warn('⚠️ Redis not available (ECONNREFUSED) - using in-memory queue');
+            // Check if we haven't already logged this specific fallback
+            if (this.redisClient) {
+              console.warn('⚠️ Redis not available (ECONNREFUSED) - using in-memory queue');
+            }
           } else {
             console.warn('⚠️ Redis error:', err.message);
           }
           // Use in-memory fallback
-          if (this.redisClient.status !== 'ready') {
+          if (this.redisClient && this.redisClient.status !== 'ready') {
             this.redisClient = null;
           }
         });

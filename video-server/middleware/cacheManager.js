@@ -45,11 +45,13 @@ class CacheManager {
         // Add error handlers to prevent crash and log spam
         this.redisClient.on('error', (err) => {
           if (err.message.includes('ECONNREFUSED')) {
-            console.warn('⚠️ Redis not available (ECONNREFUSED) - caching disabled');
+            if (this.redisClient) {
+              console.warn('⚠️ Redis not available (ECONNREFUSED) - caching disabled');
+            }
           } else {
             console.warn('⚠️ Redis connection error (caching disabled):', err.message);
           }
-          if (this.redisClient.status !== 'ready') {
+          if (this.redisClient && this.redisClient.status !== 'ready') {
             this.redisClient = null;
           }
         });

@@ -49,11 +49,13 @@ class PersistentSessionManager {
         // SAFETY: Always attach error listener
         this.redisClient.on('error', (err) => {
           if (err.message.includes('ECONNREFUSED')) {
-            console.warn('⚠️ Redis not available (ECONNREFUSED) - sessions using file storage');
+            if (this.redisClient) {
+              console.warn('⚠️ Redis not available (ECONNREFUSED) - sessions using file storage');
+            }
           } else {
             console.warn('⚠️ Redis session error:', err.message);
           }
-          if (this.redisClient.status !== 'ready') {
+          if (this.redisClient && this.redisClient.status !== 'ready') {
             this.redisClient = null;
           }
         });
