@@ -38,25 +38,35 @@ class PersistentSessionManager {
       if (process.env.REDIS_URL) {
         const { default: Redis } = await import('ioredis');
         this.redisClient = new Redis(process.env.REDIS_URL, {
+          lazyConnect: true, // Don't connect immediately
           maxRetriesPerRequest: 0,
-          enableReadyCheck: false,
-          retryStrategy: () => null,
-          lazyConnect: true
+          retryStrategy: (times) => {
+            if (times > 3) return null; // Stop retrying after 3 attempts
+            return Math.min(times * 100, 3000);
+          }
         });
 
+        // SAFETY: Always attach error listener
         this.redisClient.on('error', (err) => {
-          console.warn('⚠️ Redis connection error (sessions use file storage):', err.message);
-          this.redisClient = null;
+          if (err.message.includes('ECONNREFUSED')) {
+            console.warn('⚠️ Redis not available (ECONNREFUSED) - sessions using file storage');
+          } else {
+            console.warn('⚠️ Redis session error:', err.message);
+          }
+          if (this.redisClient.status !== 'ready') {
+            this.redisClient = null;
+          }
         });
 
         this.redisClient.on('connect', () => {
           console.log('✅ Redis connected for session management');
         });
 
+        // Attempt connection gracefully
         try {
           await this.redisClient.connect();
         } catch (connectError) {
-          console.warn('⚠️ Redis not available, using file-based session storage');
+          console.warn('⚠️ Redis connection failed, using file-based session storage');
           this.redisClient = null;
         }
       }

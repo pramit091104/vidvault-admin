@@ -34,16 +34,24 @@ class CacheManager {
       if (process.env.REDIS_URL) {
         const { default: Redis } = await import('ioredis');
         this.redisClient = new Redis(process.env.REDIS_URL, {
+          lazyConnect: true,
           maxRetriesPerRequest: 0, // Don't retry requests
-          enableReadyCheck: false,
-          retryStrategy: () => null, // Disable automatic reconnection
-          lazyConnect: true // Don't connect immediately
+          retryStrategy: (times) => {
+            if (times > 3) return null;
+            return Math.min(times * 100, 3000);
+          }
         });
 
         // Add error handlers to prevent crash and log spam
         this.redisClient.on('error', (err) => {
-          console.warn('⚠️ Redis connection error (caching disabled):', err.message);
-          this.redisClient = null; // Disable Redis on error
+          if (err.message.includes('ECONNREFUSED')) {
+            console.warn('⚠️ Redis not available (ECONNREFUSED) - caching disabled');
+          } else {
+            console.warn('⚠️ Redis connection error (caching disabled):', err.message);
+          }
+          if (this.redisClient.status !== 'ready') {
+            this.redisClient = null;
+          }
         });
 
         this.redisClient.on('connect', () => {
