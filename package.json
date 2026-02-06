@@ -10,5 +10,9 @@
     },
     "devDependencies": {
         "concurrently": "^9.0.0"
+    },
+    "dependencies": {
+        "@google-cloud/storage": "^7.19.0",
+        "dotenv": "^17.2.4"
     }
 }
