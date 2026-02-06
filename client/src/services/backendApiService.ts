@@ -1,5 +1,5 @@
 import { auth } from '@/integrations/firebase/config';
-import { getCachedSubscription, setCachedSubscription, clearCachedSubscription } from '@/lib/subscriptionCache';
+
 import { getApiBaseUrl } from '@/config/environment';
 
 export interface BackendSubscription {
@@ -54,11 +54,7 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
       throw new Error('User not authenticated');
     }
 
-    // Check cache first
-    const cached = getCachedSubscription(user.uid);
-    if (cached) {
-      return cached;
-    }
+
 
     const headers = await getAuthHeaders();
 
@@ -86,8 +82,7 @@ export async function getSubscriptionStatus(): Promise<BackendSubscription> {
 
     const data: SubscriptionStatusResponse = await response.json();
 
-    // Cache the successful response
-    setCachedSubscription(user.uid, data.subscription);
+
 
     return data.subscription;
   } catch (error) {
@@ -136,8 +131,7 @@ export async function updateSubscription(subscriptionData: {
 
     const data = await response.json();
 
-    // Update cache with new subscription data
-    setCachedSubscription(user.uid, data.subscription);
+
 
     return data.subscription;
   } catch (error) {

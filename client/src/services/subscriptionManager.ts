@@ -2,12 +2,12 @@ import { auth } from '@/integrations/firebase/config';
 import { getSubscriptionStatus, updateSubscription, BackendSubscription } from '@/services/backendApiService';
 import { cacheManager } from '@/services/cacheManager';
 import { auditSystem } from './auditSystem';
-import { 
-  SubscriptionStatus, 
-  Subscription, 
-  SubscriptionUpgradeOptions, 
-  ValidationResult, 
-  BusinessRules 
+import {
+  SubscriptionStatus,
+  Subscription,
+  SubscriptionUpgradeOptions,
+  ValidationResult,
+  BusinessRules
 } from '@/types/subscription';
 
 /**
@@ -72,46 +72,62 @@ export class SubscriptionManager {
         throw new Error('User ID is required for subscription validation');
       }
 
-      // Check cache first using unified cache manager
-      const cachedSubscription = cacheManager.getSubscriptionCache(userId);
-      if (cachedSubscription) {
-        // Verify cached data is not expired
-        const isExpired = this.checkExpiry(cachedSubscription.expiryDate);
-        if (!isExpired) {
-          return cachedSubscription;
-        } else {
-          // Cache has expired subscription, invalidate and continue to fetch fresh data
-          cacheManager.invalidateUserCache(userId);
+      // Check cache first using unified cache manager with stale-while-revalidate support
+      const cachedResult = cacheManager.getStaleSubscriptionCache(userId);
+
+      if (cachedResult) {
+        const { data, isStale } = cachedResult;
+
+        // If data is fresh, return it immediately
+        if (!isStale) {
+          // Verify expiry date hasn't passed even if cache TTL is valid
+          const isSubscriptionExpired = this.checkExpiry(data.expiryDate);
+          if (!isSubscriptionExpired) {
+            return data;
+          }
+        }
+
+        // If data is stale, we'll return it but trigger a background refresh
+        // This is the "Stale-While-Revalidate" pattern
+        if (isStale) {
+          console.log(`Returning stale subscription data for user ${userId} while refreshing in background`);
+
+          // Trigger background refresh without awaiting
+          this.refreshSubscriptionInBackground(userId).catch(err =>
+            console.error('Background subscription refresh failed:', err)
+          );
+
+          return data;
         }
       }
 
       // Always query database for real-time validation - no hardcoded values
       const backendSubscription = await getSubscriptionStatus();
-      
+
       // Check expiry status
       const isExpired = this.checkExpiry(backendSubscription.expiryDate);
-      
+
       // If expired, trigger automatic downgrade
       if (isExpired && backendSubscription.status === 'active') {
         await this.downgradeExpiredSubscription(userId);
         // Re-fetch after downgrade
         const updatedSubscription = await getSubscriptionStatus();
         const subscriptionStatus = this.mapToSubscriptionStatus(updatedSubscription);
-        
+
         // Cache the updated subscription with unified TTL
         cacheManager.setSubscriptionCache(userId, subscriptionStatus);
         return subscriptionStatus;
       }
 
       const subscriptionStatus = this.mapToSubscriptionStatus(backendSubscription);
-      
+
       // Cache the subscription data with unified TTL (3 minutes)
       cacheManager.setSubscriptionCache(userId, subscriptionStatus);
-      
+
       return subscriptionStatus;
     } catch (error) {
       console.error('Error validating subscription:', error);
-      
+
       // Log system event for validation failure
       await auditSystem.logSystemEvent({
         eventType: 'system_event',
@@ -122,8 +138,38 @@ export class SubscriptionManager {
         userId,
         metadata: { userId }
       });
-      
+
       throw new Error(`Subscription validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Refreshes subscription data in the background and updates cache
+   */
+  private async refreshSubscriptionInBackground(userId: string): Promise<void> {
+    try {
+      const backendSubscription = await getSubscriptionStatus();
+      const isExpired = this.checkExpiry(backendSubscription.expiryDate);
+
+      // If expired, trigger automatic downgrade
+      if (isExpired && backendSubscription.status === 'active') {
+        await this.downgradeExpiredSubscription(userId);
+        // Re-fetch after downgrade
+        const updatedSubscription = await getSubscriptionStatus();
+        const subscriptionStatus = this.mapToSubscriptionStatus(updatedSubscription);
+
+        // Cache the updated subscription
+        cacheManager.setSubscriptionCache(userId, subscriptionStatus);
+      } else {
+        const subscriptionStatus = this.mapToSubscriptionStatus(backendSubscription);
+        // Cache the subscription data
+        cacheManager.setSubscriptionCache(userId, subscriptionStatus);
+      }
+
+      console.log(`Background subscription refresh completed for user ${userId}`);
+    } catch (error) {
+      console.error('Error in background subscription refresh:', error);
+      // We don't throw here to prevent unhandled promise rejections in the background task
     }
   }
 
@@ -144,7 +190,7 @@ export class SubscriptionManager {
    * Preserves existing upload counts and user data
    */
   public async upgradeSubscription(
-    userId: string, 
+    userId: string,
     options: SubscriptionUpgradeOptions
   ): Promise<SubscriptionStatus> {
     try {
@@ -160,7 +206,7 @@ export class SubscriptionManager {
 
       // Get current subscription to preserve data
       const currentSubscription = await getSubscriptionStatus();
-      
+
       // Prepare upgrade data with preserved information
       const upgradeData = {
         tier: options.newTier,
@@ -189,7 +235,7 @@ export class SubscriptionManager {
       await this.logSubscriptionChange(userId, currentSubscription, updatedSubscription, 'upgrade');
 
       const subscriptionStatus = this.mapToSubscriptionStatus(updatedSubscription);
-      
+
       // Cache the updated subscription
       cacheManager.setSubscriptionCache(userId, subscriptionStatus);
 
@@ -207,7 +253,7 @@ export class SubscriptionManager {
   private async downgradeExpiredSubscription(userId: string): Promise<void> {
     try {
       const currentSubscription = await getSubscriptionStatus();
-      
+
       const downgradeData = {
         tier: 'free' as const,
         maxVideoUploads: this.businessRules.maxUploadsByTier.free,
@@ -220,7 +266,7 @@ export class SubscriptionManager {
       };
 
       const updatedSubscription = await updateSubscription(downgradeData);
-      
+
       // Invalidate cache to ensure consistency
       cacheManager.invalidateUserCache(userId);
 
@@ -241,22 +287,22 @@ export class SubscriptionManager {
       // This would typically query all active subscriptions from the database
       // For now, we'll implement a placeholder that would work with a proper backend
       console.log('Batch downgrade process started');
-      
+
       // In a real implementation, this would:
       // 1. Query all active subscriptions with expiry dates in the past
       // 2. Process each one through downgradeExpiredSubscription
       // 3. Return the count of processed subscriptions
-      
+
       // Placeholder implementation
       let processedCount = 0;
-      
+
       // This would be replaced with actual database query
       // const expiredSubscriptions = await this.queryExpiredSubscriptions();
       // for (const subscription of expiredSubscriptions) {
       //   await this.downgradeExpiredSubscription(subscription.userId);
       //   processedCount++;
       // }
-      
+
       console.log(`Batch downgrade completed. Processed ${processedCount} subscriptions.`);
       return processedCount;
     } catch (error) {
@@ -368,7 +414,7 @@ export class SubscriptionManager {
    */
   private mapToSubscriptionStatus(backendSubscription: BackendSubscription): SubscriptionStatus {
     const isExpired = this.checkExpiry(backendSubscription.expiryDate);
-    
+
     return {
       isActive: backendSubscription.status === 'active' && !isExpired,
       tier: backendSubscription.tier,
@@ -429,7 +475,7 @@ export class SubscriptionManager {
    * Includes referential integrity checks and business rule validation
    */
   public async validateSubscriptionIntegrity(
-    userId: string, 
+    userId: string,
     subscriptionData: any
   ): Promise<ValidationResult> {
     try {
@@ -469,7 +515,7 @@ export class SubscriptionManager {
    * Performs additional integrity checks specific to subscription data
    */
   private async performAdditionalIntegrityChecks(
-    userId: string, 
+    userId: string,
     subscriptionData: any
   ): Promise<ValidationResult> {
     const errors: string[] = [];
@@ -619,16 +665,16 @@ export class SubscriptionManager {
     try {
       // In a real implementation, this would query the database for subscriptions
       // expiring within the specified timeframe
-      
+
       // For now, we'll return an empty array as this would typically be handled
       // by a backend service that has access to all user subscriptions
       console.log(`Checking for subscriptions expiring in ${daysAhead} days`);
-      
+
       // This is a placeholder implementation
       // In production, this would be something like:
       // const cutoffDate = new Date(Date.now() + daysAhead * 24 * 60 * 60 * 1000);
       // return await database.query('subscriptions').where('expiryDate', '<=', cutoffDate).where('status', '==', 'active');
-      
+
       return [];
     } catch (error) {
       console.error('Error getting expiring subscriptions:', error);
@@ -646,7 +692,7 @@ export class SubscriptionManager {
     try {
       // Validate integrity before update
       const integrityCheck = await this.validateSubscriptionIntegrity(userId, updateData);
-      
+
       if (!integrityCheck.isValid) {
         throw new Error(`Subscription integrity validation failed: ${integrityCheck.errors.join(', ')}`);
       }
@@ -671,7 +717,7 @@ export class SubscriptionManager {
       await this.logSubscriptionChange(userId, currentSubscription, updatedSubscription, 'integrity_update');
 
       const subscriptionStatus = this.mapToSubscriptionStatus(updatedSubscription);
-      
+
       // Cache the updated subscription
       cacheManager.setSubscriptionCache(userId, subscriptionStatus);
 
@@ -750,9 +796,9 @@ export class SubscriptionManager {
    * Logs subscription changes for audit trail
    */
   private async logSubscriptionChange(
-    userId: string, 
-    oldSubscription: BackendSubscription, 
-    newSubscription: BackendSubscription, 
+    userId: string,
+    oldSubscription: BackendSubscription,
+    newSubscription: BackendSubscription,
     changeType: string
   ): Promise<void> {
     try {

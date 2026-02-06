@@ -10,6 +10,7 @@ export class CacheManager {
   private static instance: CacheManager;
   private cache: Map<string, CacheEntry>;
   private readonly UNIFIED_TTL = 3 * 60 * 1000; // 3 minutes in milliseconds
+  private readonly STALE_TTL = 24 * 60 * 60 * 1000; // 24 hours grace period for stale data
   private readonly CLEANUP_INTERVAL = 60 * 1000; // 1 minute cleanup interval
   private cleanupTimer: NodeJS.Timeout | null = null;
 
@@ -41,7 +42,7 @@ export class CacheManager {
       };
 
       this.cache.set(key, entry);
-      
+
       // Also cache in localStorage for frontend persistence
       if (typeof window !== 'undefined') {
         this.setLocalStorageCache(key, entry);
@@ -60,10 +61,10 @@ export class CacheManager {
   public getSubscriptionCache(userId: string): SubscriptionStatus | null {
     try {
       const key = this.getSubscriptionKey(userId);
-      
+
       // Check memory cache first
       let entry = this.cache.get(key);
-      
+
       // If not in memory, check localStorage (frontend only)
       if (!entry && typeof window !== 'undefined') {
         entry = this.getLocalStorageCache(key);
@@ -94,16 +95,64 @@ export class CacheManager {
   }
 
   /**
+   * Gets subscription data from cache even if expired (stale-while-revalidate pattern)
+   * Returns data if it exists and is within the stale grace period (24 hours)
+   */
+  public getStaleSubscriptionCache(userId: string): { data: SubscriptionStatus; isStale: boolean } | null {
+    try {
+      const key = this.getSubscriptionKey(userId);
+
+      // Check memory cache first
+      let entry = this.cache.get(key);
+
+      // If not in memory, check localStorage (frontend only)
+      if (!entry && typeof window !== 'undefined') {
+        entry = this.getLocalStorageCache(key);
+        if (entry) {
+          // Restore to memory cache
+          this.cache.set(key, entry);
+        }
+      }
+
+      if (!entry) {
+        return null;
+      }
+
+      const now = Date.now();
+      const isExpired = now - entry.timestamp > entry.ttl;
+      const isStale = now - entry.timestamp > this.STALE_TTL;
+
+      // If it's too old (beyond stale TTL), remove it and return null
+      if (isStale) {
+        this.cache.delete(key);
+        if (typeof window !== 'undefined') {
+          this.removeLocalStorageCache(key);
+        }
+        return null;
+      }
+
+      // Return data with stale flag
+      return {
+        data: entry.data as SubscriptionStatus,
+        isStale: isExpired
+      };
+    } catch (error) {
+      console.error('Error getting stale subscription cache:', error);
+      return null;
+    }
+  }
+
+  /**
    * Invalidates user cache for subscription changes
    * Requirement 7.1: Invalidate related cache entries across frontend and backend
    */
   public invalidateUserCache(userId: string): void {
     try {
       const subscriptionKey = this.getSubscriptionKey(userId);
-      
+
       // Remove from memory cache
       this.cache.delete(subscriptionKey);
-      
+
       // Remove from localStorage (frontend only)
       if (typeof window !== 'undefined') {
         this.removeLocalStorageCache(subscriptionKey);
@@ -125,7 +174,7 @@ export class CacheManager {
   public async warmCache(userIds: string[], dataFetcher?: (userId: string) => Promise<SubscriptionStatus>): Promise<void> {
     try {
       console.log(`Warming cache for ${userIds.length} users`);
-      
+
       const warmingPromises = userIds.map(async (userId) => {
         try {
           // Check if cache already exists and is valid
@@ -158,13 +207,13 @@ export class CacheManager {
   public ensureConsistency(): void {
     try {
       console.log('Ensuring cache consistency...');
-      
+
       // Remove expired entries
       this.cleanupExpiredEntries();
-      
+
       // Validate cache integrity
       this.validateCacheIntegrity();
-      
+
       // Sync with localStorage if in browser environment
       if (typeof window !== 'undefined') {
         this.syncWithLocalStorage();
@@ -190,7 +239,7 @@ export class CacheManager {
       };
 
       this.cache.set(key, entry);
-      
+
       if (typeof window !== 'undefined') {
         this.setLocalStorageCache(key, entry);
       }
@@ -205,7 +254,7 @@ export class CacheManager {
   public getCache(key: string): any | null {
     try {
       let entry = this.cache.get(key);
-      
+
       if (!entry && typeof window !== 'undefined') {
         entry = this.getLocalStorageCache(key);
         if (entry) {
@@ -234,7 +283,7 @@ export class CacheManager {
   public invalidatePattern(pattern: string): void {
     try {
       const keysToDelete: string[] = [];
-      
+
       for (const key of this.cache.keys()) {
         if (key.includes(pattern)) {
           keysToDelete.push(key);
@@ -289,7 +338,7 @@ export class CacheManager {
   public clearAll(): void {
     try {
       this.cache.clear();
-      
+
       if (typeof window !== 'undefined') {
         // Clear all cache-related localStorage entries
         const keysToRemove: string[] = [];
@@ -334,7 +383,7 @@ export class CacheManager {
 
   private cleanupExpiredEntries(): void {
     const keysToDelete: string[] = [];
-    
+
     for (const [key, entry] of this.cache.entries()) {
       if (this.isExpired(entry)) {
         keysToDelete.push(key);
@@ -356,7 +405,7 @@ export class CacheManager {
   private validateCacheIntegrity(): void {
     // Check for any inconsistencies in cache data
     let inconsistencies = 0;
-    
+
     for (const [key, entry] of this.cache.entries()) {
       // Validate entry structure
       if (!entry.data || !entry.timestamp || !entry.ttl || !entry.type) {
@@ -364,7 +413,7 @@ export class CacheManager {
         this.cache.delete(key);
         inconsistencies++;
       }
-      
+
       // Validate timestamp
       if (entry.timestamp > Date.now()) {
         console.warn(`Future timestamp detected for key: ${key}`);
@@ -408,7 +457,7 @@ export class CacheManager {
       if (!cached) return null;
 
       const entry: CacheEntry = JSON.parse(cached);
-      
+
       // Validate entry structure
       if (!entry.data || !entry.timestamp || !entry.ttl || !entry.type) {
         localStorage.removeItem(cacheKey);
