@@ -14,6 +14,7 @@ import { format } from "date-fns";
 import { notificationService } from "@/services/notificationService";
 import { ApprovalButtons } from "@/components/watch/ApprovalButtons";
 import { applicationService } from "@/services";
+import { GCS_CONFIG } from "@/integrations/gcs/config";
 
 interface PublicVideo {
   id: string;
@@ -373,7 +374,10 @@ const Watch = () => {
       cancelled = true;
       if (playerRef.current) {
         try {
-          playerRef.current.destroy();
+          // Soft destroy to avoid removing nodes that might be gone
+          if (document.body.contains(videoRef.current)) {
+            playerRef.current.destroy();
+          }
         } catch (err) {
           console.error('Error destroying player:', err);
         }
@@ -450,14 +454,15 @@ const Watch = () => {
           title: videoData.title,
           description: videoData.description || '',
           clientName: videoData.clientName,
-          videoUrl: (videoData as GCSVideoRecord).publicUrl,
+          videoUrl: (videoData as GCSVideoRecord).publicUrl?.replace('undefined', GCS_CONFIG.BUCKET_NAME || 'previu_videos'),
           thumbnailUrl: undefined,
           slug: videoData.publicSlug || slug,
           isPublic: videoData.isPublic || false,
           uploadedAt: uploadedAtDate,
           viewCount: videoData.viewCount || 0,
           service: videoData.service,
-          publicUrl: (videoData as GCSVideoRecord).publicUrl,
+          // Fix for undefined bucket in URL
+          publicUrl: (videoData as GCSVideoRecord).publicUrl?.replace('undefined', GCS_CONFIG.BUCKET_NAME || 'previu_videos'),
           // Approval workflow fields
           approvalStatus: videoData.approvalStatus || 'draft',
           reviewedAt: videoData.reviewedAt,
