@@ -51,8 +51,7 @@ const configureCors = async () => {
             'https://previu.online',
             'http://localhost:5173',
             'http://localhost:8080',
-            'https://previuproject.vercel.app', // Added HTTPS
-            'https://previuproject.vercel.app/'
+            'https://previuproject.vercel.app'
         ];
 
         console.log('Allowed Origins:', origins);
