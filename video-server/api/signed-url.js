@@ -1,34 +1,113 @@
 import { Storage } from '@google-cloud/storage';
+import { initializeApp, cert, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import multer from 'multer';
 
 // Initialize Google Cloud Storage
+// Initialize Google Cloud Storage
 let bucket = null;
 
-if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
-  try {
-    let credentials = null;
+const initStorage = () => {
+  if (bucket) return; // Already initialized
 
-    if (process.env.GCS_CREDENTIALS) {
-      // Parse credentials and fix escaped newlines in private key
-      credentials = JSON.parse(process.env.GCS_CREDENTIALS);
-      if (credentials.private_key) {
-        // Replace escaped newlines with actual newlines
-        credentials.private_key = credentials.private_key.replace(/\\n/g, '\n');
+  if (process.env.GCS_BUCKET_NAME && process.env.GCS_PROJECT_ID) {
+    try {
+      let credentials = null;
+
+      if (process.env.GCS_CREDENTIALS) {
+        // Parse credentials and fix escaped newlines in private key
+        try {
+          const credentialsRaw = process.env.GCS_CREDENTIALS;
+          if (typeof credentialsRaw === 'string') {
+            credentials = JSON.parse(credentialsRaw);
+          } else {
+            credentials = credentialsRaw;
+          }
+
+          if (credentials.private_key) {
+            // Replace escaped newlines with actual newlines
+            const privateKey = credentials.private_key.replace(/\\n/g, '\n');
+            credentials.private_key = privateKey;
+
+            // Debug logging (masked)
+            console.log('GCS Credential Debug:');
+            console.log('- Project ID:', credentials.project_id);
+            console.log('- Client Email:', credentials.client_email);
+          }
+        } catch (e) {
+          console.error('Error parsing GCS_CREDENTIALS:', e);
+        }
       }
+
+      const storage = new Storage({
+        projectId: process.env.GCS_PROJECT_ID,
+        credentials: credentials
+      });
+      bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
+
+      console.log('GCS initialized successfully in signed-url handler');
+    } catch (error) {
+      console.error('Failed to initialize GCS:', error.message);
+      console.error('Error details:', error);
+    }
+  } else {
+    console.warn('Missing GCS_BUCKET_NAME or GCS_PROJECT_ID');
+  }
+};
+
+// Initialize Firebase Admin (lazy initialization to avoid startup errors)
+let db = null;
+const initFirebase = () => {
+  if (db) return db;
+
+  try {
+    if (getApps().length === 0) {
+      let serviceAccount;
+      // Try to get credentials from environment
+      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        try {
+          const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
+          serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch (e) {
+          console.error('Error parsing FIREBASE_SERVICE_ACCOUNT:', e);
+        }
+      }
+
+      // Fallback to GCS_CREDENTIALS if FIREBASE_SERVICE_ACCOUNT is missing
+      if (!serviceAccount && process.env.GCS_CREDENTIALS) {
+        try {
+          const raw = process.env.GCS_CREDENTIALS;
+          serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        } catch (e) {
+          console.error('Error parsing GCS_CREDENTIALS for Firebase:', e);
+        }
+      }
+
+      if (serviceAccount) {
+        // Fix private key newlines
+        if (serviceAccount.private_key) {
+          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+        }
+
+        initializeApp({
+          credential: cert(serviceAccount)
+        });
+        console.log('Firebase Admin initialized in signed-url handler');
+      } else {
+        console.warn('No service account found for Firebase Admin initialization');
+        return null;
+      }
+    } else {
+      // Already initialized
     }
 
-    const storage = new Storage({
-      projectId: process.env.GCS_PROJECT_ID,
-      credentials: credentials
-    });
-    bucket = storage.bucket(process.env.GCS_BUCKET_NAME);
-
-    console.log('GCS initialized successfully');
+    db = getFirestore();
+    return db;
   } catch (error) {
-    console.error('Failed to initialize GCS:', error.message);
-    console.error('Error details:', error);
+    console.error('Error initializing Firebase Admin:', error);
+    return null;
   }
-}
+};
 
 // Multer for handling file uploads in serverless environment
 const upload = multer({
@@ -60,6 +139,7 @@ export default async function handler(req, res) {
   }
 
   try {
+    initStorage();
     if (!bucket) {
       console.error('Storage unavailable - bucket not initialized');
       return res.status(503).json({ error: 'Storage unavailable' });
@@ -174,6 +254,53 @@ export default async function handler(req, res) {
         }
       } catch (listError) {
         console.error('Error listing drafts folder:', listError);
+      }
+    }
+
+    // If still not found, try looking up in Firestore (gcsClientCodes)
+    if (!foundFile) {
+      const firestore = initFirebase();
+
+      if (firestore) {
+        try {
+          // Try looking up by the clean ID (which is likely the doc ID)
+          const docRef = firestore.collection('gcsClientCodes').doc(cleanId);
+          const docSnap = await docRef.get();
+
+          if (docSnap.exists) {
+            const data = docSnap.data();
+
+            if (data.userId && data.fileName) {
+              const firestorePath = `drafts/${data.userId}/${data.fileName}`;
+
+              const file = bucket.file(firestorePath);
+              const [exists] = await file.exists();
+
+              if (exists) {
+                foundFile = file;
+              } else {
+                // Fallback: Search for the specific filename in drafts/ directory
+                try {
+                  const [files] = await bucket.getFiles({
+                    prefix: 'drafts/',
+                    maxResults: 1000
+                  });
+
+                  const matchingFile = files.find(f => f.name.endsWith(data.fileName));
+                  if (matchingFile) {
+                    foundFile = matchingFile;
+                  }
+                } catch (searchError) {
+                  console.error('Error during recursive filename search:', searchError);
+                }
+              }
+            } else {
+              console.error('Firestore document missing userId or fileName:', data);
+            }
+          }
+        } catch (firestoreError) {
+          console.error('Error querying Firestore:', firestoreError);
+        }
       }
     }
 

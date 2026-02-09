@@ -1119,117 +1119,14 @@ app.get('/api/gcs/upload-status/:sessionId', async (req, res) => {
 
 // --- Existing Endpoints ---
 
-app.post('/api/signed-url', async (req, res) => {
-  try {
-    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
-    const { videoId, service } = req.body;
-    console.log('[/api/signed-url] request body:', { videoId, service });
-
-    // Clean up the input ID (remove doubles extensions if present)
-    const cleanId = videoId.replace(/\.mp4\.mp4$/, '.mp4');
-
-    // Check cache first
-    const cachedUrl = await cacheManager.getSignedUrl(cleanId);
-    if (cachedUrl && cachedUrl.expiresAt && new Date(cachedUrl.expiresAt) > new Date()) {
-      console.log(`✅ Cache hit for signed URL: ${cleanId}`);
-      return res.json(cachedUrl);
-    }
-
-    console.log(`\n🔍 Searching for: "${cleanId}"`);
-
-    // SEARCH PATHS
-    const potentialPaths = [
-      `videos/${cleanId}`,
-      `uploads/${cleanId}`,           // <--- Check 'uploads' folder
-      cleanId,                        // <--- Check Root (Exact match)
-      `${cleanId}.mp4`,               // <--- Check Root + .mp4
-      `uploads/${cleanId}.mp4`,       // <--- Check Uploads + .mp4
-      `videos/${cleanId}.mp4`
-    ];
-
-    let foundFile = null;
-
-    // 1. Try to find the file
-    for (const path of potentialPaths) {
-      const file = bucket.file(path);
-      const [exists] = await file.exists();
-      if (exists) {
-        foundFile = file;
-        console.log(`✅ FOUND at: ${path}`);
-        break;
-      }
-    }
-
-    // 2. IF NOT FOUND: Debugging Help
-    if (!foundFile) {
-      console.error('⚠️ File not found. Searched paths:', potentialPaths);
-      console.error('⚠️ File not found. Listing files in bucket to help debug...');
-
-      // List first 25 files in bucket to see where they actually are
-      try {
-        const [files] = await bucket.getFiles({ maxResults: 25 });
-        console.log('--- ACTUAL BUCKET CONTENT (First 25) ---');
-        files.forEach(f => console.log(`- ${f.name}`));
-        console.log('----------------------------------------');
-
-        // Try to find similar files (partial matches)
-        const similarFiles = files.filter(f =>
-          f.name.includes(cleanId.split('_')[0]) || // Match timestamp part
-          f.name.includes(cleanId.split('_').slice(1).join('_')) // Match name part
-        );
-
-        if (similarFiles.length > 0) {
-          console.log('🔍 Found similar files:');
-          similarFiles.forEach(f => console.log(`  - ${f.name}`));
-
-          // Return a more helpful error message
-          return res.status(404).json({
-            error: 'Video not found in storage',
-            searchedFor: cleanId,
-            searchedPaths: potentialPaths,
-            similarFiles: similarFiles.map(f => f.name).slice(0, 5),
-            suggestion: 'Check if the video filename in the database matches the actual file in storage'
-          });
-        }
-      } catch (e) {
-        console.error('Could not list files:', e.message);
-      }
-
-      return res.status(404).json({
-        error: 'Video not found in storage',
-        searchedFor: cleanId,
-        searchedPaths: potentialPaths
-      });
-    }
-
-    // 3. Generate URL
-    const expiresAt = Date.now() + 60 * 60 * 1000;
-    const [signedUrl] = await foundFile.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: expiresAt,
-    });
-
-    const urlData = {
-      signedUrl,
-      expiresAt: new Date(expiresAt).toISOString()
-    };
-
-    // Cache the signed URL for 5 minutes (much shorter than expiry)
-    await cacheManager.setSignedUrl(cleanId, urlData, 300);
-
-    res.json(urlData);
-
-  } catch (error) {
-    console.error('Error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+// Signed URL endpoint - now using the dedicated handler
+app.post('/api/signed-url', signedUrlHandler);
 
 // --- Razorpay Payment Endpoints ---
 // Note: Razorpay endpoints are now handled by the payment handler
 
 // Import the new API handlers
+import signedUrlHandler from './api/signed-url.js';
 import subscriptionHandler from './api/subscription.js';
 import clientsValidateHandler from './api/clients/validate.js';
 import clientsCreateHandler from './api/clients/create.js';
