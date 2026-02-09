@@ -41,7 +41,7 @@ export class VideoAccessService {
   private readonly MAX_ACCESS_ATTEMPTS = 20; // Increased from 5 to 20
   private readonly RATE_LIMIT_WINDOW = 60000; // 1 minute
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): VideoAccessService {
     if (!VideoAccessService.instance) {
@@ -57,19 +57,19 @@ export class VideoAccessService {
   public async generateSecureAccess(request: VideoAccessRequest): Promise<SecureVideoAccess> {
     // Create a unique key for request deduplication
     const requestKey = `${request.videoId}_${request.userId || 'anonymous'}`;
-    
+
     // Check if there's already a pending request for this video/user combination
     if (this.pendingRequests.has(requestKey)) {
       console.log(`Deduplicating request for video ${request.videoId}`);
       return await this.pendingRequests.get(requestKey)!;
     }
-    
+
     // Create the actual request promise
     const requestPromise = this.executeSecureAccessRequest(request);
-    
+
     // Store the promise for deduplication
     this.pendingRequests.set(requestKey, requestPromise);
-    
+
     try {
       const result = await requestPromise;
       return result;
@@ -88,7 +88,7 @@ export class VideoAccessService {
       if (await this.isRateLimited(request.userId || 'anonymous')) {
         const rateLimitStatus = this.getRateLimitStatus(request.userId || 'anonymous');
         const waitTimeMinutes = Math.ceil(rateLimitStatus.timeRemaining / 60000);
-        
+
         await this.logAccessViolation({
           videoId: request.videoId,
           userId: request.userId,
@@ -96,27 +96,27 @@ export class VideoAccessService {
           severity: 'medium',
           timestamp: new Date(),
           userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-          additionalContext: { 
+          additionalContext: {
             rateLimitExceeded: true,
             attempts: rateLimitStatus.attempts,
             maxAttempts: rateLimitStatus.maxAttempts,
             timeRemaining: rateLimitStatus.timeRemaining
           }
         });
-        
+
         throw new Error(`Too many access requests (${rateLimitStatus.attempts}/${rateLimitStatus.maxAttempts}). Please wait ${waitTimeMinutes} minute(s) before trying again.`);
       }
 
       // Validate subscription if user is authenticated
       let subscriptionVerified = false;
       let subscriptionTier = 'free';
-      
+
       if (request.userId) {
         try {
           const subscriptionStatus = await subscriptionManager.validateSubscription(request.userId);
           subscriptionVerified = subscriptionStatus.isActive;
           subscriptionTier = subscriptionStatus.tier;
-          
+
           // For premium content, require active subscription
           if (!subscriptionStatus.isActive && subscriptionTier === 'free') {
             // Allow access but with limitations (handled by content protection)
@@ -131,9 +131,9 @@ export class VideoAccessService {
             violationType: 'invalid_subscription',
             severity: 'high',
             timestamp: new Date(),
-            additionalContext: { 
+            additionalContext: {
               error: error instanceof Error ? error.message : 'Unknown error',
-              subscriptionCheckFailed: true 
+              subscriptionCheckFailed: true
             }
           });
           throw new Error('Unable to verify subscription status');
@@ -201,8 +201,8 @@ export class VideoAccessService {
    * Requirements 8.2: Automatically refresh URLs without interrupting playback
    */
   public async refreshVideoUrl(
-    videoId: string, 
-    refreshToken: string, 
+    videoId: string,
+    refreshToken: string,
     userId?: string,
     gcsPath?: string
   ): Promise<SecureVideoAccess> {
@@ -277,9 +277,9 @@ export class VideoAccessService {
         violationType: 'expired_url',
         severity: 'medium',
         timestamp: new Date(),
-        additionalContext: { 
+        additionalContext: {
           maxRetriesExceeded: true,
-          retryCount 
+          retryCount
         }
       });
       return null;
@@ -301,13 +301,13 @@ export class VideoAccessService {
       return await this.refreshVideoUrl(videoId, refreshToken, userId);
     } catch (error) {
       console.error(`URL refresh retry ${retryCount + 1} failed:`, error);
-      
+
       // Only retry if it's not a 404 error (video not found)
       if (error instanceof Error && error.message.includes('Video not found')) {
         console.log(`Video ${videoId} not found - stopping retries`);
         return null;
       }
-      
+
       // Recursive retry with exponential backoff
       return await this.handleRefreshFailure(videoId, userId, retryCount + 1);
     }
@@ -392,13 +392,13 @@ export class VideoAccessService {
    */
   private scheduleUrlRefresh(request: VideoAccessRequest, access: SecureVideoAccess): void {
     const refreshTime = access.expiryTime.getTime() - Date.now() - (5 * 60 * 1000); // 5 minutes before expiry
-    
+
     if (refreshTime > 0) {
       const timerId = setTimeout(async () => {
         try {
           await this.refreshVideoUrl(
-            request.videoId, 
-            access.refreshToken!, 
+            request.videoId,
+            access.refreshToken!,
             request.userId,
             request.gcsPath
           );
@@ -423,8 +423,8 @@ export class VideoAccessService {
       timestamp: Date.now(),
       nonce: Math.random().toString(36).substr(2, 9)
     };
-    
-    return Buffer.from(JSON.stringify(payload)).toString('base64');
+
+    return btoa(JSON.stringify(payload));
   }
 
   /**
@@ -432,16 +432,16 @@ export class VideoAccessService {
    */
   private validateRefreshToken(token: string, videoId: string, userId?: string): boolean {
     try {
-      const payload = JSON.parse(Buffer.from(token, 'base64').toString());
-      
+      const payload = JSON.parse(atob(token));
+
       // Check if token matches request
       if (payload.videoId !== videoId) return false;
       if (payload.userId !== (userId || 'anonymous')) return false;
-      
+
       // Check if token is not too old (1 hour max)
       const tokenAge = Date.now() - payload.timestamp;
       if (tokenAge > 60 * 60 * 1000) return false;
-      
+
       return true;
     } catch (error) {
       return false;
@@ -455,20 +455,20 @@ export class VideoAccessService {
     const key = `access_${userId}`;
     const now = Date.now();
     const attempts = this.accessAttempts.get(key) || 0;
-    
+
     // Reset counter if window has passed
     const lastAttemptKey = `last_${userId}`;
     const lastAttempt = this.accessAttempts.get(lastAttemptKey) || 0;
-    
+
     if (now - lastAttempt > this.RATE_LIMIT_WINDOW) {
       this.accessAttempts.set(key, 1);
       this.accessAttempts.set(lastAttemptKey, now);
       return false;
     }
-    
+
     // Progressive rate limiting - more lenient for normal usage
     let maxAttempts = this.MAX_ACCESS_ATTEMPTS;
-    
+
     // If user has been making requests recently but not excessively, be more lenient
     if (attempts < 10) {
       maxAttempts = this.MAX_ACCESS_ATTEMPTS;
@@ -476,17 +476,17 @@ export class VideoAccessService {
       // Warn but don't block yet
       console.warn(`User ${userId} approaching rate limit: ${attempts}/${maxAttempts}`);
     }
-    
+
     // Check if limit exceeded
     if (attempts >= maxAttempts) {
       console.warn(`Rate limit exceeded for user ${userId}: ${attempts}/${maxAttempts}`);
       return true;
     }
-    
+
     // Increment counter
     this.accessAttempts.set(key, attempts + 1);
     this.accessAttempts.set(lastAttemptKey, now);
-    
+
     return false;
   }
 
@@ -511,7 +511,7 @@ export class VideoAccessService {
     const lastAttempt = this.accessAttempts.get(lastAttemptKey) || 0;
     const now = Date.now();
     const timeRemaining = Math.max(0, this.RATE_LIMIT_WINDOW - (now - lastAttempt));
-    
+
     return {
       attempts,
       maxAttempts: this.MAX_ACCESS_ATTEMPTS,
@@ -528,7 +528,7 @@ export class VideoAccessService {
       clearTimeout(timerId);
       this.urlRefreshTimers.delete(videoId);
     }
-    
+
     // Clean up any pending requests for this video
     const keysToDelete = Array.from(this.pendingRequests.keys()).filter(key => key.startsWith(videoId));
     keysToDelete.forEach(key => this.pendingRequests.delete(key));

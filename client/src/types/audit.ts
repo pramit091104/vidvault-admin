@@ -90,7 +90,7 @@ export interface SubscriptionAuditEntry extends BaseAuditEntry {
  */
 export interface SecurityViolationEntry extends BaseAuditEntry {
   type: 'security_violation';
-  violationType: 'unauthorized_access' | 'rate_limit_exceeded' | 'invalid_signature' | 'permission_denied' | 'suspicious_activity' | 'data_integrity_failure';
+  violationType: 'unauthorized_access' | 'rate_limit_exceeded' | 'invalid_signature' | 'permission_denied' | 'suspicious_activity' | 'data_integrity_failure' | 'expired_url' | 'invalid_subscription' | 'url_tampering' | 'excessive_requests';
   severity: 'low' | 'medium' | 'high' | 'critical';
   resourceId?: string;
   resourceType?: 'video' | 'subscription' | 'payment' | 'user' | 'system';
@@ -105,7 +105,7 @@ export interface SecurityViolationEntry extends BaseAuditEntry {
  */
 export interface SystemEventEntry extends BaseAuditEntry {
   type: 'system_event';
-  eventType: 'cache_invalidation' | 'batch_process' | 'notification_sent' | 'webhook_processed' | 'data_migration' | 'backup_created' | 'system_event';
+  eventType: 'cache_invalidation' | 'batch_process' | 'notification_sent' | 'webhook_processed' | 'data_migration' | 'backup_created' | 'system_event' | 'video_access';
   component: string;
   operation: string;
   success: boolean;
@@ -118,11 +118,11 @@ export interface SystemEventEntry extends BaseAuditEntry {
 /**
  * Union type for all audit entries
  */
-export type AuditEntry = 
-  | ApprovalAuditEntry 
-  | PaymentAuditEntry 
-  | SubscriptionAuditEntry 
-  | SecurityViolationEntry 
+export type AuditEntry =
+  | ApprovalAuditEntry
+  | PaymentAuditEntry
+  | SubscriptionAuditEntry
+  | SecurityViolationEntry
   | SystemEventEntry;
 
 /**

@@ -1,5 +1,5 @@
 import { v4 as uuidv4 } from 'uuid';
-import crypto from 'crypto';
+// import crypto from 'crypto'; // Removed Node.js crypto
 
 interface SignedUrlPayload {
   videoId: string;
@@ -19,7 +19,7 @@ export const generateSignedUrlPayload = (
 ): SignedUrlPayload => {
   const expires = Date.now() + (expiresInMinutes * 60 * 1000);
   const nonce = uuidv4();
-  
+
   return {
     videoId,
     securityCode,
@@ -32,40 +32,72 @@ export const generateSignedUrlPayload = (
 /**
  * Create a signed token for the payload
  */
-export const createSignedToken = (payload: SignedUrlPayload, secret: string): string => {
+export const createSignedToken = async (payload: SignedUrlPayload, secret: string): Promise<string> => {
   const payloadString = JSON.stringify(payload);
-  const signature = crypto
-    .createHmac('sha256', secret)
-    .update(payloadString)
-    .digest('hex');
-  
-  return Buffer.from(JSON.stringify({ payload, signature })).toString('base64');
+  const encoder = new TextEncoder();
+  const data = encoder.encode(payloadString);
+  const keyData = encoder.encode(secret);
+
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign']
+  );
+
+  const signatureBuffer = await crypto.subtle.sign(
+    'HMAC',
+    key,
+    data
+  );
+
+  const signatureArray = Array.from(new Uint8Array(signatureBuffer));
+  const signature = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
+  return btoa(JSON.stringify({ payload, signature }));
 };
 
 /**
  * Verify a signed token
  */
-export const verifySignedToken = (token: string, secret: string): SignedUrlPayload | null => {
+export const verifySignedToken = async (token: string, secret: string): Promise<SignedUrlPayload | null> => {
   try {
-    const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+    const decoded = JSON.parse(atob(token));
     const { payload, signature } = decoded;
-    
+
     // Verify signature
     const payloadString = JSON.stringify(payload);
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(payloadString)
-      .digest('hex');
-    
+    const encoder = new TextEncoder();
+    const data = encoder.encode(payloadString);
+    const keyData = encoder.encode(secret);
+
+    const key = await crypto.subtle.importKey(
+      'raw',
+      keyData,
+      { name: 'HMAC', hash: 'SHA-256' },
+      false,
+      ['sign']
+    );
+
+    const signatureBuffer = await crypto.subtle.sign(
+      'HMAC',
+      key,
+      data
+    );
+
+    const signatureArray = Array.from(new Uint8Array(signatureBuffer));
+    const expectedSignature = signatureArray.map(b => b.toString(16).padStart(2, '0')).join('');
+
     if (signature !== expectedSignature) {
       return null;
     }
-    
+
     // Check expiration
     if (Date.now() > payload.expires) {
       return null;
     }
-    
+
     return payload;
   } catch (error) {
     console.error('Error verifying signed token:', error);
