@@ -160,18 +160,13 @@ export default async function handler(req, res) {
       const [exists] = await file.exists();
 
       if (exists) {
-        // Generate signed URL
+        // Return proxy URL instead of signed URL
+        const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3001';
+        const proxyUrl = `${backendUrl}/api/stream-video?path=${encodeURIComponent(gcsPath)}`;
         const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
-        console.log('Generating signed URL for gcsPath...');
 
-        const [signedUrl] = await file.getSignedUrl({
-          version: 'v4',
-          action: 'read',
-          expires: expiresAt,
-        });
-
-        console.log('Signed URL generated successfully for gcsPath');
-        return res.json({ signedUrl, expiresAt: new Date(expiresAt).toISOString() });
+        console.log('Returning proxy URL for gcsPath');
+        return res.json({ signedUrl: proxyUrl, expiresAt: new Date(expiresAt).toISOString() });
       } else {
         console.error('File not found at gcsPath:', gcsPath);
         // Fall through to try videoId-based search
@@ -318,18 +313,14 @@ export default async function handler(req, res) {
       });
     }
 
-    // Generate signed URL
+    // Generate proxy URL instead of signed URL
+    const gcsFilePath = foundFile.name;
+    const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3001';
+    const proxyUrl = `${backendUrl}/api/stream-video?path=${encodeURIComponent(gcsFilePath)}`;
     const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
-    console.log('Generating signed URL...');
 
-    const [signedUrl] = await foundFile.getSignedUrl({
-      version: 'v4',
-      action: 'read',
-      expires: expiresAt,
-    });
-
-    console.log('Signed URL generated successfully');
-    res.json({ signedUrl, expiresAt: new Date(expiresAt).toISOString() });
+    console.log('Returning proxy URL for video streaming');
+    res.json({ signedUrl: proxyUrl, expiresAt: new Date(expiresAt).toISOString() });
 
   } catch (error) {
     console.error('Error in signed-url handler:', error);

@@ -1289,6 +1289,79 @@ app.get('/api/gcs/metadata', async (req, res) => {
   }
 });
 
+// Stream video with CORS headers (proxy for GCS)
+app.get('/api/stream-video', async (req, res) => {
+  try {
+    if (!bucket) return res.status(503).json({ error: 'Storage unavailable' });
+
+    const gcsPath = String(req.query.path || '');
+    if (!gcsPath) return res.status(400).json({ error: 'path parameter is required' });
+
+    console.log('Streaming video from:', gcsPath);
+
+    const file = bucket.file(gcsPath);
+    const [exists] = await file.exists();
+
+    if (!exists) {
+      return res.status(404).json({ error: 'Video not found' });
+    }
+
+    // Get file metadata
+    const [metadata] = await file.getMetadata();
+    const fileSize = parseInt(metadata.size);
+    const contentType = metadata.contentType || 'video/mp4';
+
+    // Handle range requests for video seeking
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+      const chunkSize = (end - start) + 1;
+
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': contentType,
+      });
+
+      // Stream the requested range
+      file.createReadStream({ start, end })
+        .on('error', (error) => {
+          console.error('Stream error:', error);
+          if (!res.headersSent) {
+            res.status(500).end();
+          }
+        })
+        .pipe(res);
+    } else {
+      // Stream entire file
+      res.writeHead(200, {
+        'Content-Length': fileSize,
+        'Content-Type': contentType,
+        'Accept-Ranges': 'bytes',
+      });
+
+      file.createReadStream()
+        .on('error', (error) => {
+          console.error('Stream error:', error);
+          if (!res.headersSent) {
+            res.status(500).end();
+          }
+        })
+        .pipe(res);
+    }
+
+  } catch (error) {
+    console.error('Error in stream-video handler:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+});
+
 // Admin endpoint to set bucket CORS policy (POST)
 app.post('/api/gcs/set-cors', express.json(), async (req, res) => {
   try {

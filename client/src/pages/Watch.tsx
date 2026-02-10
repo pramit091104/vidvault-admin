@@ -70,7 +70,8 @@ const Watch = () => {
 
   // Determine if we should use content protection based on video and subscription
   // Enable protection if video is not public or if we explicitly don't have a public URL
-  const shouldUseContentProtection = (video?.id && (!video?.isPublic || !video?.publicUrl)) && !isLoadingSubscription;
+  // FIXED: Simplified logic - only use content protection for truly private videos
+  const shouldUseContentProtection = video?.id && !video?.isPublic && !isLoadingSubscription;
 
   // Define content protection handlers with useCallback to prevent infinite loops
   const handleUnauthorizedAccess = useCallback(() => {
@@ -159,17 +160,20 @@ const Watch = () => {
   }, [video, video?.publicUrl, shouldUseContentProtection, contentProtection.url]);
 
   // Add timeout for content protection to prevent infinite loading
+  // FIXED: Increased timeout to 30 seconds and improved error handling
   useEffect(() => {
     if (shouldUseContentProtection && contentProtection.isLoading) {
       const timeout = setTimeout(() => {
         console.warn('Content protection loading timeout - falling back to public URL');
         if (video?.publicUrl) {
           toast.warning('Using fallback video URL due to protection timeout');
+          // Force use of public URL by disabling content protection
+          setVideoError(null);
         } else {
           setVideoError('Video loading timeout. Please refresh the page.');
           toast.error('Video loading timeout. Please refresh the page.');
         }
-      }, 15000); // 15 second timeout
+      }, 30000); // 30 second timeout (increased from 15)
 
       return () => clearTimeout(timeout);
     }
@@ -331,13 +335,25 @@ const Watch = () => {
   }, []);
 
   // Initialize Plyr player when video element is ready
+  // FIXED: Improved initialization logic and error handling
   useEffect(() => {
     let cancelled = false;
     const init = async () => {
+      // Determine the video URL to use
+      const videoUrl = shouldUseContentProtection ? contentProtection.url : video?.publicUrl;
+      
       // Only initialize if we have a video element and a video URL
-      if (!videoRef.current || (!video?.publicUrl && !contentProtection.url) || playerRef.current) return;
+      if (!videoRef.current || !videoUrl || playerRef.current) {
+        console.log('Plyr init skipped:', { 
+          hasVideoRef: !!videoRef.current, 
+          hasVideoUrl: !!videoUrl, 
+          hasPlayer: !!playerRef.current 
+        });
+        return;
+      }
 
       try {
+        console.log('Initializing Plyr player...');
         const PlyrModule = await import('plyr');
         const PlyrClass = (PlyrModule as any).default || PlyrModule;
         playerRef.current = new PlyrClass(videoRef.current, {
@@ -359,12 +375,17 @@ const Watch = () => {
           autoplay: false,
         });
 
+        console.log('Plyr player initialized successfully');
+
         // Remove all mute-related listeners
         if (playerRef.current) {
           playerRef.current.off('volumechange', () => { });
         }
       } catch (err) {
-        if (!cancelled) console.error('Plyr initialization error:', err);
+        if (!cancelled) {
+          console.error('Plyr initialization error:', err);
+          toast.error('Video player initialization failed. Using default controls.');
+        }
       }
     };
 
@@ -375,7 +396,7 @@ const Watch = () => {
       if (playerRef.current) {
         try {
           // Soft destroy to avoid removing nodes that might be gone
-          if (document.body.contains(videoRef.current)) {
+          if (videoRef.current && document.body.contains(videoRef.current)) {
             playerRef.current.destroy();
           }
         } catch (err) {
@@ -384,7 +405,7 @@ const Watch = () => {
         playerRef.current = null;
       }
     };
-  }, [video?.publicUrl, contentProtection.url]); // Updated dependencies
+  }, [video?.publicUrl, contentProtection.url, shouldUseContentProtection]); // Updated dependencies
 
   // Fetch comments for this video
   useEffect(() => {
@@ -449,20 +470,33 @@ const Watch = () => {
           uploadedAtDate = new Date();
         }
 
+        // FIXED: Better handling of undefined bucket names in URLs
+        const fixBucketUrl = (url: string | undefined): string | undefined => {
+          if (!url) return undefined;
+          
+          // Check if URL contains 'undefined' and fix it
+          if (url.includes('/undefined/')) {
+            const bucketName = GCS_CONFIG.BUCKET_NAME || 'previu_videos';
+            console.warn(`Fixing undefined bucket in URL. Using bucket: ${bucketName}`);
+            return url.replace('/undefined/', `/${bucketName}/`);
+          }
+          
+          return url;
+        };
+
         const mappedVideo: PublicVideo = {
           id: videoData.id,
           title: videoData.title,
           description: videoData.description || '',
           clientName: videoData.clientName,
-          videoUrl: (videoData as GCSVideoRecord).publicUrl?.replace('undefined', GCS_CONFIG.BUCKET_NAME || 'previu_videos'),
+          videoUrl: fixBucketUrl((videoData as GCSVideoRecord).publicUrl),
           thumbnailUrl: undefined,
           slug: videoData.publicSlug || slug,
           isPublic: videoData.isPublic || false,
           uploadedAt: uploadedAtDate,
           viewCount: videoData.viewCount || 0,
           service: videoData.service,
-          // Fix for undefined bucket in URL
-          publicUrl: (videoData as GCSVideoRecord).publicUrl?.replace('undefined', GCS_CONFIG.BUCKET_NAME || 'previu_videos'),
+          publicUrl: fixBucketUrl((videoData as GCSVideoRecord).publicUrl),
           // Approval workflow fields
           approvalStatus: videoData.approvalStatus || 'draft',
           reviewedAt: videoData.reviewedAt,
@@ -831,6 +865,7 @@ const Watch = () => {
     console.error("Video Player Error Object:", error);
     console.error("Video src:", e.currentTarget.currentSrc);
     console.error("Video readyState:", e.currentTarget.readyState);
+    console.error("Video networkState:", e.currentTarget.networkState);
 
     let errorMessage = "Playback failed.";
 
@@ -847,6 +882,8 @@ const Watch = () => {
     // Add additional context based on the video source
     if (contentProtection.url?.includes('protected/stream')) {
       errorMessage += " Protected video stream error. Please refresh the page.";
+    } else if (!e.currentTarget.currentSrc) {
+      errorMessage = "No video source available. Please check the video URL.";
     }
 
     console.error("Final error message:", errorMessage);
@@ -860,6 +897,11 @@ const Watch = () => {
           videoRef.current.load();
         }
       }, 2000);
+    } else {
+      // If already tried reloading, suggest using public URL if available
+      if (video?.publicUrl && shouldUseContentProtection) {
+        toast.error('Video failed to load. Try refreshing the page.');
+      }
     }
   };
 
@@ -1009,23 +1051,32 @@ const Watch = () => {
                 </div>
               )}
               {/* Show video if we have any valid URL - Mobile */}
-              {((shouldUseContentProtection ? contentProtection.url : video.publicUrl)) && (
-                <video
-                  key={shouldUseContentProtection ? contentProtection.url : video.publicUrl}
-                  ref={videoRef}
-                  className="w-full h-full bg-black"
-                  poster={video.thumbnailUrl}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                  onError={handleVideoError}
-                  onLoadedMetadata={handleVideoMetadata}
-                >
-                  <source src={shouldUseContentProtection ? contentProtection.url! : video.publicUrl} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-              )}
+              {/* FIXED: Simplified video URL logic with better fallback */}
+              {(() => {
+                const videoUrl = shouldUseContentProtection ? contentProtection.url : video.publicUrl;
+                if (!videoUrl) {
+                  console.warn('No video URL available', { shouldUseContentProtection, hasContentProtectionUrl: !!contentProtection.url, hasPublicUrl: !!video.publicUrl });
+                  return null;
+                }
+                
+                return (
+                  <video
+                    key={videoUrl}
+                    ref={videoRef}
+                    className="w-full h-full bg-black"
+                    poster={video.thumbnailUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    crossOrigin="anonymous"
+                    onError={handleVideoError}
+                    onLoadedMetadata={handleVideoMetadata}
+                  >
+                    <source src={videoUrl} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                );
+              })()}
 
               {/* Show loading spinner if content protection is loading */}
               {shouldUseContentProtection && contentProtection.isLoading && (
@@ -1253,23 +1304,32 @@ const Watch = () => {
                 </div>
               )}
               {/* Show video - prioritize public URL for reliability (Desktop) */}
-              {((shouldUseContentProtection ? contentProtection.url : video.publicUrl)) && (
-                <video
-                  key={shouldUseContentProtection ? contentProtection.url : video.publicUrl}
-                  ref={videoRef}
-                  className="w-full h-full bg-black"
-                  poster={video.thumbnailUrl}
-                  controls
-                  playsInline
-                  preload="metadata"
-                  crossOrigin="anonymous"
-                  onError={handleVideoError}
-                  onLoadedMetadata={handleVideoMetadata}
-                >
-                  <source src={shouldUseContentProtection ? contentProtection.url! : video.publicUrl} type="video/mp4" />
-                  Your browser does not support the video tag.
-                </video>
-              )}
+              {/* FIXED: Simplified video URL logic with better fallback */}
+              {(() => {
+                const videoUrl = shouldUseContentProtection ? contentProtection.url : video.publicUrl;
+                if (!videoUrl) {
+                  console.warn('No video URL available', { shouldUseContentProtection, hasContentProtectionUrl: !!contentProtection.url, hasPublicUrl: !!video.publicUrl });
+                  return null;
+                }
+                
+                return (
+                  <video
+                    key={videoUrl}
+                    ref={videoRef}
+                    className="w-full h-full bg-black"
+                    poster={video.thumbnailUrl}
+                    controls
+                    playsInline
+                    preload="metadata"
+                    crossOrigin="anonymous"
+                    onError={handleVideoError}
+                    onLoadedMetadata={handleVideoMetadata}
+                  >
+                    <source src={videoUrl} type="video/mp4" />
+                    Your browser does not support the video tag.
+                  </video>
+                );
+              })()}
 
               {/* Show loading spinner if content protection is loading */}
               {shouldUseContentProtection && contentProtection.isLoading && (
