@@ -1122,19 +1122,35 @@ const Watch = () => {
                 </div>
               )}
               {/* Show video if we have any valid URL - Mobile */}
-              {/* FIXED: Simplified video URL logic with better fallback */}
+              {/* SECURITY: Never expose direct GCS URLs - always use proxy */}
               {(() => {
-                // Try content protection first, fall back to public URL if protection fails
-                const videoUrl = (shouldUseContentProtection && contentProtection.url && !contentProtection.error) 
-                  ? contentProtection.url 
-                  : video.publicUrl;
+                // For protected videos, ONLY use the signed/proxy URL - no fallback to public URL
+                let videoUrl = null;
+                
+                if (shouldUseContentProtection) {
+                  // Protected video - must use signed URL through proxy
+                  if (contentProtection.url && !contentProtection.error) {
+                    videoUrl = contentProtection.url;
+                  } else if (contentProtection.isLoading) {
+                    // Still loading - show spinner below
+                    return null;
+                  } else {
+                    // Protection failed - show error
+                    console.error('Content protection failed for private video', { error: contentProtection.error });
+                    return null;
+                  }
+                } else {
+                  // Public video - can use public URL
+                  videoUrl = video.publicUrl;
+                }
                 
                 if (!videoUrl) {
                   console.warn('No video URL available', { 
                     shouldUseContentProtection, 
                     hasContentProtectionUrl: !!contentProtection.url, 
                     hasPublicUrl: !!video.publicUrl,
-                    protectionError: contentProtection.error
+                    protectionError: contentProtection.error,
+                    isPublic: video.isPublic
                   });
                   return null;
                 }
@@ -1387,12 +1403,37 @@ const Watch = () => {
                   <p className="text-sm text-gray-300">{videoError}</p>
                 </div>
               )}
-              {/* Show video - prioritize public URL for reliability (Desktop) */}
-              {/* FIXED: Simplified video URL logic with better fallback */}
+              {/* Show video - use proxy URL for protection (Desktop) */}
+              {/* SECURITY: Never expose direct GCS URLs - always use proxy */}
               {(() => {
-                const videoUrl = (shouldUseContentProtection && contentProtection.url && !contentProtection.error) ? contentProtection.url : video.publicUrl;
+                // For protected videos, ONLY use the signed/proxy URL - no fallback to public URL
+                let videoUrl = null;
+                
+                if (shouldUseContentProtection) {
+                  // Protected video - must use signed URL through proxy
+                  if (contentProtection.url && !contentProtection.error) {
+                    videoUrl = contentProtection.url;
+                  } else if (contentProtection.isLoading) {
+                    // Still loading - show spinner below
+                    return null;
+                  } else {
+                    // Protection failed - show error
+                    console.error('Content protection failed for private video', { error: contentProtection.error });
+                    return null;
+                  }
+                } else {
+                  // Public video - can use public URL
+                  videoUrl = video.publicUrl;
+                }
+                
                 if (!videoUrl) {
-                  console.warn('No video URL available', { shouldUseContentProtection, hasContentProtectionUrl: !!contentProtection.url, hasPublicUrl: !!video.publicUrl, protectionError: contentProtection.error });
+                  console.warn('No video URL available', { 
+                    shouldUseContentProtection, 
+                    hasContentProtectionUrl: !!contentProtection.url, 
+                    hasPublicUrl: !!video.publicUrl, 
+                    protectionError: contentProtection.error,
+                    isPublic: video.isPublic
+                  });
                   return null;
                 }
                 
