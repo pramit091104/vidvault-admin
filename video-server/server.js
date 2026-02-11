@@ -1135,6 +1135,9 @@ import gcsResumableUploadUrlHandler from './api/gcs/resumable-upload-url.js';
 import gcsDeleteHandler from './api/gcs/delete.js';
 import commentNotificationHandler from './api/notifications/comment.js';
 import paymentHandler from './api/payment.js';
+import hlsStreamHandler from './api/hls/stream.js';
+import hlsTranscodeHandler from './api/hls/transcode.js';
+import hlsQueueHandler from './api/hls/queue.js';
 
 // Add the new API routes
 app.use('/api/subscription', subscriptionHandler);
@@ -1148,6 +1151,21 @@ app.post('/api/notifications/comment', commentNotificationHandler);
 // Payment routes - use the payment handler for both /api/payment and /api/razorpay routes
 app.use('/api/payment', paymentHandler);
 app.use('/api/razorpay', paymentHandler);
+
+// HLS streaming routes
+app.post('/api/hls/generate-session', apiLimiter, hlsStreamHandler.generateHLSSession);
+app.get('/api/hls/playlist/:sessionId/:playlistName', hlsStreamHandler.servePlaylist);
+app.get('/api/hls/segment/:sessionId/:segmentName', hlsStreamHandler.serveSegment);
+app.get('/api/hls/key/:sessionId', hlsStreamHandler.serveKey);
+
+// HLS transcoding routes (direct - for testing only)
+app.post('/api/hls/transcode', apiLimiter, hlsTranscodeHandler.transcodeVideo);
+app.get('/api/hls/status/:videoId', apiLimiter, hlsTranscodeHandler.checkTranscodeStatus);
+
+// HLS queue routes (recommended for production)
+app.post('/api/hls/queue', apiLimiter, hlsQueueHandler.queueTranscode);
+app.get('/api/hls/queue/status/:videoId', apiLimiter, hlsQueueHandler.getTranscodeStatus);
+app.get('/api/hls/queue/stats', apiLimiter, hlsQueueHandler.getQueueStats);
 
 // --- Debug Endpoint for GCS Credentials ---
 app.get('/api/debug/gcs-check', async (req, res) => {

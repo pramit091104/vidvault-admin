@@ -36,3 +36,7 @@ gcs-key.json
 # Temporary directories
 temp/
 uploads/
+
+# Documentation files (exclude all .md files except README.md)
+*.md
+!README.md

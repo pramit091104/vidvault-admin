@@ -307,7 +307,7 @@ const Watch = () => {
     loadRateLimitStatus();
   }, [currentUser]);
 
-  // Update current time from video element
+  // Update current time from video element and add download prevention
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
@@ -325,11 +325,45 @@ const Watch = () => {
       }
     };
 
+    // Prevent right-click context menu on video
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault();
+      return false;
+    };
+
+    // Prevent drag and drop
+    const handleDragStart = (e: DragEvent) => {
+      e.preventDefault();
+      return false;
+    };
+
+    // Disable download button on load
+    const handleLoadStart = () => {
+      if (video.controlsList) {
+        video.controlsList.add('nodownload');
+        video.controlsList.add('nofullscreen');
+        video.controlsList.add('noremoteplayback');
+      }
+      video.disablePictureInPicture = true;
+      video.disableRemotePlayback = true;
+    };
+
     video.addEventListener('timeupdate', handleTimeUpdate);
+    video.addEventListener('contextmenu', handleContextMenu);
+    video.addEventListener('dragstart', handleDragStart);
+    video.addEventListener('loadstart', handleLoadStart);
     document.addEventListener('keydown', handleKeyDown);
+
+    // Trigger loadstart immediately if video is already loaded
+    if (video.readyState > 0) {
+      handleLoadStart();
+    }
 
     return () => {
       video.removeEventListener('timeupdate', handleTimeUpdate);
+      video.removeEventListener('contextmenu', handleContextMenu);
+      video.removeEventListener('dragstart', handleDragStart);
+      video.removeEventListener('loadstart', handleLoadStart);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, []);
@@ -968,6 +1002,42 @@ const Watch = () => {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
+      {/* Global CSS to hide download button */}
+      <style>{`
+        /* Hide download button in all browsers */
+        video::-webkit-media-controls-download-button {
+          display: none !important;
+        }
+        video::-internal-media-controls-download-button {
+          display: none !important;
+        }
+        video::-webkit-media-controls-enclosure {
+          overflow: hidden !important;
+        }
+        video::-webkit-media-controls-panel {
+          width: calc(100% + 30px) !important;
+        }
+        
+        /* Firefox */
+        video::-moz-media-controls-download-button {
+          display: none !important;
+        }
+        
+        /* Prevent right-click on video */
+        .no-download-video {
+          -webkit-user-select: none !important;
+          -moz-user-select: none !important;
+          -ms-user-select: none !important;
+          user-select: none !important;
+          -webkit-touch-callout: none !important;
+        }
+        
+        /* Additional protection */
+        video {
+          pointer-events: auto !important;
+        }
+      `}</style>
+      
       {/* Header: Full width - Better mobile spacing */}
       <header className="border-b bg-card/95 px-3 py-3 sm:px-4 sm:py-4 shrink-0">
         <div className="w-full px-2 sm:px-4 lg:px-6 flex justify-between items-center">
@@ -1063,14 +1133,18 @@ const Watch = () => {
                   <video
                     key={videoUrl}
                     ref={videoRef}
-                    className="w-full h-full bg-black"
+                    className="w-full h-full bg-black no-download-video"
                     poster={video.thumbnailUrl}
                     controls
+                    controlsList="nodownload nofullscreen noremoteplayback"
+                    disablePictureInPicture
+                    disableRemotePlayback
                     playsInline
                     preload="metadata"
                     crossOrigin="anonymous"
                     onError={handleVideoError}
                     onLoadedMetadata={handleVideoMetadata}
+                    onContextMenu={(e) => e.preventDefault()}
                   >
                     <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
@@ -1316,14 +1390,18 @@ const Watch = () => {
                   <video
                     key={videoUrl}
                     ref={videoRef}
-                    className="w-full h-full bg-black"
+                    className="w-full h-full bg-black no-download-video"
                     poster={video.thumbnailUrl}
                     controls
+                    controlsList="nodownload nofullscreen noremoteplayback"
+                    disablePictureInPicture
+                    disableRemotePlayback
                     playsInline
                     preload="metadata"
                     crossOrigin="anonymous"
                     onError={handleVideoError}
                     onLoadedMetadata={handleVideoMetadata}
+                    onContextMenu={(e) => e.preventDefault()}
                   >
                     <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.

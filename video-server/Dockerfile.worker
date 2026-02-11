@@ -1,6 +1,6 @@
 FROM node:18-slim
 
-# Install build dependencies (no system FFmpeg needed - using ffmpeg-static)
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
     python3 \
     make \
@@ -20,12 +20,8 @@ COPY . .
 
 # Create temp directories with proper permissions
 RUN mkdir -p /app/temp/hls && \
-    mkdir -p /app/temp/sessions && \
     mkdir -p /app/temp/transcode && \
     chmod -R 777 /app/temp
 
-# Expose port
-EXPOSE 3000
-
-# Start server
-CMD ["npm", "start"]
+# Start worker
+CMD ["node", "worker.js"]

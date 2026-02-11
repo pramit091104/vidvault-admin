@@ -28,15 +28,21 @@ service cloud.firestore {
     }
     
     // Allow authenticated users to read/write comments
+    // UPDATED: Allow anonymous comment creation
     match /comments/{document} {
-      allow read, write: if request.auth != null;
+      allow read: if true; // Public read
+      allow create: if true; // Allow anonymous comment creation
+      allow update: if request.auth != null; // Only authenticated users can update
+      allow delete: if request.auth != null; // Only authenticated users can delete
     }
     
     // Allow authenticated users to write comments, public read
-    // Anonymous comments allow spam, so we restrict to auth only for now
+    // UPDATED: Allow anonymous comments with rate limiting handled by client
     match /timestampedComments/{document} {
       allow read: if true; 
-      allow write: if request.auth != null; // RESTRICTED: authenticated users only
+      allow create: if true; // Allow anonymous comment creation
+      allow update: if request.auth != null; // Only authenticated users can update
+      allow delete: if request.auth != null; // Only authenticated users can delete
     }
     
     // Service account rules for server-side operations

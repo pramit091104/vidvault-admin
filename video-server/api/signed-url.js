@@ -2,6 +2,7 @@ import { Storage } from '@google-cloud/storage';
 import { initializeApp, cert, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import multer from 'multer';
+import { parseAndFixGCSCredentials, logCredentialInfo } from '../utils/credentialsHelper.js';
 
 // Initialize Google Cloud Storage
 // Initialize Google Cloud Storage
@@ -15,27 +16,14 @@ const initStorage = () => {
       let credentials = null;
 
       if (process.env.GCS_CREDENTIALS) {
-        // Parse credentials and fix escaped newlines in private key
-        try {
-          const credentialsRaw = process.env.GCS_CREDENTIALS;
-          if (typeof credentialsRaw === 'string') {
-            credentials = JSON.parse(credentialsRaw);
-          } else {
-            credentials = credentialsRaw;
-          }
-
-          if (credentials.private_key) {
-            // Replace escaped newlines with actual newlines
-            const privateKey = credentials.private_key.replace(/\\n/g, '\n');
-            credentials.private_key = privateKey;
-
-            // Debug logging (masked)
-            console.log('GCS Credential Debug:');
-            console.log('- Project ID:', credentials.project_id);
-            console.log('- Client Email:', credentials.client_email);
-          }
-        } catch (e) {
-          console.error('Error parsing GCS_CREDENTIALS:', e);
+        // Use the utility function to parse and fix credentials
+        credentials = parseAndFixGCSCredentials(process.env.GCS_CREDENTIALS);
+        
+        if (credentials) {
+          // Log credential info for debugging (without exposing sensitive data)
+          logCredentialInfo(credentials, 'GCS_CREDENTIALS');
+        } else {
+          console.error('Failed to parse GCS_CREDENTIALS');
         }
       }
 
@@ -65,29 +53,17 @@ const initFirebase = () => {
       let serviceAccount;
       // Try to get credentials from environment
       if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-        try {
-          const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-          serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        } catch (e) {
-          console.error('Error parsing FIREBASE_SERVICE_ACCOUNT:', e);
-        }
+        serviceAccount = parseAndFixGCSCredentials(process.env.FIREBASE_SERVICE_ACCOUNT);
       }
 
       // Fallback to GCS_CREDENTIALS if FIREBASE_SERVICE_ACCOUNT is missing
       if (!serviceAccount && process.env.GCS_CREDENTIALS) {
-        try {
-          const raw = process.env.GCS_CREDENTIALS;
-          serviceAccount = typeof raw === 'string' ? JSON.parse(raw) : raw;
-        } catch (e) {
-          console.error('Error parsing GCS_CREDENTIALS for Firebase:', e);
-        }
+        serviceAccount = parseAndFixGCSCredentials(process.env.GCS_CREDENTIALS);
       }
 
       if (serviceAccount) {
-        // Fix private key newlines
-        if (serviceAccount.private_key) {
-          serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
-        }
+        // Log credential info for debugging
+        logCredentialInfo(serviceAccount, 'Firebase Admin');
 
         initializeApp({
           credential: cert(serviceAccount)
