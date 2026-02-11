@@ -370,77 +370,89 @@ const Watch = () => {
   }, []);
 
   // Initialize Plyr player when video element is ready
-  // FIXED: Improved initialization logic and error handling
+  // FIXED: Prevent duplicate initialization and improve cleanup
   useEffect(() => {
     let cancelled = false;
+    let initTimeout: NodeJS.Timeout;
+
     const init = async () => {
       // Determine the video URL to use
       const videoUrl = shouldUseContentProtection ? contentProtection.url : video?.publicUrl;
       
       // Only initialize if we have a video element and a video URL
-      if (!videoRef.current || !videoUrl || playerRef.current) {
-        console.log('Plyr init skipped:', { 
-          hasVideoRef: !!videoRef.current, 
-          hasVideoUrl: !!videoUrl, 
-          hasPlayer: !!playerRef.current 
-        });
+      if (!videoRef.current || !videoUrl) {
         return;
       }
 
-      try {
-        console.log('Initializing Plyr player...');
-        const PlyrModule = await import('plyr');
-        const PlyrClass = (PlyrModule as any).default || PlyrModule;
-        playerRef.current = new PlyrClass(videoRef.current, {
-          controls: [
-            'play-large',
-            'play',
-            'progress',
-            'current-time',
-            'duration',
-            'volume',
-            'airplay',
-            'fullscreen'
-          ],
-          settings: ['captions', 'quality', 'speed', 'loop'],
-          quality: { default: 720, options: [360, 720] },
-          tooltips: { controls: true, seek: true },
-          keyboard: { focused: true, global: true },
-          clickToPlay: true,
-          autoplay: false,
-        });
-
-        console.log('Plyr player initialized successfully');
-
-        // Remove all mute-related listeners
-        if (playerRef.current) {
-          playerRef.current.off('volumechange', () => { });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          console.error('Plyr initialization error:', err);
-          toast.error('Video player initialization failed. Using default controls.');
-        }
+      // If player already exists, don't reinitialize
+      if (playerRef.current) {
+        return;
       }
+
+      // Wait a bit to ensure video element is fully ready
+      initTimeout = setTimeout(async () => {
+        if (cancelled || !videoRef.current) return;
+
+        try {
+          console.log('Initializing Plyr player...');
+          const PlyrModule = await import('plyr');
+          const PlyrClass = (PlyrModule as any).default || PlyrModule;
+          
+          if (cancelled || playerRef.current) return; // Double check before creating
+          
+          playerRef.current = new PlyrClass(videoRef.current, {
+            controls: [
+              'play-large',
+              'play',
+              'progress',
+              'current-time',
+              'duration',
+              'volume',
+              'airplay',
+              'fullscreen'
+            ],
+            settings: ['captions', 'quality', 'speed', 'loop'],
+            quality: { default: 720, options: [360, 720] },
+            tooltips: { controls: true, seek: true },
+            keyboard: { focused: true, global: true },
+            clickToPlay: true,
+            autoplay: false,
+          });
+
+          console.log('Plyr player initialized successfully');
+
+          // Remove all mute-related listeners
+          if (playerRef.current) {
+            playerRef.current.off('volumechange', () => { });
+          }
+        } catch (err) {
+          if (!cancelled) {
+            console.error('Plyr initialization error:', err);
+            toast.error('Video player initialization failed. Using default controls.');
+          }
+        }
+      }, 100); // Small delay to ensure DOM is ready
     };
 
     init();
 
     return () => {
       cancelled = true;
+      if (initTimeout) {
+        clearTimeout(initTimeout);
+      }
       if (playerRef.current) {
         try {
-          // Soft destroy to avoid removing nodes that might be gone
-          if (videoRef.current && document.body.contains(videoRef.current)) {
-            playerRef.current.destroy();
-          }
+          // Destroy player safely
+          playerRef.current.destroy();
         } catch (err) {
-          console.error('Error destroying player:', err);
+          // Silently handle destroy errors
+          console.warn('Player cleanup warning:', err);
         }
         playerRef.current = null;
       }
     };
-  }, [video?.publicUrl, contentProtection.url, shouldUseContentProtection]); // Updated dependencies
+  }, [video?.id, shouldUseContentProtection]); // Only reinit when video changes, not URL
 
   // Fetch comments for this video
   useEffect(() => {
