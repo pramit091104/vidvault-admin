@@ -1123,9 +1123,18 @@ const Watch = () => {
               {/* Show video if we have any valid URL - Mobile */}
               {/* FIXED: Simplified video URL logic with better fallback */}
               {(() => {
-                const videoUrl = shouldUseContentProtection ? contentProtection.url : video.publicUrl;
+                // Try content protection first, fall back to public URL if protection fails
+                const videoUrl = (shouldUseContentProtection && contentProtection.url && !contentProtection.error) 
+                  ? contentProtection.url 
+                  : video.publicUrl;
+                
                 if (!videoUrl) {
-                  console.warn('No video URL available', { shouldUseContentProtection, hasContentProtectionUrl: !!contentProtection.url, hasPublicUrl: !!video.publicUrl });
+                  console.warn('No video URL available', { 
+                    shouldUseContentProtection, 
+                    hasContentProtectionUrl: !!contentProtection.url, 
+                    hasPublicUrl: !!video.publicUrl,
+                    protectionError: contentProtection.error
+                  });
                   return null;
                 }
                 
@@ -1380,9 +1389,9 @@ const Watch = () => {
               {/* Show video - prioritize public URL for reliability (Desktop) */}
               {/* FIXED: Simplified video URL logic with better fallback */}
               {(() => {
-                const videoUrl = shouldUseContentProtection ? contentProtection.url : video.publicUrl;
+                const videoUrl = (shouldUseContentProtection && contentProtection.url && !contentProtection.error) ? contentProtection.url : video.publicUrl;
                 if (!videoUrl) {
-                  console.warn('No video URL available', { shouldUseContentProtection, hasContentProtectionUrl: !!contentProtection.url, hasPublicUrl: !!video.publicUrl });
+                  console.warn('No video URL available', { shouldUseContentProtection, hasContentProtectionUrl: !!contentProtection.url, hasPublicUrl: !!video.publicUrl, protectionError: contentProtection.error });
                   return null;
                 }
                 
