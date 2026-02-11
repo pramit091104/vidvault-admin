@@ -240,34 +240,71 @@ export default async function handler(req, res) {
 
           if (docSnap.exists) {
             const data = docSnap.data();
+            console.log('Found Firestore document:', { id: cleanId, hasGcsPath: !!data.gcsPath, hasFileName: !!data.fileName, hasUserId: !!data.userId });
 
-            if (data.userId && data.fileName) {
-              const firestorePath = `drafts/${data.userId}/${data.fileName}`;
-
-              const file = bucket.file(firestorePath);
+            // Priority 1: Use gcsPath if available
+            if (data.gcsPath) {
+              console.log('Using gcsPath from Firestore:', data.gcsPath);
+              const file = bucket.file(data.gcsPath);
               const [exists] = await file.exists();
 
               if (exists) {
                 foundFile = file;
+                console.log('✅ Found file using gcsPath from Firestore');
               } else {
-                // Fallback: Search for the specific filename in drafts/ directory
+                console.warn('gcsPath from Firestore does not exist in GCS:', data.gcsPath);
+              }
+            }
+
+            // Priority 2: Construct path from userId and fileName
+            if (!foundFile && data.userId && data.fileName) {
+              // Try multiple path patterns since we don't know the exact timestamp
+              const patterns = [
+                `drafts/${data.userId}/${data.fileName}`,
+                `uploads/${data.userId}/${data.fileName}`,
+                `videos/${data.userId}/${data.fileName}`
+              ];
+
+              for (const pattern of patterns) {
+                console.log('Trying constructed path:', pattern);
+                const file = bucket.file(pattern);
+                const [exists] = await file.exists();
+                if (exists) {
+                  foundFile = file;
+                  console.log('✅ Found file using constructed path');
+                  break;
+                }
+              }
+
+              // Priority 3: Search for filename in drafts folder (handles timestamp prefix)
+              if (!foundFile) {
+                console.log('Searching drafts folder for filename:', data.fileName);
                 try {
                   const [files] = await bucket.getFiles({
-                    prefix: 'drafts/',
+                    prefix: `drafts/${data.userId}/`,
                     maxResults: 1000
                   });
 
-                  const matchingFile = files.find(f => f.name.endsWith(data.fileName));
+                  // Look for files that end with the original filename or contain it
+                  const matchingFile = files.find(f => {
+                    const name = f.name;
+                    // Match files like: drafts/userId/1770627201178-5716235-filename.mp4
+                    return name.endsWith(data.fileName) || name.includes(data.fileName);
+                  });
+
                   if (matchingFile) {
                     foundFile = matchingFile;
+                    console.log('✅ Found file by searching drafts folder:', matchingFile.name);
                   }
                 } catch (searchError) {
-                  console.error('Error during recursive filename search:', searchError);
+                  console.error('Error during filename search in drafts:', searchError);
                 }
               }
-            } else {
-              console.error('Firestore document missing userId or fileName:', data);
+            } else if (!foundFile) {
+              console.error('Firestore document missing required fields:', { hasGcsPath: !!data.gcsPath, hasUserId: !!data.userId, hasFileName: !!data.fileName });
             }
+          } else {
+            console.log('No Firestore document found for ID:', cleanId);
           }
         } catch (firestoreError) {
           console.error('Error querying Firestore:', firestoreError);

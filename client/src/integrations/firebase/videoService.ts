@@ -47,6 +47,7 @@ export interface GCSVideoRecord extends BaseVideoRecord {
   service: 'gcs';
   fileName: string;
   publicUrl: string;
+  gcsPath?: string; // Full GCS path to the file
   size: number;
   contentType: string;
   privacyStatus: 'private' | 'unlisted' | 'public';

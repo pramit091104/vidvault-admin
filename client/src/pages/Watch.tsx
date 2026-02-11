@@ -30,6 +30,7 @@ interface PublicVideo {
   viewCount: number;
   service: 'gcs';
   publicUrl?: string;
+  gcsPath?: string; // Full GCS path to the file
   // Approval workflow fields
   approvalStatus?: 'draft' | 'pending_review' | 'needs_changes' | 'approved' | 'completed';
   reviewedAt?: Date;
@@ -137,7 +138,7 @@ const Watch = () => {
     quality: shouldUseContentProtection && subscriptionStatus?.tier === 'enterprise' ? 'hd' : 'standard',
     maxUses: 10,
     videoDuration: videoDuration || undefined,
-    gcsPath: undefined,
+    gcsPath: video?.gcsPath, // Pass the GCS path from the video record
     onUnauthorizedAccess: handleUnauthorizedAccess,
     onProtectionViolation: handleProtectionViolation,
     onUrlRefresh: handleUrlRefresh
