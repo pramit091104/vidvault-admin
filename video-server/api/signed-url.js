@@ -326,13 +326,31 @@ export default async function handler(req, res) {
       });
     }
 
-    // Generate proxy URL instead of signed URL
+    // Generate secure token for stream access
     const gcsFilePath = foundFile.name;
+    const timestamp = Date.now();
+    const secret = process.env.STREAM_SECRET || 'default-secret-change-in-production';
+    
+    // Create signature
+    const crypto = await import('crypto');
+    const signature = crypto.createHmac('sha256', secret)
+      .update(`${gcsFilePath}:${timestamp}`)
+      .digest('hex');
+
+    // Create access token
+    const tokenData = {
+      path: gcsFilePath,
+      timestamp: timestamp,
+      signature: signature
+    };
+    const token = Buffer.from(JSON.stringify(tokenData)).toString('base64');
+
+    // Generate proxy URL with token
     const backendUrl = process.env.BACKEND_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:3001';
-    const proxyUrl = `${backendUrl}/api/stream-video?path=${encodeURIComponent(gcsFilePath)}`;
+    const proxyUrl = `${backendUrl}/api/stream-video?path=${encodeURIComponent(gcsFilePath)}&token=${encodeURIComponent(token)}`;
     const expiresAt = Date.now() + 60 * 60 * 1000; // 1 hour
 
-    console.log('Returning proxy URL for video streaming');
+    console.log('Returning secure proxy URL for video streaming');
     res.json({ signedUrl: proxyUrl, expiresAt: new Date(expiresAt).toISOString() });
 
   } catch (error) {

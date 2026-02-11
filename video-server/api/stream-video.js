@@ -41,11 +41,88 @@ const initStorage = () => {
   }
 };
 
+// Initialize Firebase Admin for token verification
+let db = null;
+const initFirebase = () => {
+  if (db) return db;
+
+  try {
+    if (getApps().length === 0) {
+      let serviceAccount;
+      if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+        serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      } else if (process.env.GCS_CREDENTIALS) {
+        serviceAccount = JSON.parse(process.env.GCS_CREDENTIALS);
+      }
+
+      if (serviceAccount && serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
+
+      if (serviceAccount) {
+        initializeApp({
+          credential: cert(serviceAccount)
+        });
+      }
+    }
+
+    db = getFirestore();
+    return db;
+  } catch (error) {
+    console.error('Error initializing Firebase Admin:', error);
+    return null;
+  }
+};
+
+// Simple token-based access control
+const validateStreamAccess = async (gcsPath, token) => {
+  if (!token) {
+    return { valid: false, reason: 'No access token provided' };
+  }
+
+  try {
+    // Decode the token (base64 encoded JSON)
+    const decoded = JSON.parse(Buffer.from(token, 'base64').toString('utf-8'));
+    
+    // Validate token structure
+    if (!decoded.path || !decoded.timestamp || !decoded.signature) {
+      return { valid: false, reason: 'Invalid token structure' };
+    }
+
+    // Verify path matches
+    if (decoded.path !== gcsPath) {
+      return { valid: false, reason: 'Token path mismatch' };
+    }
+
+    // Check token expiry (1 hour validity)
+    const tokenAge = Date.now() - decoded.timestamp;
+    if (tokenAge > 60 * 60 * 1000) {
+      return { valid: false, reason: 'Token expired' };
+    }
+
+    // Verify signature (simple HMAC-like check)
+    const secret = process.env.STREAM_SECRET || 'default-secret-change-in-production';
+    const expectedSignature = require('crypto')
+      .createHmac('sha256', secret)
+      .update(`${decoded.path}:${decoded.timestamp}`)
+      .digest('hex');
+
+    if (decoded.signature !== expectedSignature) {
+      return { valid: false, reason: 'Invalid signature' };
+    }
+
+    return { valid: true };
+  } catch (error) {
+    console.error('Token validation error:', error);
+    return { valid: false, reason: 'Token validation failed' };
+  }
+};
+
 export default async function handler(req, res) {
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type');
+  res.setHeader('Access-Control-Allow-Headers', 'Range, Content-Type, Authorization');
   res.setHeader('Access-Control-Expose-Headers', 'Content-Length, Content-Range, Accept-Ranges');
 
   if (req.method === 'OPTIONS') {
@@ -63,10 +140,17 @@ export default async function handler(req, res) {
       return res.status(503).json({ error: 'Storage unavailable' });
     }
 
-    const { path: gcsPath } = req.query;
+    const { path: gcsPath, token } = req.query;
 
     if (!gcsPath) {
       return res.status(400).json({ error: 'path parameter is required' });
+    }
+
+    // Validate access token
+    const accessCheck = await validateStreamAccess(gcsPath, token);
+    if (!accessCheck.valid) {
+      console.warn('Unauthorized stream access attempt:', { gcsPath, reason: accessCheck.reason });
+      return res.status(403).json({ error: 'Access denied', reason: accessCheck.reason });
     }
 
     console.log('Streaming video from:', gcsPath);
