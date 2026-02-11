@@ -1,0 +1,82 @@
+SECURITY CHECKLIST - Files with Exposed Credentials
+====================================================
+
+⚠️ CRITICAL: These files contain sensitive credentials and should NEVER be committed to Git:
+
+1. ENVIRONMENT FILES (.env files):
+   ✅ video-server/.env - Contains:
+      - GCS_CREDENTIALS (private key)
+      - RAZORPAY_KEY_SECRET
+      - RAZORPAY_WEBHOOK_SECRET
+      - GMAIL_APP_PASSWORD
+   
+   ✅ .env.vercel - Contains:
+      - GCS_CREDENTIALS (private key)
+      - RAZORPAY_KEY_SECRET
+   
+   ✅ .env.security-audit.md
+
+2. CREDENTIAL FILES:
+   ✅ RENDER_GCS_CREDENTIALS.txt
+   ✅ gcs-key.json
+
+3. DEBUG/TEST SCRIPTS:
+   ✅ get-render-credentials.js
+   ✅ verify-fix.js
+   ✅ test-render-upload.js
+   ✅ test-render-debug.js
+
+4. DOCUMENTATION (may contain examples with credentials):
+   ✅ All .md files (except README.md)
+
+STATUS: ✅ All files are now in .gitignore
+
+WHAT'S PROTECTED IN .gitignore:
+================================
+- .env
+- .env.*
+- !.env.example (this is safe to commit)
+- .env.vercel
+- .env.security-audit.md
+- gcs-key.json
+- *.md (except README.md)
+- RENDER_GCS_CREDENTIALS.txt
+- get-render-credentials.js
+- verify-fix.js
+- test-render-*.js
+
+BEFORE COMMITTING:
+==================
+1. Run: git status
+2. Verify none of these files appear
+3. If they do, run: git rm --cached <filename>
+4. Then commit
+
+CREDENTIALS TO ROTATE (if already exposed):
+===========================================
+If any of these were committed to Git, you MUST rotate them:
+
+1. GCS Service Account Key:
+   - Go to Google Cloud Console
+   - IAM & Admin → Service Accounts
+   - Delete old key, create new one
+   - Update in Render/Railway environment variables
+
+2. Razorpay Keys:
+   - Go to Razorpay Dashboard
+   - Settings → API Keys
+   - Regenerate keys
+   - Update in environment variables
+
+3. Gmail App Password:
+   - Go to Google Account
+   - Security → App Passwords
+   - Revoke old password
+   - Generate new one
+   - Update in environment variables
+
+4. Razorpay Webhook Secret:
+   - Go to Razorpay Dashboard
+   - Settings → Webhooks
+   - Regenerate secret
+   - Update in environment variables
