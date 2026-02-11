@@ -43,6 +43,8 @@ import { PaginationHelper, paginationMiddleware, sendPaginatedResponse } from '.
 import { messageQueue, queueEmail, queueNotification } from './middleware/messageQueue.js';
 import urlObfuscation from './middleware/urlObfuscation.js';
 import networkProtection from './middleware/networkTabProtection.js';
+import hlsStream from './api/hls/stream.js';
+import hlsTranscode from './api/hls/transcode.js';
 
 // ES module compatibility
 const __filename = fileURLToPath(import.meta.url);
@@ -642,6 +644,14 @@ app.post('/api/system/test-email', strictLimiter, async (req, res) => {
 });
 
 // --- Endpoints ---
+
+// --- HLS Streaming Endpoints ---
+app.post('/api/hls/transcode', apiLimiter, hlsTranscode.transcodeVideo);
+app.get('/api/hls/status/:videoId', apiLimiter, hlsTranscode.checkTranscodeStatus);
+app.post('/api/hls/generate-session', apiLimiter, hlsStream.generateHLSSession);
+app.get('/api/hls/playlist/:sessionId/:playlistName', hlsStream.servePlaylist);
+app.get('/api/hls/segment/:sessionId/:segmentName', hlsStream.serveSegment);
+app.get('/api/hls/key/:sessionId', hlsStream.serveKey);
 
 // Video compression endpoints
 app.post('/api/video/analyze', upload.single('video'), async (req, res) => {
