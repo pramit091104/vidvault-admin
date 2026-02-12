@@ -1,0 +1,51 @@
+services:
+  # HLS Transcoding Worker (as Web Service for free tier)
+  - type: web
+    name: hls-transcoding-worker
+    runtime: docker
+    dockerfilePath: ./video-server/Dockerfile.worker
+    dockerContext: ./video-server
+    plan: free # Free tier available for web services
+    region: oregon # Change to your preferred region
+    branch: main # Change to your default branch
+    
+    envVars:
+      - key: NODE_ENV
+        value: production
+      
+      - key: PORT
+        value: 10000
+      
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: hls-worker-redis
+          property: connectionString
+      
+      - key: GCS_PROJECT_ID
+        sync: false # Set manually in Render dashboard
+      
+      - key: GCS_BUCKET_NAME
+        sync: false # Set manually in Render dashboard
+      
+      - key: GCS_CREDENTIALS
+        sync: false # Set manually in Render dashboard
+      
+      - key: LOG_LEVEL
+        value: info
+    
+    # Health check
+    healthCheckPath: /health
+    
+    # Auto-deploy on push
+    autoDeploy: true
+
+  # Redis Instance for Job Queue
+  - type: redis
+    name: hls-worker-redis
+    plan: starter # 100MB, $10/month (or free for testing)
+    region: oregon # Same region as worker
+    ipAllowList: [] # Allow all IPs (worker needs access)
+    
+    # Persistence
+    maxmemoryPolicy: noeviction # Don't evict keys when full

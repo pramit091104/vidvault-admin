@@ -204,6 +204,35 @@ async function handleSimpleUpload(req, res) {
         console.error('❌ Failed to increment upload count:', error);
       }
 
+      // Automatically queue HLS transcoding
+      let hlsTranscodingQueued = false;
+      try {
+        const { createClient } = await import('redis');
+        const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+        const redisClient = createClient({ url: redisUrl });
+        await redisClient.connect();
+
+        const job = {
+          videoId: uploadId,
+          gcsPath: filePath,
+          userId,
+          queuedAt: new Date().toISOString()
+        };
+
+        await redisClient.lPush('transcode:queue', JSON.stringify(job));
+        await redisClient.set(`transcode:${uploadId}`, JSON.stringify({
+          videoId: uploadId,
+          status: 'queued',
+          queuedAt: job.queuedAt
+        }), { EX: 86400 });
+
+        await redisClient.quit();
+        hlsTranscodingQueued = true;
+        console.log(`🎬 HLS transcoding queued for: ${uploadId}`);
+      } catch (error) {
+        console.error('❌ Failed to queue HLS transcoding:', error);
+      }
+
       // Generate signed URL (valid for 7 days)
       const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
       const [signedUrl] = await file.getSignedUrl({
@@ -226,6 +255,12 @@ async function handleSimpleUpload(req, res) {
           tier: validation.subscription.tier,
           uploadsUsed: validation.subscription.videoUploadsUsed + 1,
           maxUploads: validation.subscription.maxVideoUploads
+        },
+        hlsTranscoding: {
+          queued: hlsTranscodingQueued,
+          message: hlsTranscodingQueued 
+            ? 'Video will be automatically transcoded to HLS format'
+            : 'Upload successful, but automatic transcoding failed. You can manually trigger transcoding later.'
         }
       });
     } catch (error) {

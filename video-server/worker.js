@@ -9,6 +9,7 @@
  */
 
 import dotenv from 'dotenv';
+import express from 'express';
 import { Storage } from '@google-cloud/storage';
 import HLSTranscoder from './services/hlsTranscoder.js';
 import { createClient } from 'redis';
@@ -277,6 +278,44 @@ async function startWorker() {
   }
 
   success('Worker initialized successfully');
+
+  // Start HTTP server for Render health checks
+  const app = express();
+  const PORT = process.env.PORT || 3001;
+
+  app.get('/', (req, res) => {
+    res.json({
+      status: 'running',
+      service: 'HLS Transcoding Worker',
+      uptime: process.uptime(),
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  app.get('/health', (req, res) => {
+    res.json({
+      status: 'healthy',
+      redis: redisClient?.isOpen ? 'connected' : 'disconnected',
+      gcs: bucket ? 'initialized' : 'not initialized'
+    });
+  });
+
+  app.get('/stats', async (req, res) => {
+    try {
+      const queueLength = await redisClient.lLen('transcode:queue');
+      res.json({
+        queueLength,
+        uptime: process.uptime()
+      });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.listen(PORT, () => {
+    success(`HTTP server listening on port ${PORT}`);
+  });
+
   info('Waiting for transcode jobs...\n');
 
   // Listen for jobs

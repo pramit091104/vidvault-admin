@@ -210,7 +210,8 @@ async function handleFinalizeUpload(req, res) {
     return res.status(401).json({ error: 'Unauthorized: Invalid token' });
   }
 
-  const { gcsPath, metadata } = req.body;
+  const userId = decodedToken.uid;
+  const { gcsPath, metadata, videoId } = req.body;
 
   if (!gcsPath) {
     return res.status(400).json({ error: 'Missing gcsPath' });
@@ -218,12 +219,64 @@ async function handleFinalizeUpload(req, res) {
 
   console.log(`✅ Upload finalized for: ${gcsPath}`);
 
-  res.status(200).json({
-    success: true,
-    gcsPath: gcsPath,
-    finalizedAt: new Date().toISOString(),
-    metadata: metadata
-  });
+  // Automatically queue HLS transcoding
+  try {
+    const { queueTranscode } = await import('../hls/queue.js');
+    
+    // Create a mock request object for queueTranscode
+    const queueReq = {
+      headers: { authorization: authHeader },
+      body: {
+        videoId: videoId || gcsPath.split('/').pop().split('.')[0],
+        gcsPath: gcsPath
+      }
+    };
+
+    // Create a mock response object to capture the result
+    let queueResult = null;
+    const queueRes = {
+      status: (code) => ({
+        json: (data) => {
+          queueResult = { statusCode: code, data };
+        }
+      }),
+      json: (data) => {
+        queueResult = { statusCode: 200, data };
+      }
+    };
+
+    // Queue the transcode job
+    await queueTranscode(queueReq, queueRes);
+
+    console.log(`🎬 HLS transcoding queued for: ${videoId || gcsPath}`);
+
+    res.status(200).json({
+      success: true,
+      gcsPath: gcsPath,
+      finalizedAt: new Date().toISOString(),
+      metadata: metadata,
+      hlsTranscoding: {
+        queued: queueResult?.statusCode === 200,
+        videoId: videoId || gcsPath.split('/').pop().split('.')[0],
+        message: 'Video will be automatically transcoded to HLS format'
+      }
+    });
+  } catch (error) {
+    console.error('❌ Failed to queue HLS transcoding:', error);
+    
+    // Still return success for upload, but note transcoding failed
+    res.status(200).json({
+      success: true,
+      gcsPath: gcsPath,
+      finalizedAt: new Date().toISOString(),
+      metadata: metadata,
+      hlsTranscoding: {
+        queued: false,
+        error: 'Failed to queue HLS transcoding',
+        message: 'Upload successful, but automatic transcoding failed. You can manually trigger transcoding later.'
+      }
+    });
+  }
 }
 
 async function handleUploadStatus(req, res) {
